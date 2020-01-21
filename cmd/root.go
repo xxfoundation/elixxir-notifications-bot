@@ -21,12 +21,11 @@ import (
 )
 
 var (
-	cfgFile              string
-	verbose              bool
-	noTLS                bool
-	NotificationParams   Params
-	loopDelay            int
-	disablePermissioning bool
+	cfgFile            string
+	verbose            bool
+	noTLS              bool
+	NotificationParams Params
+	loopDelay          int
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -112,9 +111,6 @@ func init() {
 
 	rootCmd.Flags().BoolVar(&noTLS, "noTLS", false,
 		"Runs without TLS enabled")
-
-	rootCmd.Flags().BoolVarP(&disablePermissioning, "disablePermissioning", "",
-		false, "Disables registration server checking for ndf updates")
 
 	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 5,
 		"Set the delay between notification loops (in seconds)")
