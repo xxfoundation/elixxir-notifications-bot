@@ -7,7 +7,7 @@
 package main
 
 import (
-	"gitlab.com/elixxir/registration/cmd"
+	"gitlab.com/elixxir/notifications-bot/cmd"
 )
 
 func main() {

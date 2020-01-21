@@ -10,33 +10,22 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/fsnotify/fsnotify"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/primitives/ndf"
-	"gitlab.com/elixxir/registration/database"
+	"gitlab.com/elixxir/notifications-bot/database"
 	"os"
 	"path"
-	"strconv"
-	"strings"
-	"sync"
 )
 
 var (
 	cfgFile              string
 	verbose              bool
-	showVer              bool
 	noTLS                bool
-	RegistrationCodes    []string
-	RegParams            Params
-	ClientRegCodes       []string
-	udbParams            ndf.UDB
-	clientVersion        string
-	clientVersionLock    sync.RWMutex
+	NotificationParams   Params
+	loopDelay            int
 	disablePermissioning bool
 )
 
@@ -47,11 +36,6 @@ var rootCmd = &cobra.Command{
 	Long:  `This server provides registration functions on cMix`,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if showVer {
-			printVersion()
-			return
-		}
-
 		if verbose {
 			err := os.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", "info")
 			if err != nil {
@@ -64,63 +48,37 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
-		cmixMap := viper.GetStringMapString("groups.cmix")
-		e2eMap := viper.GetStringMapString("groups.e2e")
-
-		cmix := toGroup(cmixMap)
-		e2e := toGroup(e2eMap)
-
 		// Parse config file options
 		certPath := viper.GetString("certPath")
 		keyPath := viper.GetString("keyPath")
 		localAddress := fmt.Sprintf("0.0.0.0:%d", viper.GetInt("port"))
-		ndfOutputPath := viper.GetString("ndfOutputPath")
-		setClientVersion(viper.GetString("clientVersion"))
 		ipAddr := viper.GetString("publicAddress")
-
 		publicAddress := fmt.Sprintf("%s:%d", ipAddr, viper.GetInt("port"))
 
 		// Set up database connection
-		database.PermissioningDb = database.NewDatabase(
+		database.NotificationsDb = database.NewDatabase(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
 			viper.GetString("dbName"),
 			viper.GetString("dbAddress"),
 		)
 
-		// Populate Node registration codes into the database
-		RegistrationCodes = viper.GetStringSlice("registrationCodes")
-		database.PopulateNodeRegistrationCodes(RegistrationCodes)
-
-		ClientRegCodes = viper.GetStringSlice("clientRegCodes")
-		database.PopulateClientRegistrationCodes(ClientRegCodes, 1000)
-
-		//Fixme: Do we want the udbID to be specified in the yaml?
-		tmpSlice := make([]byte, 32)
-
-		tmpSlice[len(tmpSlice)-1] = byte(viper.GetInt("udbID"))
-		udbParams.ID = tmpSlice
 		// Populate params
-		RegParams = Params{
+		NotificationParams = Params{
 			Address:       localAddress,
 			CertPath:      certPath,
 			KeyPath:       keyPath,
-			NdfOutputPath: ndfOutputPath,
-			cmix:          cmix,
-			e2e:           e2e,
 			publicAddress: publicAddress,
 		}
-		jww.INFO.Println("Starting Permissioning")
-		jww.INFO.Println("Starting User Registration")
-		// Start registration server
-		impl := StartRegistration(RegParams)
+		jww.INFO.Println("Starting Notifications")
 
-		// Begin the thread which handles the completion of node registration
-		go nodeRegistrationCompleter(impl)
+		impl := StartNotifications(NotificationParams)
+
+		// Start notification loop
+		go RunNotificationLoop(impl, loopDelay)
 
 		// Wait forever to prevent process from ending
 		select {}
-
 	},
 }
 
@@ -148,8 +106,6 @@ func init() {
 	// will be global for your application.
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false,
 		"Show verbose logs for debugging")
-	rootCmd.Flags().BoolVarP(&showVer, "version", "V", false,
-		"Show version information")
 
 	rootCmd.Flags().StringVarP(&cfgFile, "config", "c",
 		"", "Sets a custom config file path")
@@ -159,6 +115,9 @@ func init() {
 
 	rootCmd.Flags().BoolVarP(&disablePermissioning, "disablePermissioning", "",
 		false, "Disables registration server checking for ndf updates")
+
+	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 5,
+		"Set the delay between notification loops (in seconds)")
 
 }
 
@@ -209,42 +168,8 @@ func initConfig() {
 			jww.ERROR.Printf("Unable to parse config file (%s): %+v", cfgFile, err)
 			validConfig = false
 		}
-		viper.OnConfigChange(updateClientVersion)
 		viper.WatchConfig()
 	}
-}
-
-func updateClientVersion(in fsnotify.Event) {
-	newVersion := viper.GetString("clientVersion")
-	err := validateVersion(newVersion)
-	if err != nil {
-		panic(err)
-	}
-	setClientVersion(newVersion)
-}
-
-func setClientVersion(version string) {
-	clientVersionLock.Lock()
-	clientVersion = version
-	clientVersionLock.Unlock()
-}
-
-func validateVersion(versionString string) error {
-	// If a version string has more than 2 dots in it, anything after the first
-	// 2 dots is considered to be part of the patch version
-	versions := strings.SplitN(versionString, ".", 3)
-	if len(versions) != 3 {
-		return errors.New("Client version string must contain a major, minor, and patch version separated by \".\"")
-	}
-	_, err := strconv.Atoi(versions[0])
-	if err != nil {
-		return errors.New("Major client version couldn't be parsed as integer")
-	}
-	_, err = strconv.Atoi(versions[1])
-	if err != nil {
-		return errors.New("Minor client version couldn't be parsed as integer")
-	}
-	return nil
 }
 
 // initLog initializes logging thresholds and the log path.

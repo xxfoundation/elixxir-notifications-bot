@@ -15,6 +15,7 @@ import (
 	"sync"
 )
 
+// TODO: implement db operations
 // Struct implementing the Database Interface with an underlying DB
 type DatabaseImpl struct {
 	db *pg.DB // Stored database connection
@@ -22,81 +23,15 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
-	client map[string]*RegistrationCode
-	node   map[string]*NodeInformation
-	user   map[string]bool
-	mut    sync.Mutex
+	user map[string]bool
+	mut  sync.Mutex
 }
 
 // Global variable for database interaction
-var PermissioningDb Storage
-
-type nodeRegistration interface {
-	// If Node registration code is valid, add Node information
-	InsertNode(id []byte, code, serverAddr, serverCert,
-		gatewayAddress, gatewayCert string) error
-	// Insert Node registration code into the database
-	InsertNodeRegCode(code string) error
-	// Count the number of Nodes currently registered
-	CountRegisteredNodes() (int, error)
-	// Get Node information for the given Node registration code
-	GetNode(code string) (*NodeInformation, error)
-}
-
-type clientRegistration interface {
-	// Inserts Client registration code with given number of uses
-	InsertClientRegCode(code string, uses int) error
-	// If Client registration code is valid, decrements remaining uses
-	UseCode(code string) error
-	// Gets User from the database
-	GetUser(publicKey string) (*User, error)
-	// Inserts User into the database
-	InsertUser(publicKey string) error
-}
+var NotificationsDb Storage
 
 // Interface database storage operations
 type Storage struct {
-	clientRegistration
-	nodeRegistration
-}
-
-// Struct representing a RegistrationCode table in the database
-type RegistrationCode struct {
-	// Overwrite table name
-	tableName struct{} `sql:"registration_codes,alias:registration_codes"`
-
-	// Registration code acts as the primary key
-	Code string `sql:",pk"`
-	// Remaining uses for the RegistrationCode
-	RemainingUses int
-}
-
-// Struct representing the Node Information table in the database
-type NodeInformation struct {
-	// Overwrite table name
-	tableName struct{} `sql:"nodes,alias:nodes"`
-
-	// Registration code acts as the primary key
-	Code string `sql:",pk"`
-	// Node ID
-	Id []byte
-	// Server IP address
-	ServerAddress string
-	// Gateway IP address
-	GatewayAddress string
-	// Node TLS public certificate in PEM string format
-	NodeCertificate string
-	// Gateway TLS public certificate in PEM string format
-	GatewayCertificate string
-}
-
-// Struct representing the User table in the database
-type User struct {
-	// Overwrite table name
-	tableName struct{} `sql:"users,alias:users"`
-
-	// User TLS public certificate in PEM string format
-	PublicKey string `sql:",pk"`
 }
 
 // Initialize the Database interface with database backend
@@ -118,34 +53,17 @@ func NewDatabase(username, password, database, address string) Storage {
 		// in the event there is a database error
 		jww.ERROR.Printf("Unable to initialize database backend: %+v", err)
 		jww.INFO.Println("Map backend initialized successfully!")
-		return Storage{
-			clientRegistration: clientRegistration(&MapImpl{
-				client: make(map[string]*RegistrationCode),
-				user:   make(map[string]bool),
-			}),
-			nodeRegistration: nodeRegistration(&MapImpl{
-				node: make(map[string]*NodeInformation),
-			})}
+		return Storage{}
 	}
-
-	regCodeDb := &DatabaseImpl{
-		db: db,
-	}
-	nodeMap := nodeRegistration(&MapImpl{
-		node: make(map[string]*NodeInformation),
-	})
 
 	jww.INFO.Println("Database backend initialized successfully!")
-	return Storage{
-		clientRegistration: regCodeDb,
-		nodeRegistration:   nodeMap,
-	}
+	return Storage{}
 
 }
 
 // Create the database schema
 func createSchema(db *pg.DB) error {
-	for _, model := range []interface{}{&RegistrationCode{}, &User{}} {
+	for _, model := range []interface{}{} {
 		err := db.CreateTable(model, &orm.CreateTableOptions{
 			// Ignore create table if already exists?
 			IfNotExists: true,
@@ -165,26 +83,4 @@ func createSchema(db *pg.DB) error {
 	}
 	// No error, return nil
 	return nil
-}
-
-// Adds Client registration codes to the database
-func PopulateClientRegistrationCodes(codes []string, uses int) {
-	for _, code := range codes {
-		err := PermissioningDb.InsertClientRegCode(code, uses)
-		if err != nil {
-			jww.ERROR.Printf("Unable to populate Client registration code: %+v",
-				err)
-		}
-	}
-}
-
-// Adds Node registration codes to the database
-func PopulateNodeRegistrationCodes(codes []string) {
-	for _, code := range codes {
-		err := PermissioningDb.InsertNodeRegCode(code)
-		if err != nil {
-			jww.ERROR.Printf("Unable to populate Node registration code: %+v",
-				err)
-		}
-	}
 }
