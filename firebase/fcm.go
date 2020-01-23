@@ -12,14 +12,18 @@ import (
 	"google.golang.org/api/option"
 )
 
+// function types for use in notificationsbot struct
 type SetupFunc func(string) (*messaging.Client, context.Context, error)
 type SendFunc func(FBSender, context.Context, string) (string, error)
 
+// NotificationsBot is a struct which holds the functions to setup the messaging app and sending notifications
+// Using a struct in this manner allows us to properly unit test the NotifyUser function
 type NotificationsBot struct {
 	SetupMessagingApp SetupFunc
 	SendNotification  SendFunc
 }
 
+// This interface matches the send function in the messaging app, allowing us to unit test sendNotification
 type FBSender interface {
 	Send(context.Context, *messaging.Message) (string, error)
 }
