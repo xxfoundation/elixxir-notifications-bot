@@ -15,7 +15,7 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/notifications-bot/database"
+	"gitlab.com/elixxir/notifications-bot/storage"
 	"os"
 	"path"
 )
@@ -55,7 +55,7 @@ var rootCmd = &cobra.Command{
 		publicAddress := fmt.Sprintf("%s:%d", ipAddr, viper.GetInt("port"))
 
 		// Set up database connection
-		database.NotificationsDb = database.NewDatabase(
+		storage.NotificationsBackend = storage.NewDatabase(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
 			viper.GetString("dbName"),
