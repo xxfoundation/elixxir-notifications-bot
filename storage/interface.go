@@ -28,7 +28,7 @@ type MapImpl struct {
 // Global variable for backend interaction
 var NotificationsBackend *Storage
 
-// Interface database storage operations
+// Interface for backend storage operations
 type Storage interface {
 	// Obtain User from backend by primary key
 	GetUser(userId string) (*User, error)
