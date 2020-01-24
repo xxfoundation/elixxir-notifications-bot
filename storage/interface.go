@@ -4,9 +4,9 @@
 // All rights reserved.                                                        /
 ////////////////////////////////////////////////////////////////////////////////
 
-// Handles high level database control
+// Handles high level database interfaces, and structures
 
-package database
+package storage
 
 import (
 	"github.com/go-pg/pg"
@@ -15,7 +15,6 @@ import (
 	"sync"
 )
 
-// TODO: implement db operations
 // Struct implementing the Database Interface with an underlying DB
 type DatabaseImpl struct {
 	db *pg.DB // Stored database connection
@@ -23,19 +22,36 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
-	user map[string]bool
-	mut  sync.Mutex
+	users sync.Map
 }
 
-// Global variable for database interaction
-var NotificationsDb Storage
+// Global variable for backend interaction
+var NotificationsBackend *Storage
 
 // Interface database storage operations
-type Storage struct {
+type Storage interface {
+	// Obtain User from backend by primary key
+	GetUser(userId string) (*User, error)
+	// Delete User from backend by primary key
+	DeleteUser(userId string) error
+	// Insert or Update User into backend
+	UpsertUser(user *User) error
+}
+
+// Structure representing a User in the database
+type User struct {
+	// Overwrite table name
+	tableName struct{} `sql:"users,alias:users"`
+
+	// User ID string
+	Id string
+
+	// User notifications token
+	Token string
 }
 
 // Initialize the Database interface with database backend
-func NewDatabase(username, password, database, address string) Storage {
+func NewDatabase(username, password, database, address string) *Storage {
 	// Create the database connection
 	db := pg.Connect(&pg.Options{
 		User:         username,
@@ -48,22 +64,26 @@ func NewDatabase(username, password, database, address string) Storage {
 
 	// Initialize the schema
 	err := createSchema(db)
+	var backend Storage
 	if err != nil {
 		// Return the map-backend interface
 		// in the event there is a database error
 		jww.ERROR.Printf("Unable to initialize database backend: %+v", err)
 		jww.INFO.Println("Map backend initialized successfully!")
-		return Storage{}
+		backend = &MapImpl{}
+	} else {
+		// Return the database-backed interface in the event there is no error
+		jww.INFO.Println("Database backend initialized successfully!")
+		backend = &DatabaseImpl{
+			db: db,
+		}
 	}
-
-	jww.INFO.Println("Database backend initialized successfully!")
-	return Storage{}
-
+	return &backend
 }
 
 // Create the database schema
 func createSchema(db *pg.DB) error {
-	for _, model := range []interface{}{} {
+	for _, model := range []interface{}{&User{}} {
 		err := db.CreateTable(model, &orm.CreateTableOptions{
 			// Ignore create table if already exists?
 			IfNotExists: true,
