@@ -4,7 +4,7 @@
 // All rights reserved.                                                        /
 ////////////////////////////////////////////////////////////////////////////////
 
-// Handles high level database interfaces, and structures
+// Handles high level database interfaces and structures
 
 package storage
 
@@ -38,7 +38,7 @@ type Storage interface {
 	UpsertUser(user *User) error
 }
 
-// Structure representing a User in the database
+// Structure representing a User in the Storage backend
 type User struct {
 	// Overwrite table name
 	tableName struct{} `sql:"users,alias:users"`
@@ -50,7 +50,7 @@ type User struct {
 	Token string
 }
 
-// Initialize the Database interface with database backend
+// Initialize the Storage interface with a proper backend type
 func NewDatabase(username, password, database, address string) *Storage {
 	// Create the database connection
 	db := pg.Connect(&pg.Options{
@@ -62,7 +62,7 @@ func NewDatabase(username, password, database, address string) *Storage {
 		MinIdleConns: 1,
 	})
 
-	// Initialize the schema
+	// Attempt to initialize the schema
 	err := createSchema(db)
 	var backend Storage
 	if err != nil {
