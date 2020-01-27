@@ -65,7 +65,11 @@ var rootCmd = &cobra.Command{
 		}
 		jww.INFO.Println("Starting Notifications")
 
-		impl := notifications.StartNotifications(NotificationParams, noTLS)
+		impl, err := notifications.StartNotifications(NotificationParams, noTLS)
+		if err != nil {
+			err = fmt.Errorf("Failed to start notifications server: %+v", err)
+			panic(err)
+		}
 
 		impl.Storage = storage.NewDatabase(
 			viper.GetString("dbUsername"),
@@ -75,7 +79,8 @@ var rootCmd = &cobra.Command{
 		)
 
 		// Start notification loop
-		go notifications.RunNotificationLoop(firebaseCredFile, impl, loopDelay)
+		killChan := make(chan struct{})
+		go notifications.RunNotificationLoop(firebaseCredFile, impl, loopDelay, killChan)
 
 		// Wait forever to prevent process from ending
 		select {}
@@ -116,7 +121,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 5,
 		"Set the delay between notification loops (in seconds)")
 
-	rootCmd.Flags().StringVarP(&firebaseCredFile, "firebaseCredentialFilePath", "firebaseCreds",
+	rootCmd.Flags().StringVarP(&firebaseCredFile, "firebaseCredentialFilePath", "",
 		"", "Points to the firebase credentials file")
 
 }

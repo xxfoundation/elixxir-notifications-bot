@@ -26,6 +26,13 @@ func TestSendNotification(t *testing.T) {
 	}
 }
 
+func TestNewFirebaseComm(t *testing.T) {
+	comm := NewFirebaseComm()
+	if comm.SendNotification == nil || comm.SetupMessagingApp == nil {
+		t.Error("Failed to set functions in comm")
+	}
+}
+
 /*
  * This function can't be unit tested without mocking firebase's infrastructure to a degree that is counterproductive
 func TestSetupMessagingApp(t *testing.T) {

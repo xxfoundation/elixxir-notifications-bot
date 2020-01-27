@@ -23,9 +23,11 @@ import (
 	"time"
 )
 
-type PollFunc func(*connect.Host, *notificationBot.Comms) ([]string, error)
+// Function type definitions for the main operations (poll and notify)
+type PollFunc func(*connect.Host, RequestInterface) ([]string, error)
 type NotifyFunc func(string, string, *firebase.FirebaseComm, storage.Storage) (string, error)
 
+// Params struct holds info passed in for configuration
 type Params struct {
 	Address       string
 	CertPath      string
@@ -33,20 +35,33 @@ type Params struct {
 	PublicAddress string
 }
 
+// Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
 	Comms            *notificationBot.Comms
 	Storage          storage.Storage
 	notificationCert *x509.Certificate
 	notificationKey  *rsa.PrivateKey
 	certFromFile     string
-	gatewayHost      *connect.Host // TODO: populate this field
-	pollFunc         PollFunc      // TODO: implement function which polls gateway for UID
-	notifyFunc       NotifyFunc    // TODO: implement function which notifies user with given UID
+	gatewayHost      *connect.Host // TODO: populate this field from ndf
+	pollFunc         PollFunc
+	notifyFunc       NotifyFunc
 }
 
-func RunNotificationLoop(fbCreds string, impl *Impl, loopDuration int) {
+// Request interface holds the request function from comms, allowing us to unit test polling
+type RequestInterface interface {
+	RequestNotifications(host *connect.Host, message *mixmessages.Ping) (*mixmessages.IDList, error)
+}
+
+// Main function for this repo accepts credentials and an impl
+// loops continuously, polling for notifications and notifying the relevant users
+func RunNotificationLoop(fbCreds string, impl *Impl, loopDuration int, killChan chan struct{}) {
 	fc := firebase.NewFirebaseComm()
 	for {
+		select {
+		case <-killChan:
+			return
+		default:
+		}
 		// TODO: fill in body of main loop, should poll gateway and send relevant notifications to firebase
 		UIDs, err := impl.pollFunc(impl.gatewayHost, impl.Comms)
 		if err != nil {
@@ -64,7 +79,8 @@ func RunNotificationLoop(fbCreds string, impl *Impl, loopDuration int) {
 	}
 }
 
-func StartNotifications(params Params, noTLS bool) *Impl {
+// StartNotifications creates an Impl from the information passed in
+func StartNotifications(params Params, noTLS bool) (*Impl, error) {
 	impl := &Impl{}
 
 	var cert, key []byte
@@ -73,11 +89,11 @@ func StartNotifications(params Params, noTLS bool) *Impl {
 	// Read in private key
 	key, err = utils.ReadFile(params.KeyPath)
 	if err != nil {
-		jww.ERROR.Printf("failed to read key at %+v: %+v", params.KeyPath, err)
+		return nil, errors.Errorf("failed to read key at %+v: %+v", params.KeyPath, err)
 	}
 	impl.notificationKey, err = rsa.LoadPrivateKeyFromPem(key)
 	if err != nil {
-		jww.ERROR.Printf("Failed to parse notifications server key: %+v. "+
+		return nil, errors.Errorf("Failed to parse notifications server key: %+v. "+
 			"NotificationsKey is %+v",
 			err, impl.notificationKey)
 	}
@@ -86,13 +102,13 @@ func StartNotifications(params Params, noTLS bool) *Impl {
 		// Read in TLS keys from files
 		cert, err = utils.ReadFile(params.CertPath)
 		if err != nil {
-			jww.ERROR.Printf("failed to read certificate at %+v: %+v", params.CertPath, err)
+			return nil, errors.Errorf("failed to read certificate at %+v: %+v", params.CertPath, err)
 		}
 		// Set globals for notification server
 		impl.certFromFile = string(cert)
 		impl.notificationCert, err = tls.LoadCertificate(string(cert))
 		if err != nil {
-			jww.ERROR.Printf("Failed to parse notifications server cert: %+v. "+
+			return nil, errors.Errorf("Failed to parse notifications server cert: %+v. "+
 				"Notifications cert is %+v",
 				err, impl.notificationCert)
 		}
@@ -101,9 +117,10 @@ func StartNotifications(params Params, noTLS bool) *Impl {
 	impl.pollFunc = pollForNotifications
 	impl.notifyFunc = notifyUser
 
-	return impl
+	return impl, nil
 }
 
+// NewImplementation
 func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	impl := notificationBot.NewImplementation()
 
@@ -138,7 +155,9 @@ func notifyUser(uid string, serviceKeyPath string, fc *firebase.FirebaseComm, db
 	return resp, nil
 }
 
-func pollForNotifications(h *connect.Host, comms *notificationBot.Comms) (strings []string, e error) {
+// pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
+// It retrieves a list of user ids to be notified from the gateway
+func pollForNotifications(h *connect.Host, comms RequestInterface) (strings []string, e error) {
 	users, err := comms.RequestNotifications(h, &mixmessages.Ping{})
 	if err != nil {
 		return nil, errors.Errorf("Failed to retrieve notifications from gateway: %+v", err)
@@ -147,6 +166,7 @@ func pollForNotifications(h *connect.Host, comms *notificationBot.Comms) (string
 	return users.IDs, nil
 }
 
+// RegisterForNotifications is called by the client, and adds a user registration to our database
 func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth) error {
 	// Implement this
 	u := &storage.User{
@@ -160,6 +180,7 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 	return nil
 }
 
+// UnregisterForNotifications is called by the client, and removes a user registration from our database
 func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 	err := nb.Storage.DeleteUser(auth.Sender.GetId())
 	if err != nil {
