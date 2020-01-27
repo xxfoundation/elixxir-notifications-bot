@@ -4,8 +4,6 @@
 // All rights reserved.                                                        /
 ////////////////////////////////////////////////////////////////////////////////
 
-// Handles creating client registration callbacks for hooking into comms library
-
 package notifications
 
 import (
@@ -54,7 +52,7 @@ type RequestInterface interface {
 
 // Main function for this repo accepts credentials and an impl
 // loops continuously, polling for notifications and notifying the relevant users
-func RunNotificationLoop(fbCreds string, impl *Impl, loopDuration int, killChan chan struct{}) {
+func (nb *Impl) RunNotificationLoop(fbCreds string, loopDuration int, killChan chan struct{}) {
 	fc := firebase.NewFirebaseComm()
 	for {
 		select {
@@ -63,13 +61,13 @@ func RunNotificationLoop(fbCreds string, impl *Impl, loopDuration int, killChan 
 		default:
 		}
 		// TODO: fill in body of main loop, should poll gateway and send relevant notifications to firebase
-		UIDs, err := impl.pollFunc(impl.gatewayHost, impl.Comms)
+		UIDs, err := nb.pollFunc(nb.gatewayHost, nb.Comms)
 		if err != nil {
 			jww.ERROR.Printf("Failed to poll gateway for users to notify: %+v", err)
 		}
 
 		for _, id := range UIDs {
-			_, err := impl.notifyFunc(id, fbCreds, fc, impl.Storage)
+			_, err := nb.notifyFunc(id, fbCreds, fc, nb.Storage)
 			if err != nil {
 				jww.ERROR.Printf("Failed to notify user with ID %+v: %+v", id, err)
 			}

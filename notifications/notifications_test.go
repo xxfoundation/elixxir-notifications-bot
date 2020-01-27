@@ -33,7 +33,7 @@ func TestRunNotificationLoop(t *testing.T) {
 		time.Sleep(10 * time.Second)
 		killChan <- struct{}{}
 	}()
-	RunNotificationLoop("", impl, 3, killChan)
+	impl.RunNotificationLoop("", 3, killChan)
 }
 
 // Test notificationbot's notifyuser function

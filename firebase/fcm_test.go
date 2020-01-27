@@ -26,6 +26,7 @@ func TestSendNotification(t *testing.T) {
 	}
 }
 
+// Unit test the NewFirebaseComm method
 func TestNewFirebaseComm(t *testing.T) {
 	comm := NewFirebaseComm()
 	if comm.SendNotification == nil || comm.SetupMessagingApp == nil {

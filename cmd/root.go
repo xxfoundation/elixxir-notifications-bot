@@ -80,7 +80,7 @@ var rootCmd = &cobra.Command{
 
 		// Start notification loop
 		killChan := make(chan struct{})
-		go notifications.RunNotificationLoop(firebaseCredFile, impl, loopDelay, killChan)
+		go impl.RunNotificationLoop(firebaseCredFile, loopDelay, killChan)
 
 		// Wait forever to prevent process from ending
 		select {}
