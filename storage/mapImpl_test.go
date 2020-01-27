@@ -60,17 +60,11 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 	if err != nil {
 		t.Errorf("TestMapImpl_DeleteUser_Happy: function returned error\n\tGot: %s", err)
 	}
-}
 
-// This tests deleting a user that does *not* exist in the database
-func TestMapImpl_DeleteUser_NoUser(t *testing.T) {
-	m := &MapImpl{}
-	u := User{Id:"test", Token:"token"}
-
-	err := m.DeleteUser(u.Id)
-
-	if err == nil {
-		t.Errorf("TestMapImpl_DeleteUser_NoUser: function did not return error")
+	// Try to oad user from map manually
+	_, ok := m.users.Load(u.Id)
+	if ok == true {
+		t.Errorf("TestMapImpl_DeleteUser_Happy: user existed in database after deletion called")
 	}
 }
 
