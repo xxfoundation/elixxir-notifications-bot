@@ -17,7 +17,7 @@ import (
 
 // Struct implementing the Database Interface with an underlying DB
 type DatabaseImpl struct {
-	pg *pg.DB // Stored database connection
+	db *pg.DB // Stored database connection
 }
 
 // Struct implementing the Database Interface with an underlying Map
@@ -75,7 +75,7 @@ func NewDatabase(username, password, database, address string) Storage {
 		// Return the database-backed interface in the event there is no error
 		jww.INFO.Println("Database backend initialized successfully!")
 		backend = &DatabaseImpl{
-			pg: db,
+			db: db,
 		}
 	}
 	return backend
