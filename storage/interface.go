@@ -17,7 +17,7 @@ import (
 
 // Struct implementing the Database Interface with an underlying DB
 type DatabaseImpl struct {
-	db *pg.DB // Stored database connection
+	pg *pg.DB // Stored database connection
 }
 
 // Struct implementing the Database Interface with an underlying Map
@@ -26,7 +26,7 @@ type MapImpl struct {
 }
 
 // Global variable for backend interaction
-var NotificationsBackend *Storage
+var NotificationsBackend Storage
 
 // Interface for backend storage operations
 type Storage interface {
@@ -51,7 +51,7 @@ type User struct {
 }
 
 // Initialize the Storage interface with a proper backend type
-func NewDatabase(username, password, database, address string) *Storage {
+func NewDatabase(username, password, database, address string) Storage {
 	// Create the database connection
 	db := pg.Connect(&pg.Options{
 		User:         username,
@@ -75,10 +75,10 @@ func NewDatabase(username, password, database, address string) *Storage {
 		// Return the database-backed interface in the event there is no error
 		jww.INFO.Println("Database backend initialized successfully!")
 		backend = &DatabaseImpl{
-			db: db,
+			pg: db,
 		}
 	}
-	return &backend
+	return backend
 }
 
 // Create the database schema
