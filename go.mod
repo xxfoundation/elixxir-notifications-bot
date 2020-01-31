@@ -3,10 +3,12 @@ module gitlab.com/elixxir/notifications-bot
 go 1.13
 
 require (
-	cloud.google.com/go/bigquery v1.4.0 // indirect
+	cloud.google.com/go v0.52.0 // indirect
 	cloud.google.com/go/firestore v1.1.1 // indirect
+	cloud.google.com/go/storage v1.5.0 // indirect
 	firebase.google.com/go v3.12.0+incompatible
 	github.com/go-pg/pg v8.0.6+incompatible
+	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20191106031601-ce3c9ade29de // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
@@ -26,10 +28,8 @@ require (
 	gitlab.com/elixxir/crypto v0.0.0-20200108005412-8159c60663f9
 	gitlab.com/elixxir/primitives v0.0.0-20200131183153-e93c6b75019f
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa
-	golang.org/x/sys v0.0.0-20200124204421-9fbb57f87de9 // indirect
-	golang.org/x/tools v0.0.0-20200125223703-d33eef8e6825 // indirect
 	google.golang.org/api v0.15.0
-	google.golang.org/genproto v0.0.0-20200127141224-2548664c049f // indirect
+	google.golang.org/genproto v0.0.0-20200122232147-0452cf42e150 // indirect
 	gopkg.in/ini.v1 v1.51.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 	mellium.im/sasl v0.0.0-20190815210834-e27ea4901008 // indirect
