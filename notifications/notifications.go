@@ -4,6 +4,8 @@
 // All rights reserved.                                                        /
 ////////////////////////////////////////////////////////////////////////////////
 
+// This file contains the main logic for notifications, including the main implementation and core loop
+
 package notifications
 
 import (
@@ -17,6 +19,7 @@ import (
 	"gitlab.com/elixxir/crypto/tls"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/utils"
 	"time"
 )
@@ -114,6 +117,10 @@ func StartNotifications(params Params, noTLS bool) (*Impl, error) {
 
 	impl.pollFunc = pollForNotifications
 	impl.notifyFunc = notifyUser
+
+	handler := NewImplementation(impl)
+
+	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.PublicAddress, handler, cert, key)
 
 	return impl, nil
 }

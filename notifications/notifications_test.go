@@ -84,8 +84,8 @@ func TestStartNotifications(t *testing.T) {
 	}
 
 	params := Params{
-		Address:       "0.0.0.0:4200",
-		PublicAddress: "0.0.0.0:4200",
+		Address:       "0.0.0.0:42010",
+		PublicAddress: "0.0.0.0:42010",
 	}
 
 	n, err := StartNotifications(params, false)
@@ -208,7 +208,7 @@ func getNewImpl() *Impl {
 		Address:       "0.0.0.0:4200",
 		KeyPath:       wd + "/../testutil/cmix.rip.key",
 		CertPath:      wd + "/../testutil/cmix.rip.crt",
-		PublicAddress: "0.0.0.0:4200",
+		PublicAddress: "0.0.0.0:0",
 	}
 	instance, _ := StartNotifications(params, false)
 	return instance
