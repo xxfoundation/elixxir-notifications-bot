@@ -16,9 +16,9 @@ import (
 type SetupFunc func(string) (*messaging.Client, context.Context, error)
 type SendFunc func(FBSender, context.Context, string) (string, error)
 
-// NotificationsBot is a struct which holds the functions to setup the messaging app and sending notifications
+// FirebaseComm is a struct which holds the functions to setup the messaging app and sending notifications
 // Using a struct in this manner allows us to properly unit test the NotifyUser function
-type NotificationsBot struct {
+type FirebaseComm struct {
 	SetupMessagingApp SetupFunc
 	SendNotification  SendFunc
 }
@@ -29,19 +29,19 @@ type FBSender interface {
 }
 
 // Set up a notificationbot object with the proper setup and send functions
-func NewNotificationsBot() *NotificationsBot {
-	return &NotificationsBot{
+func NewFirebaseComm() *FirebaseComm {
+	return &FirebaseComm{
 		SetupMessagingApp: setupMessagingApp,
 		SendNotification:  sendNotification,
 	}
 }
 
 // FOR TESTING USE ONLY: setup a notificationbot object with mocked setup and send funcs
-func NewMockNotificationsBot(t *testing.T, setupFunc SetupFunc, sendFunc SendFunc) *NotificationsBot {
+func NewMockFirebaseComm(t *testing.T, setupFunc SetupFunc, sendFunc SendFunc) *FirebaseComm {
 	if t == nil {
 		panic("This method should only be used in tests")
 	}
-	return &NotificationsBot{
+	return &FirebaseComm{
 		SetupMessagingApp: setupFunc,
 		SendNotification:  sendFunc,
 	}
@@ -82,30 +82,4 @@ func sendNotification(app FBSender, ctx context.Context, token string) (string, 
 		return "", errors.Errorf("Failed to send notification: %+v", err)
 	}
 	return resp, nil
-}
-
-// NotifyUser accepts a UID and service key file path.
-// It handles the logic involved in retrieving a user's token and sending the notification
-func (nb *NotificationsBot) NotifyUser(uid []byte, serviceKeyPath string) (string, error) {
-	// TODO: replace this, should be retreiving token from the database
-	token, err := GetTokenByUID(uid)
-	if err != nil {
-		return "", errors.Errorf("Failed to get token for UID %+v: %+v", uid, err)
-	}
-
-	app, ctx, err := nb.SetupMessagingApp(serviceKeyPath)
-	if err != nil {
-		return "", errors.Errorf("Failed to setup messaging app: %+v", err)
-	}
-
-	resp, err := nb.SendNotification(app, ctx, token)
-	if err != nil {
-		return "", errors.Errorf("Failed to send notification to user with ID %+v: %+v", uid, err)
-	}
-	return resp, nil
-}
-
-// TODO: DELETE TEMP METHOD delete this method once database is finished
-func GetTokenByUID(uid []byte) (string, error) {
-	return string(uid), nil
 }

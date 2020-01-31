@@ -26,6 +26,14 @@ func TestSendNotification(t *testing.T) {
 	}
 }
 
+// Unit test the NewFirebaseComm method
+func TestNewFirebaseComm(t *testing.T) {
+	comm := NewFirebaseComm()
+	if comm.SendNotification == nil || comm.SetupMessagingApp == nil {
+		t.Error("Failed to set functions in comm")
+	}
+}
+
 /*
  * This function can't be unit tested without mocking firebase's infrastructure to a degree that is counterproductive
 func TestSetupMessagingApp(t *testing.T) {
@@ -36,19 +44,3 @@ func TestSetupMessagingApp(t *testing.T) {
 	}
 }
 */
-
-// Test notificationbot's notifyuser function; this mocks the setup and send functions, and only tests the core logic of this function
-func TestNotificationsBot_NotifyUser(t *testing.T) {
-	setup := func(string) (*messaging.Client, context.Context, error) {
-		ctx := context.Background()
-		return &messaging.Client{}, ctx, nil
-	}
-	send := func(FBSender, context.Context, string) (string, error) {
-		return "", nil
-	}
-	nb := NewMockNotificationsBot(t, setup, send)
-	_, err := nb.NotifyUser([]byte("test"), "testpath")
-	if err != nil {
-		t.Errorf("Failed to notify user properly")
-	}
-}

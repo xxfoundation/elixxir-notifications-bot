@@ -25,9 +25,6 @@ type MapImpl struct {
 	users sync.Map
 }
 
-// Global variable for backend interaction
-var NotificationsBackend *Storage
-
 // Interface for backend storage operations
 type Storage interface {
 	// Obtain User from backend by primary key
@@ -51,7 +48,7 @@ type User struct {
 }
 
 // Initialize the Storage interface with a proper backend type
-func NewDatabase(username, password, database, address string) *Storage {
+func NewDatabase(username, password, database, address string) Storage {
 	// Create the database connection
 	db := pg.Connect(&pg.Options{
 		User:         username,
@@ -78,7 +75,7 @@ func NewDatabase(username, password, database, address string) *Storage {
 			db: db,
 		}
 	}
-	return &backend
+	return backend
 }
 
 // Create the database schema
