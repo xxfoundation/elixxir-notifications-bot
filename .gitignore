@@ -12,3 +12,5 @@ localdev_*
 # Ignore logs
 *.log
 creds/*
+
+testutil/

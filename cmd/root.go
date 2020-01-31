@@ -15,6 +15,7 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gitlab.com/elixxir/comms/mixmessages"
+	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"os"
 	"path"
@@ -24,8 +25,9 @@ var (
 	cfgFile            string
 	verbose            bool
 	noTLS              bool
-	NotificationParams Params
+	NotificationParams notifications.Params
 	loopDelay          int
+	firebaseCredFile   string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -54,27 +56,31 @@ var rootCmd = &cobra.Command{
 		ipAddr := viper.GetString("publicAddress")
 		publicAddress := fmt.Sprintf("%s:%d", ipAddr, viper.GetInt("port"))
 
-		// Set up database connection
-		storage.NotificationsBackend = storage.NewDatabase(
+		// Populate params
+		NotificationParams = notifications.Params{
+			Address:       localAddress,
+			CertPath:      certPath,
+			KeyPath:       keyPath,
+			PublicAddress: publicAddress,
+		}
+		jww.INFO.Println("Starting Notifications")
+
+		impl, err := notifications.StartNotifications(NotificationParams, noTLS)
+		if err != nil {
+			err = fmt.Errorf("Failed to start notifications server: %+v", err)
+			panic(err)
+		}
+
+		impl.Storage = storage.NewDatabase(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
 			viper.GetString("dbName"),
 			viper.GetString("dbAddress"),
 		)
 
-		// Populate params
-		NotificationParams = Params{
-			Address:       localAddress,
-			CertPath:      certPath,
-			KeyPath:       keyPath,
-			publicAddress: publicAddress,
-		}
-		jww.INFO.Println("Starting Notifications")
-
-		impl := StartNotifications(NotificationParams)
-
 		// Start notification loop
-		go RunNotificationLoop(impl, loopDelay)
+		killChan := make(chan struct{})
+		go impl.RunNotificationLoop(firebaseCredFile, loopDelay, killChan)
 
 		// Wait forever to prevent process from ending
 		select {}
@@ -114,6 +120,9 @@ func init() {
 
 	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 5,
 		"Set the delay between notification loops (in seconds)")
+
+	rootCmd.Flags().StringVarP(&firebaseCredFile, "firebaseCredentialFilePath", "",
+		"", "Points to the firebase credentials file")
 
 }
 

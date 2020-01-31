@@ -25,9 +25,6 @@ type MapImpl struct {
 	users sync.Map
 }
 
-// Global variable for backend interaction
-var NotificationsBackend Storage
-
 // Interface for backend storage operations
 type Storage interface {
 	// Obtain User from backend by primary key
