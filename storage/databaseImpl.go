@@ -35,17 +35,11 @@ func (impl *DatabaseImpl) DeleteUser(userId string) error {
 
 // Insert or Update User into backend
 func (impl *DatabaseImpl) UpsertUser(user *User) error {
-	expectedToken := user.Token
 	_, err := impl.db.Model(user).
 		OnConflict("(Id) DO UPDATE").
-		Set("Token = EXCLUDED.Token").Insert()
+		Set("Token = EXCLUDED.Token").Returning("").Insert()
 	if err != nil {
 		return errors.Errorf("Failed to insert user %s: %+v", user.Id, err)
-	}
-
-	err = impl.db.Select(user)
-	if err != nil || expectedToken != user.Token {
-		return errors.Errorf("User was not inserted properly: %+v", err)
 	}
 	return nil
 }
