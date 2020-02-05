@@ -55,9 +55,9 @@ var rootCmd = &cobra.Command{
 
 		// Populate params
 		NotificationParams = notifications.Params{
-			Address:       localAddress,
-			CertPath:      certPath,
-			KeyPath:       keyPath,
+			Address:  localAddress,
+			CertPath: certPath,
+			KeyPath:  keyPath,
 		}
 		jww.INFO.Println("Starting Notifications...")
 

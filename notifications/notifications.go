@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/comms/connect"
-	"gitlab.com/elixxir/comms/mixmessages"
+	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/signature/rsa"
 	"gitlab.com/elixxir/crypto/tls"
@@ -46,6 +46,7 @@ type Impl struct {
 	gatewayHost      *connect.Host // TODO: populate this field from ndf
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
+	ndf              *pb.NDF
 }
 
 // Request interface holds the request function from comms, allowing us to unit test polling
@@ -192,4 +193,13 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 		return errors.Errorf("Failed to unregister user with notifications: %+v", err)
 	}
 	return nil
+}
+
+// Polls Registartion for an NDF
+func GetNdfFromPermissioning(comms *notificationBot.Comms, host *connect.Host) (*pb.NDF, error) {
+	ndf, err := comms.RequestNdf(host, &pb.NDFHash{})
+	if err != nil {
+		return nil, errors.Errorf("Failed to obtain ndf: %+v", err)
+	}
+	return ndf, False
 }
