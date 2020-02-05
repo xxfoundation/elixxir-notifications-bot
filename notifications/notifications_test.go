@@ -5,7 +5,7 @@ import (
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/comms/connect"
-	"gitlab.com/elixxir/comms/mixmessages"
+	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/notifications-bot/testutil"
@@ -182,6 +182,19 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	}
 }
 
+func TestImpl_UpdateNdf(t *testing.T) {
+	impl := getNewImpl()
+	emptyNdf := &pb.NDF{}
+
+	impl.UpdateNdf(emptyNdf)
+
+	if( impl.ndf != emptyNdf) {
+		t.Logf("Failed to change ndf")
+		t.Fail()
+	}
+}
+
+
 // Unit test for UnregisterForNotifications
 func TestImpl_UnregisterForNotifications(t *testing.T) {
 	impl := getNewImpl()
@@ -213,3 +226,5 @@ func getNewImpl() *Impl {
 	instance, _ := StartNotifications(params, false)
 	return instance
 }
+
+

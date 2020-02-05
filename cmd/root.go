@@ -17,6 +17,7 @@ import (
 	"gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/elixxir/primitives/id"
 	"os"
 	"path"
 )
@@ -74,8 +75,9 @@ var rootCmd = &cobra.Command{
 			viper.GetString("dbAddress"),
 		)
 
-		// permissioningAddr := viper.GetString("permissioningAddress")
-		// permissioningCertPath := viper.GetString("permissioningCertPath")
+		permissioningAddr := viper.GetString("permissioningAddress")
+		permissioningCertPath := viper.GetString("permissioningCertPath")
+		impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
 
 		// Start notification loop
 		killChan := make(chan struct{})

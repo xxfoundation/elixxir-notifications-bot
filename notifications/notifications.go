@@ -196,6 +196,6 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 }
 
 // Setter function to, set NDF into our Impl structure
-func (nb *Impl) UpdateNdf(ndf *pb.NDF){
+func (nb *Impl) UpdateNdf(ndf *pb.NDF) {
 	nb.ndf = ndf
 }
