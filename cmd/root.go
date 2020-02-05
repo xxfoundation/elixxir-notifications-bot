@@ -27,7 +27,6 @@ var (
 	noTLS              bool
 	NotificationParams notifications.Params
 	loopDelay          int
-	firebaseCredFile   string
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -53,17 +52,14 @@ var rootCmd = &cobra.Command{
 		certPath := viper.GetString("certPath")
 		keyPath := viper.GetString("keyPath")
 		localAddress := fmt.Sprintf("0.0.0.0:%d", viper.GetInt("port"))
-		ipAddr := viper.GetString("publicAddress")
-		publicAddress := fmt.Sprintf("%s:%d", ipAddr, viper.GetInt("port"))
 
 		// Populate params
 		NotificationParams = notifications.Params{
 			Address:       localAddress,
 			CertPath:      certPath,
 			KeyPath:       keyPath,
-			PublicAddress: publicAddress,
 		}
-		jww.INFO.Println("Starting Notifications")
+		jww.INFO.Println("Starting Notifications...")
 
 		impl, err := notifications.StartNotifications(NotificationParams, noTLS)
 		if err != nil {
@@ -78,9 +74,14 @@ var rootCmd = &cobra.Command{
 			viper.GetString("dbAddress"),
 		)
 
+		// permissioningAddr := viper.GetString("permissioningAddress")
+		// permissioningCertPath := viper.GetString("permissioningCertPath")
+
 		// Start notification loop
 		killChan := make(chan struct{})
-		go impl.RunNotificationLoop(firebaseCredFile, loopDelay, killChan)
+		go impl.RunNotificationLoop(viper.GetString("firebaseCredentialsPath"),
+			loopDelay,
+			killChan)
 
 		// Wait forever to prevent process from ending
 		select {}
@@ -121,9 +122,16 @@ func init() {
 	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 5,
 		"Set the delay between notification loops (in seconds)")
 
-	rootCmd.Flags().StringVarP(&firebaseCredFile, "firebaseCredentialFilePath", "",
-		"", "Points to the firebase credentials file")
+	// Bind config and command line flags of the same name
+	err := viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
+	handleBindingError(err, "verbose")
+}
 
+// Handle flag binding errors
+func handleBindingError(err error, flag string) {
+	if err != nil {
+		jww.FATAL.Panicf("Error on binding flag \"%s\":%+v", flag, err)
+	}
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -137,7 +145,7 @@ func initConfig() {
 			os.Exit(1)
 		}
 
-		cfgFile = home + "/.elixxir/registration.yaml"
+		cfgFile = home + "/.elixxir/notifications.yaml"
 
 	}
 
