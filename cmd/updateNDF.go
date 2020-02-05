@@ -1,4 +1,4 @@
-package notifications
+package cmd
 
 import (
 	"crypto/sha256"
@@ -7,10 +7,9 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/notificationBot"
+	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
 )
-
-const PermissioningAddrID = "Permissioning"
 
 var noNDFErr = errors.New("Failed to get ndf from permissioning: rpc error: code = Unknown desc = Permissioning server does not have an ndf to give to Notification Bot")
 
@@ -25,7 +24,7 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms *notificationBot.Comms) (*
 	//Put the hash in a message
 	msg := &mixmessages.NDFHash{Hash: ndfHash}
 
-	regHost, ok := comms.GetHost(PermissioningAddrID)
+	regHost, ok := comms.GetHost(id.PERMISSIONING)
 	if !ok {
 		return nil, errors.New("Failed to find permissioning host")
 	}

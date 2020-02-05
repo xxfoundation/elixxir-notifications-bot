@@ -17,6 +17,7 @@ import (
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/signature/rsa"
 	"gitlab.com/elixxir/crypto/tls"
+	"gitlab.com/elixxir/notifications-bot/cmd"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/id"
@@ -193,4 +194,9 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 		return errors.Errorf("Failed to unregister user with notifications: %+v", err)
 	}
 	return nil
+}
+
+// Setter function to, set NDF into our Impl structure
+func (nb *Impl) UpdateNdf(ndf *pb.NDF){
+	nb.ndf = ndf
 }
