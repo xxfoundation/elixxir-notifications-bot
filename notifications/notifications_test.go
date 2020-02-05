@@ -138,15 +138,15 @@ func TestNewImplementation(t *testing.T) {
 // Dummy comms to unit test pollfornotifications
 type mockPollComm struct{}
 
-func (m mockPollComm) RequestNotifications(host *connect.Host, message *mixmessages.Ping) (*mixmessages.IDList, error) {
-	return &mixmessages.IDList{
+func (m mockPollComm) RequestNotifications(host *connect.Host, message *pb.Ping) (*pb.IDList, error) {
+	return &pb.IDList{
 		IDs: []string{"test"},
 	}, nil
 }
 
 type mockPollErrComm struct{}
 
-func (m mockPollErrComm) RequestNotifications(host *connect.Host, message *mixmessages.Ping) (*mixmessages.IDList, error) {
+func (m mockPollErrComm) RequestNotifications(host *connect.Host, message *pb.Ping) (*pb.IDList, error) {
 	return nil, errors.New("failed to poll")
 }
 
@@ -182,6 +182,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	}
 }
 
+// Unit test that tests to see that updateNDF will in fact update the ndf object inside of IMPL
 func TestImpl_UpdateNdf(t *testing.T) {
 	impl := getNewImpl()
 	emptyNdf := &pb.NDF{}
@@ -193,7 +194,6 @@ func TestImpl_UpdateNdf(t *testing.T) {
 		t.Fail()
 	}
 }
-
 
 // Unit test for UnregisterForNotifications
 func TestImpl_UnregisterForNotifications(t *testing.T) {
@@ -226,5 +226,3 @@ func getNewImpl() *Impl {
 	instance, _ := StartNotifications(params, false)
 	return instance
 }
-
-
