@@ -144,7 +144,7 @@ func TestNewImplementation(t *testing.T) {
 // Dummy comms to unit test pollfornotifications
 type mockPollComm struct{}
 
-func (m mockPollComm) RequestNotifications(host *connect.Host, message *pb.Ping) (*pb.IDList, error) {
+func (m mockPollComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
 	return &pb.IDList{
 		IDs: []string{"test"},
 	}, nil
@@ -152,7 +152,7 @@ func (m mockPollComm) RequestNotifications(host *connect.Host, message *pb.Ping)
 
 type mockPollErrComm struct{}
 
-func (m mockPollErrComm) RequestNotifications(host *connect.Host, message *pb.Ping) (*pb.IDList, error) {
+func (m mockPollErrComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
 	return nil, errors.New("failed to poll")
 }
 

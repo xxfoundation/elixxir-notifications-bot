@@ -52,7 +52,7 @@ type Impl struct {
 
 // Request interface holds the request function from comms, allowing us to unit test polling
 type RequestInterface interface {
-	RequestNotifications(host *connect.Host, message *pb.Ping) (*pb.IDList, error)
+	RequestNotifications(host *connect.Host) (*pb.IDList, error)
 }
 
 // Main function for this repo accepts credentials and an impl
@@ -165,7 +165,7 @@ func notifyUser(uid string, serviceKeyPath string, fc *firebase.FirebaseComm, db
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
 func pollForNotifications(h *connect.Host, comms RequestInterface) (strings []string, e error) {
-	users, err := comms.RequestNotifications(h, &pb.Ping{})
+	users, err := comms.RequestNotifications(h)
 	if err != nil {
 		return nil, errors.Errorf("Failed to retrieve notifications from gateway: %+v", err)
 	}
