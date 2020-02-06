@@ -77,7 +77,12 @@ var rootCmd = &cobra.Command{
 
 		permissioningAddr := viper.GetString("permissioningAddress")
 		permissioningCertPath := viper.GetString("permissioningCertPath")
-		impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
+		_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
+
+		if err != nil{
+			err = fmt.Errorf("Failed to Create permissioning host: %+v", err)
+			panic(err)
+		}
 
 		// Start notification loop
 		killChan := make(chan struct{})
