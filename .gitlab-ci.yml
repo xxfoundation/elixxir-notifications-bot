@@ -29,11 +29,14 @@ stages:
   - setup
   - test
   - build
+  - tag
   - trigger_integration
 
 setup:
   stage: setup
   image: $DOCKER_IMAGE
+  except:
+    - tags
   script:
     - go mod vendor -v
     - go build ./...
@@ -45,6 +48,8 @@ setup:
 test:
   stage: test
   image: $DOCKER_IMAGE
+  except:
+    - tags
   script:
     - GO111MODULE=off go get -u github.com/haya14busa/goverage
     - apt-get update
@@ -69,6 +74,8 @@ test:
 build:
   stage: build
   image: $DOCKER_IMAGE
+  except:
+    - tags
   script:
     - mkdir -p release
     - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' ./...
@@ -79,6 +86,17 @@ build:
   artifacts:
     paths:
      - release/
+
+tag:
+    stage: tag
+    only:
+        - master
+    image: $DOCKER_IMAGE
+    script:
+        - git remote add origin_tags git@gitlab.com:elixxir/notifications-bot.git || true
+        - git remote set-url origin_tags git@gitlab.com:elixxir/notifications-bot.git || true
+        - git tag $(./release/notifications.linux64 --version | grep "Elixxir Notifications Server v"| cut -d ' ' -f4) -f
+        - git push origin_tags -f --tags
 
 trigger_integration:
   stage: trigger_integration
