@@ -14,6 +14,7 @@ import (
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/notifications-bot/testutil"
+	"gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"os"
 	"strings"
@@ -190,11 +191,14 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 // Unit test that tests to see that updateNDF will in fact update the ndf object inside of IMPL
 func TestImpl_UpdateNdf(t *testing.T) {
 	impl := getNewImpl()
-	emptyNdf := &pb.NDF{}
+	testNdf, _, err := ndf.DecodeNDF(ExampleNdfJSON)
+	if err != nil{
+		t.Logf("%+v", err)
+	}
 
-	impl.updateNdf(emptyNdf)
+	impl.updateNdf(testNdf)
 
-	if impl.ndf != emptyNdf {
+	if impl.ndf != testNdf {
 		t.Logf("Failed to change ndf")
 		t.Fail()
 	}
