@@ -10,7 +10,6 @@ package notifications
 
 import (
 	"crypto/sha256"
-	"fmt"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/comms/connect"
@@ -19,7 +18,7 @@ import (
 	"gitlab.com/elixxir/primitives/ndf"
 )
 
-var noNDFErr = errors.New("Failed to get ndf from permissioning: rpc error: code = Unknown desc = Permissioning server does not have an ndf to give to Notification Bot")
+var noNDFErr = errors.Errorf("Failed to get ndf from permissioning: rpc error: Permissioning server does not have an ndf to give to Notification Bot")
 
 type pollCommInterface interface {
 	GetHost(hostId string) (*connect.Host, bool)
@@ -45,12 +44,12 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms pollCommInterface) (*ndf.N
 	//Send the hash to registration
 	response, err := comms.RequestNdf(regHost, msg)
 	if err != nil {
-		errMsg := fmt.Sprintf("Failed to get ndf from permissioning: %v", err)
-		if errMsg == noNDFErr.Error() {
+		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
+		if errMsg == noNDFErr {
 			jww.WARN.Println("Continuing without an updated NDF")
 			return nil, nil
 		}
-		return nil, errors.New(errMsg)
+		return nil, errMsg
 	}
 
 	//If there was no error and the response is nil, client's ndf is up-to-date
@@ -65,8 +64,8 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms pollCommInterface) (*ndf.N
 	updatedNdf, _, err := ndf.DecodeNDF(string(response.Ndf))
 	if err != nil {
 		//If there was an error decoding ndf
-		errMsg := fmt.Sprintf("Failed to decode response to ndf: %v", err)
-		return nil, errors.New(errMsg)
+		errMsg := errors.Errorf("Failed to decode response to ndf: %v", err)
+		return nil, errMsg
 	}
 	return updatedNdf, nil
 }

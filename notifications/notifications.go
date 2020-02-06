@@ -20,6 +20,7 @@ import (
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/id"
+	ndf "gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"time"
 )
@@ -46,7 +47,7 @@ type Impl struct {
 	gatewayHost      *connect.Host // TODO: populate this field from ndf
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
-	ndf              *pb.NDF
+	ndf              *ndf.NetworkDefinition
 }
 
 // Request interface holds the request function from comms, allowing us to unit test polling
@@ -196,6 +197,6 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 }
 
 // Setter function to, set NDF into our Impl structure
-func (nb *Impl) UpdateNdf(ndf *pb.NDF) {
+func (nb *Impl) updateNdf(ndf *ndf.NetworkDefinition) {
 	nb.ndf = ndf
 }

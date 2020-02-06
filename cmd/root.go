@@ -80,8 +80,7 @@ var rootCmd = &cobra.Command{
 		_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
 
 		if err != nil{
-			err = fmt.Errorf("Failed to Create permissioning host: %+v", err)
-			panic(err)
+			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
 		}
 
 		// Start notification loop

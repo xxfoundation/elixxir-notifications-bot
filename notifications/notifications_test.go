@@ -192,7 +192,7 @@ func TestImpl_UpdateNdf(t *testing.T) {
 	impl := getNewImpl()
 	emptyNdf := &pb.NDF{}
 
-	impl.UpdateNdf(emptyNdf)
+	impl.updateNdf(emptyNdf)
 
 	if impl.ndf != emptyNdf {
 		t.Logf("Failed to change ndf")
