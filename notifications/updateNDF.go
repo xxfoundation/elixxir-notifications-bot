@@ -3,6 +3,9 @@
 //                                                                             /
 // All rights reserved.                                                        /
 ////////////////////////////////////////////////////////////////////////////////
+
+// This file contains all code necessary for polling the NDF from the permissioning server
+
 package notifications
 
 import (

@@ -194,7 +194,7 @@ func TestImpl_UpdateNdf(t *testing.T) {
 
 	impl.UpdateNdf(emptyNdf)
 
-	if( impl.ndf != emptyNdf) {
+	if impl.ndf != emptyNdf {
 		t.Logf("Failed to change ndf")
 		t.Fail()
 	}
