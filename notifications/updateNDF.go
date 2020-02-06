@@ -16,18 +16,19 @@ import (
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
+	"strings"
 )
 
-var noNDFErr = errors.Errorf("Failed to get ndf from permissioning: rpc error: Permissioning server does not have an ndf to give to Notification Bot")
+var noNDFErr = errors.Errorf("Failed to get ndf from permissioning")
 
 // We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
-type notificationCommsInterface interface {
+type notificationComms interface {
 	GetHost(hostId string) (*connect.Host, bool)
 	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
 }
 
 // PollNdf, attempts to connect to the permissioning server to retrieve the latest ndf for the notifications bot
-func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationCommsInterface) (*ndf.NetworkDefinition, error) {
+func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationComms) (*ndf.NetworkDefinition, error) {
 	//Hash the notifications bot ndf for comparison with registration's ndf
 	hash := sha256.New()
 	ndfBytes := currentDef.Serialize()
@@ -46,7 +47,7 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationCommsInterface
 	response, err := comms.RequestNdf(regHost, msg)
 	if err != nil {
 		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
-		if errMsg == noNDFErr {
+		if  strings.Contains(errMsg.Error(), noNDFErr.Error()) {
 			jww.WARN.Println("Continuing without an updated NDF")
 			return nil, nil
 		}
