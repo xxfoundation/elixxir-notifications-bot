@@ -1,3 +1,8 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright © 2020 Privategrity Corporation                                   /
+//                                                                             /
+// All rights reserved.                                                        /
+////////////////////////////////////////////////////////////////////////////////
 package notifications
 
 import (
@@ -5,10 +10,11 @@ import (
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/comms/connect"
-	"gitlab.com/elixxir/comms/mixmessages"
+	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/notifications-bot/testutil"
+	"gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"os"
 	"strings"
@@ -138,15 +144,15 @@ func TestNewImplementation(t *testing.T) {
 // Dummy comms to unit test pollfornotifications
 type mockPollComm struct{}
 
-func (m mockPollComm) RequestNotifications(host *connect.Host, message *mixmessages.Ping) (*mixmessages.IDList, error) {
-	return &mixmessages.IDList{
+func (m mockPollComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
+	return &pb.IDList{
 		IDs: []string{"test"},
 	}, nil
 }
 
 type mockPollErrComm struct{}
 
-func (m mockPollErrComm) RequestNotifications(host *connect.Host, message *mixmessages.Ping) (*mixmessages.IDList, error) {
+func (m mockPollErrComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
 	return nil, errors.New("failed to poll")
 }
 
@@ -179,6 +185,22 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
+	}
+}
+
+// Unit test that tests to see that updateNDF will in fact update the ndf object inside of IMPL
+func TestImpl_UpdateNdf(t *testing.T) {
+	impl := getNewImpl()
+	testNdf, _, err := ndf.DecodeNDF(ExampleNdfJSON)
+	if err != nil{
+		t.Logf("%+v", err)
+	}
+
+	impl.updateNdf(testNdf)
+
+	if impl.ndf != testNdf {
+		t.Logf("Failed to change ndf")
+		t.Fail()
 	}
 }
 

@@ -7,7 +7,7 @@ import "testing"
 // This tests getting a user that does exist in the database
 func TestMapImpl_GetUser_Happy(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id:"test", Token:"token"}
+	u := User{Id: "test", Token: "token"}
 	m.users.Store(u.Id, &u)
 
 	user, err := m.GetUser(u.Id)
@@ -18,12 +18,12 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 	} else {
 		// Perform additional tests on the user var if we're sure it's populated
 		if user.Id != u.Id {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different ID\n\tGot: %s\n\tExpected: %s", user.Id, u.Id)
 		}
 
 		if user.Token != u.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different token\n\tGot: %s\n\tExpected: %s", user.Token, u.Token)
 		}
 	}
@@ -36,7 +36,7 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 // This tests getting a user that does *not* exist in the database
 func TestMapImpl_GetUser_NoUser(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id:"test", Token:"token"}
+	u := User{Id: "test", Token: "token"}
 
 	user, err := m.GetUser(u.Id)
 
@@ -52,7 +52,7 @@ func TestMapImpl_GetUser_NoUser(t *testing.T) {
 // This tests deleting a user that does exist in the database
 func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id:"test", Token:"token"}
+	u := User{Id: "test", Token: "token"}
 	m.users.Store(u.Id, &u)
 
 	err := m.DeleteUser(u.Id)
@@ -71,7 +71,7 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 // This tests inserting a user once and verifying we can read it back right
 func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id:"test", Token:"token"}
+	u := User{Id: "test", Token: "token"}
 
 	err := m.UpsertUser(&u)
 
@@ -87,12 +87,12 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 	} else {
 		// If a user is found, make sure it's our test user
 		if user.(*User).Id != u.Id {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different ID\n\tGot: %s\n\tExpected: %s", user.(*User).Id, u.Id)
 		}
 
 		if user.(*User).Token != u.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different token\n\tGot: %s\n\tExpected: %s", user.(*User).Token, u.Token)
 		}
 	}
@@ -101,7 +101,7 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 // This tests inserting a user *twice* and verifying we can read it back right each time
 func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id:"test", Token:"token"}
+	u := User{Id: "test", Token: "token"}
 
 	err := m.UpsertUser(&u)
 
@@ -117,18 +117,18 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	} else {
 		// If a user is found, make sure it's our test user
 		if user.(*User).Id != u.Id {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different ID\n\tGot: %s\n\tExpected: %s", user.(*User).Id, u.Id)
 		}
 
 		if user.(*User).Token != u.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different token\n\tGot: %s\n\tExpected: %s", user.(*User).Token, u.Token)
 		}
 	}
 
 	// Create user with the same ID but change the token
-	u2 := User{Id:"test", Token:"othertoken"}
+	u2 := User{Id: "test", Token: "othertoken"}
 	err = m.UpsertUser(&u2)
 
 	// Load user from map manually
@@ -139,12 +139,12 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	} else {
 		// If a user is found, make sure it's our test user
 		if user.(*User).Id != u2.Id {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different ID\n\tGot: %s\n\tExpected: %s", user.(*User).Id, u.Id)
 		}
 
 		if user.(*User).Token != u2.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned " +
+			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
 				"user with different token\n\tGot: %s\n\tExpected: %s", user.(*User).Token, u2.Token)
 		}
 	}

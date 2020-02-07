@@ -13,13 +13,14 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/comms/connect"
-	"gitlab.com/elixxir/comms/mixmessages"
+	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/signature/rsa"
 	"gitlab.com/elixxir/crypto/tls"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/id"
+	ndf "gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"time"
 )
@@ -46,11 +47,12 @@ type Impl struct {
 	gatewayHost      *connect.Host // TODO: populate this field from ndf
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
+	ndf              *ndf.NetworkDefinition
 }
 
 // Request interface holds the request function from comms, allowing us to unit test polling
 type RequestInterface interface {
-	RequestNotifications(host *connect.Host, message *mixmessages.Ping) (*mixmessages.IDList, error)
+	RequestNotifications(host *connect.Host) (*pb.IDList, error)
 }
 
 // Main function for this repo accepts credentials and an impl
@@ -163,7 +165,7 @@ func notifyUser(uid string, serviceKeyPath string, fc *firebase.FirebaseComm, db
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
 func pollForNotifications(h *connect.Host, comms RequestInterface) (strings []string, e error) {
-	users, err := comms.RequestNotifications(h, &mixmessages.Ping{})
+	users, err := comms.RequestNotifications(h)
 	if err != nil {
 		return nil, errors.Errorf("Failed to retrieve notifications from gateway: %+v", err)
 	}
@@ -192,4 +194,9 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 		return errors.Errorf("Failed to unregister user with notifications: %+v", err)
 	}
 	return nil
+}
+
+// Setter function to, set NDF into our Impl structure
+func (nb *Impl) updateNdf(ndf *ndf.NetworkDefinition) {
+	nb.ndf = ndf
 }

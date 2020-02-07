@@ -17,6 +17,7 @@ import (
 	"gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/elixxir/primitives/id"
 	"os"
 	"path"
 )
@@ -55,9 +56,9 @@ var rootCmd = &cobra.Command{
 
 		// Populate params
 		NotificationParams = notifications.Params{
-			Address:       localAddress,
-			CertPath:      certPath,
-			KeyPath:       keyPath,
+			Address:  localAddress,
+			CertPath: certPath,
+			KeyPath:  keyPath,
 		}
 		jww.INFO.Println("Starting Notifications...")
 
@@ -74,8 +75,13 @@ var rootCmd = &cobra.Command{
 			viper.GetString("dbAddress"),
 		)
 
-		// permissioningAddr := viper.GetString("permissioningAddress")
-		// permissioningCertPath := viper.GetString("permissioningCertPath")
+		permissioningAddr := viper.GetString("permissioningAddress")
+		permissioningCertPath := viper.GetString("permissioningCertPath")
+		_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
+
+		if err != nil{
+			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
+		}
 
 		// Start notification loop
 		killChan := make(chan struct{})
