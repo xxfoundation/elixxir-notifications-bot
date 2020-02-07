@@ -95,7 +95,7 @@ tag:
     script:
         - git remote add origin_tags git@gitlab.com:elixxir/notifications-bot.git || true
         - git remote set-url origin_tags git@gitlab.com:elixxir/notifications-bot.git || true
-        - git tag $(./release/notifications.linux64 --version | grep "Elixxir Notifications Server v"| cut -d ' ' -f4) -f
+        - git tag $(./release/notifications.linux64 version | grep "Elixxir Notifications Server v"| cut -d ' ' -f4) -f
         - git push origin_tags -f --tags
 
 trigger_integration:
