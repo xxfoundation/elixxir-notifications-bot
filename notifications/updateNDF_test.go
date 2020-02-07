@@ -36,13 +36,13 @@ func TestPollNdf(t *testing.T) {
 		t.Fail()
 	}
 
-	// Test that pollNdf returns nil everything if the derver doesnt have a new ndf
-	RequestNdfErr = errors.New("Failed to get ndf from permissioning")
+	// Test that pollNdf returns an error in this case
+	RequestNdfErr = errors.New("Permissioning server does not have an ndf to give to client")
 	GetHostErrBool = true
-	testndf, err := PollNdf(newNdf, mockNotificationComms{})
+	testNdf ,err := PollNdf(newNdf, mockNotificationComms{})
 
-	if err != nil && testndf != nil {
-		t.Logf("RequestNdf should have failed but it didn't: %+v", err)
+	if err != nil && testNdf != nil {
+		t.Logf("RequestNdf should have returned nil for everything because there is no new ndf but didnt")
 		t.Fail()
 	}
 

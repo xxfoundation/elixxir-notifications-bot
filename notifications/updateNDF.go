@@ -19,7 +19,7 @@ import (
 	"strings"
 )
 
-var noNDFErr = errors.Errorf("Failed to get ndf from permissioning")
+var noNDFErr = errors.Errorf("Permissioning server does not have an ndf to give to client")
 
 // We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
 type notificationComms interface {
