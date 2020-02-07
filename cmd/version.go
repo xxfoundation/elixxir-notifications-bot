@@ -19,7 +19,7 @@ const currentVersion = "1.0.0"
 
 func printVersion() {
 	fmt.Printf("Elixxir Notifications Server v%s -- %s\n\n", SEMVER, GITVERSION)
-	//fmt.Printf("Dependencies:\n\n%s\n", DEPENDENCIES)
+	fmt.Printf("Dependencies:\n\n%s\n", DEPENDENCIES)
 }
 
 func init() {
