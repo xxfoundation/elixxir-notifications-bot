@@ -20,13 +20,13 @@ import (
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/id"
-	ndf "gitlab.com/elixxir/primitives/ndf"
+	"gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"time"
 )
 
 // Function type definitions for the main operations (poll and notify)
-type PollFunc func(*connect.Host, RequestInterface) ([]string, error)
+type PollFunc func(*Impl) ([]string, error)
 type NotifyFunc func(string, string, *firebase.FirebaseComm, storage.Storage) (string, error)
 
 // Params struct holds info passed in for configuration
@@ -39,20 +39,22 @@ type Params struct {
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
-	Comms            *notificationBot.Comms
+	Comms            NotificationComms
 	Storage          storage.Storage
 	notificationCert *x509.Certificate
 	notificationKey  *rsa.PrivateKey
 	certFromFile     string
-	gatewayHost      *connect.Host // TODO: populate this field from ndf
+	ndf              *ndf.NetworkDefinition
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
-	ndf              *ndf.NetworkDefinition
 }
 
-// Request interface holds the request function from comms, allowing us to unit test polling
-type RequestInterface interface {
+// We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
+type NotificationComms interface {
+	GetHost(hostId string) (*connect.Host, bool)
+	AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error)
 	RequestNotifications(host *connect.Host) (*pb.IDList, error)
+	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
 }
 
 // Main function for this repo accepts credentials and an impl
@@ -66,7 +68,7 @@ func (nb *Impl) RunNotificationLoop(fbCreds string, loopDuration int, killChan c
 		default:
 		}
 		// TODO: fill in body of main loop, should poll gateway and send relevant notifications to firebase
-		UIDs, err := nb.pollFunc(nb.gatewayHost, nb.Comms)
+		UIDs, err := nb.pollFunc(nb)
 		if err != nil {
 			jww.ERROR.Printf("Failed to poll gateway for users to notify: %+v", err)
 		}
@@ -164,8 +166,29 @@ func notifyUser(uid string, serviceKeyPath string, fc *firebase.FirebaseComm, db
 
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
-func pollForNotifications(h *connect.Host, comms RequestInterface) (strings []string, e error) {
-	users, err := comms.RequestNotifications(h)
+func pollForNotifications(nb *Impl) (strings []string, e error) {
+	updateNdf := func() error {
+		ndf, err := PollNdf(nil, nb.Comms)
+		if err != nil {
+			return errors.Errorf("Could not poll for new NDF: %+v", err)
+		}
+
+		err = nb.UpdateNdf(ndf)
+		if err != nil {
+			return errors.Errorf("Could not update ndf: %+v", err)
+		}
+		return nil
+	}
+	h, ok := nb.Comms.GetHost("gw")
+	if !ok {
+		err := updateNdf()
+		if err != nil {
+			return nil, errors.Errorf("Could not find gateway host & failed to poll for new NDF: %+v", err)
+		}
+		return nil, errors.New("Could not find gateway host")
+	}
+
+	users, err := nb.Comms.RequestNotifications(h)
 	if err != nil {
 		return nil, errors.Errorf("Failed to retrieve notifications from gateway: %+v", err)
 	}
@@ -196,7 +219,13 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 	return nil
 }
 
-// Setter function to, set NDF into our Impl structure
-func (nb *Impl) updateNdf(ndf *ndf.NetworkDefinition) {
+func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
+	gw := ndf.Gateways[len(ndf.Gateways)-1]
+	_, err := nb.Comms.AddHost("gw", gw.Address, []byte(gw.TlsCertificate), false, true)
+	if err != nil {
+		return errors.Errorf("Failed to add gateway host from NDF: %+v", err)
+	}
+
 	nb.ndf = ndf
+	return nil
 }

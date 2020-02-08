@@ -39,7 +39,7 @@ func TestPollNdf(t *testing.T) {
 	// Test that pollNdf returns an error in this case
 	RequestNdfErr = errors.New("Permissioning server does not have an ndf to give to client")
 	GetHostErrBool = true
-	testNdf ,err := PollNdf(newNdf, mockNotificationComms{})
+	testNdf, err := PollNdf(newNdf, mockNotificationComms{})
 
 	if err != nil && testNdf != nil {
 		t.Logf("RequestNdf should have returned nil for everything because there is no new ndf but didnt")
@@ -77,4 +77,12 @@ func (m mockNotificationComms) GetHost(hostId string) (*connect.Host, bool) {
 
 func (m mockNotificationComms) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
 	return &NdfToreturn, RequestNdfErr
+}
+
+func (m mockNotificationComms) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
+	return nil, errors.New("failed to poll")
+}
+
+func (m mockNotificationComms) AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error) {
+	return nil, nil
 }

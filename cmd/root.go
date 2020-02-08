@@ -18,6 +18,7 @@ import (
 	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/id"
+	"gitlab.com/elixxir/primitives/utils"
 	"os"
 	"path"
 )
@@ -77,10 +78,24 @@ var rootCmd = &cobra.Command{
 
 		permissioningAddr := viper.GetString("permissioningAddress")
 		permissioningCertPath := viper.GetString("permissioningCertPath")
-		_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
+		cert, err := utils.ReadFile(permissioningCertPath)
+		if err != nil {
+			jww.FATAL.Panicf("Could not read permissioning cert: %+v", err)
+		}
 
-		if err != nil{
+		_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, cert, true, true)
+		if err != nil {
 			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
+		}
+
+		ndf, err := notifications.PollNdf(nil, impl.Comms)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to get NDF: %+v", err)
+		}
+
+		err = impl.UpdateNdf(ndf)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to update impl's NDF: %+v", err)
 		}
 
 		// Start notification loop

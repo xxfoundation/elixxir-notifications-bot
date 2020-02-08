@@ -25,7 +25,7 @@ import (
 // Basic test to cover RunNotificationLoop, including error sending
 func TestRunNotificationLoop(t *testing.T) {
 	impl := getNewImpl()
-	impl.pollFunc = func(host *connect.Host, requestInterface RequestInterface) (i []string, e error) {
+	impl.pollFunc = func(*Impl) (i []string, e error) {
 		return []string{"test1", "test2"}, nil
 	}
 	impl.notifyFunc = func(s3 string, s2 string, comm *firebase.FirebaseComm, storage storage.Storage) (s string, e error) {
@@ -149,21 +149,45 @@ func (m mockPollComm) RequestNotifications(host *connect.Host) (*pb.IDList, erro
 		IDs: []string{"test"},
 	}, nil
 }
+func (m mockPollComm) GetHost(hostId string) (*connect.Host, bool) {
+	return &connect.Host{}, true
+}
+func (m mockPollComm) AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error) {
+	return nil, nil
+}
+func (m mockPollComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
+	return nil, nil
+}
 
 type mockPollErrComm struct{}
 
 func (m mockPollErrComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
 	return nil, errors.New("failed to poll")
 }
+func (m mockPollErrComm) GetHost(hostId string) (*connect.Host, bool) {
+	return nil, false
+}
+func (m mockPollErrComm) AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error) {
+	return nil, nil
+}
+func (m mockPollErrComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
+	return nil, nil
+}
 
 // Unit test for PollForNotifications
 func TestPollForNotifications(t *testing.T) {
-	_, err := pollForNotifications(nil, mockPollErrComm{})
+	impl := &Impl{
+		Comms: mockPollComm{},
+	}
+	errImpl := &Impl{
+		Comms: mockPollErrComm{},
+	}
+	_, err := pollForNotifications(errImpl)
 	if err == nil {
 		t.Errorf("Failed to poll for notifications: %+v", err)
 	}
 
-	_, err = pollForNotifications(nil, mockPollComm{})
+	_, err = pollForNotifications(impl)
 	if err != nil {
 		t.Errorf("Failed to poll for notifications: %+v", err)
 	}
@@ -192,11 +216,14 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 func TestImpl_UpdateNdf(t *testing.T) {
 	impl := getNewImpl()
 	testNdf, _, err := ndf.DecodeNDF(ExampleNdfJSON)
-	if err != nil{
+	if err != nil {
 		t.Logf("%+v", err)
 	}
 
-	impl.updateNdf(testNdf)
+	err = impl.UpdateNdf(testNdf)
+	if err != nil {
+		t.Errorf("Failed to update ndf")
+	}
 
 	if impl.ndf != testNdf {
 		t.Logf("Failed to change ndf")
