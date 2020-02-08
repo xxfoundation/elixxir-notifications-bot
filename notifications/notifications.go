@@ -62,12 +62,13 @@ type NotificationComms interface {
 func (nb *Impl) RunNotificationLoop(fbCreds string, loopDuration int, killChan chan struct{}) {
 	fc := firebase.NewFirebaseComm()
 	for {
+		// Stop execution if killed by channel
 		select {
 		case <-killChan:
 			return
 		default:
 		}
-		// TODO: fill in body of main loop, should poll gateway and send relevant notifications to firebase
+
 		UIDs, err := nb.pollFunc(nb)
 		if err != nil {
 			jww.ERROR.Printf("Failed to poll gateway for users to notify: %+v", err)
@@ -149,7 +150,8 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 func notifyUser(uid string, serviceKeyPath string, fc *firebase.FirebaseComm, db storage.Storage) (string, error) {
 	u, err := db.GetUser(uid)
 	if err != nil {
-		return "", errors.Errorf("Failed to get token for UID %+v: %+v", uid, err)
+		jww.DEBUG.Printf("No registration found for user with ID %+v", uid)
+		return "", nil
 	}
 
 	app, ctx, err := fc.SetupMessagingApp(serviceKeyPath)
