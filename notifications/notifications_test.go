@@ -29,17 +29,15 @@ func TestRunNotificationLoop(t *testing.T) {
 		return []string{"test1", "test2"}, nil
 	}
 	impl.notifyFunc = func(s3 string, s2 string, comm *firebase.FirebaseComm, storage storage.Storage) (s string, e error) {
-		if s3 == "test1" {
-			return "", errors.New("Failed to notify")
-		}
 		return "good", nil
 	}
 	killChan := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
 		time.Sleep(10 * time.Second)
 		killChan <- struct{}{}
 	}()
-	impl.RunNotificationLoop("", 3, killChan)
+	impl.RunNotificationLoop("", 3, killChan, errChan)
 }
 
 // Test notificationbot's notifyuser function

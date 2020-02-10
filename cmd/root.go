@@ -87,7 +87,7 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
 		}
-
+	Setup:
 		ndf, err := notifications.PollNdf(nil, impl.Comms)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to get NDF: %+v", err)
@@ -100,12 +100,17 @@ var rootCmd = &cobra.Command{
 
 		// Start notification loop
 		killChan := make(chan struct{})
+		errChan := make(chan error)
 		go impl.RunNotificationLoop(viper.GetString("firebaseCredentialsPath"),
-			loopDelay,
-			killChan)
+			loopDelay, killChan, errChan)
 
 		// Wait forever to prevent process from ending
-		select {}
+		select {
+		case err := <-errChan:
+			jww.ERROR.Println(err)
+			goto Setup
+		default:
+		}
 	},
 }
 

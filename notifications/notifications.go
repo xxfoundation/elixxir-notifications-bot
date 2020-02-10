@@ -59,7 +59,7 @@ type NotificationComms interface {
 
 // Main function for this repo accepts credentials and an impl
 // loops continuously, polling for notifications and notifying the relevant users
-func (nb *Impl) RunNotificationLoop(fbCreds string, loopDuration int, killChan chan struct{}) {
+func (nb *Impl) RunNotificationLoop(fbCreds string, loopDuration int, killChan chan struct{}, errChan chan error) {
 	fc := firebase.NewFirebaseComm()
 	for {
 		// Stop execution if killed by channel
@@ -71,13 +71,15 @@ func (nb *Impl) RunNotificationLoop(fbCreds string, loopDuration int, killChan c
 
 		UIDs, err := nb.pollFunc(nb)
 		if err != nil {
-			jww.ERROR.Printf("Failed to poll gateway for users to notify: %+v", err)
+			errChan <- errors.Errorf("Failed to poll gateway for users to notify: %+v", err)
+			return
 		}
 
 		for _, id := range UIDs {
 			_, err := nb.notifyFunc(id, fbCreds, fc, nb.Storage)
 			if err != nil {
-				jww.ERROR.Printf("Failed to notify user with ID %+v: %+v", id, err)
+				errChan <- errors.Errorf("Failed to notify user with ID %+v: %+v", id, err)
+				return
 			}
 		}
 
@@ -169,24 +171,8 @@ func notifyUser(uid string, serviceKeyPath string, fc *firebase.FirebaseComm, db
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
 func pollForNotifications(nb *Impl) (strings []string, e error) {
-	updateNdf := func() error {
-		ndf, err := PollNdf(nil, nb.Comms)
-		if err != nil {
-			return errors.Errorf("Could not poll for new NDF: %+v", err)
-		}
-
-		err = nb.UpdateNdf(ndf)
-		if err != nil {
-			return errors.Errorf("Could not update ndf: %+v", err)
-		}
-		return nil
-	}
 	h, ok := nb.Comms.GetHost("gw")
 	if !ok {
-		err := updateNdf()
-		if err != nil {
-			return nil, errors.Errorf("Could not find gateway host & failed to poll for new NDF: %+v", err)
-		}
 		return nil, errors.New("Could not find gateway host")
 	}
 
