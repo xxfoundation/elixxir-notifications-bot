@@ -105,12 +105,9 @@ var rootCmd = &cobra.Command{
 			loopDelay, killChan, errChan)
 
 		// Wait forever to prevent process from ending
-		select {
-		case err := <-errChan:
-			jww.ERROR.Println(err)
-			goto Setup
-		default:
-		}
+		err = <-errChan
+		jww.ERROR.Println(err)
+		goto Setup
 	},
 }
 
