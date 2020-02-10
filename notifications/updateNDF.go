@@ -19,8 +19,6 @@ import (
 	"strings"
 )
 
-var noNDFErr = errors.Errorf("Permissioning server does not have an ndf to give to client")
-
 // We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
 type notificationComms interface {
 	GetHost(hostId string) (*connect.Host, bool)
@@ -47,7 +45,7 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationComms) (*ndf.N
 	response, err := comms.RequestNdf(regHost, msg)
 	if err != nil {
 		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
-		if  strings.Contains(errMsg.Error(), noNDFErr.Error()) {
+		if  strings.Contains(errMsg.Error(), ndf.NO_NDF) {
 			jww.WARN.Println("Continuing without an updated NDF")
 			return nil, nil
 		}
