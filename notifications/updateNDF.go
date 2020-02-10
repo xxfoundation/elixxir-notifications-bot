@@ -32,7 +32,7 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms NotificationComms) (*ndf.N
 	}
 
 	//Put the hash in a message
-	msg := &pb.NDFHash{Hash: ndfHash}
+	msg := &pb.NDFHash{Hash: ndfHash} // TODO: this should be a helper somewhere
 
 	regHost, ok := comms.GetHost(id.PERMISSIONING)
 	if !ok {
@@ -42,7 +42,7 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms NotificationComms) (*ndf.N
 	//Send the hash to registration
 	response, err := comms.RequestNdf(regHost, msg)
 	if err != nil {
-		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
+		errMsg := errors.Wrap(err, "Failed to get ndf from permissioning")
 		if strings.Contains(errMsg.Error(), noNDFErr.Error()) {
 			jww.WARN.Println("Continuing without an updated NDF")
 			return nil, nil
