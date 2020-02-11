@@ -96,25 +96,31 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// setupConnection handles connecting to permissioning and polling for the NDF once connected
 func setupConnection(impl *notifications.Impl, permissioningCertPath, permissioningAddr string) error {
+	// Read in permissioning certificate
 	cert, err := utils.ReadFile(permissioningCertPath)
 	if err != nil {
-		jww.FATAL.Panicf("Could not read permissioning cert: %+v", err)
+		return errors.Wrap(err, "Could not read permissioning cert")
 	}
 
+	// Add host for permissioning server
 	_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, cert, true, true)
 	if err != nil {
-		jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
+		return errors.Wrap(err, "Failed to Create permissioning host")
 	}
 
+	// Loop until an NDF is received
 	var def *ndf.NetworkDefinition
 	for def == nil {
 		def, err = notifications.PollNdf(nil, impl.Comms)
+		// Don't stop if error is expected
 		if err != nil && !strings.Contains(err.Error(), ndf.NO_NDF) {
 			return errors.Wrap(err, "Failed to get NDF")
 		}
 	}
 
+	// Update NDF & gateway host
 	err = impl.UpdateNdf(def)
 	if err != nil {
 		return errors.Wrap(err, "Failed to update impl's NDF")

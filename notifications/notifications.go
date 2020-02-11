@@ -72,6 +72,7 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 		case <-time.After(time.Millisecond * time.Duration(loopDuration)):
 		}
 
+		// Poll for UIDs to notify
 		UIDs, err := nb.pollFunc(nb)
 		if err != nil {
 			errChan <- errors.Wrap(err, "Failed to poll gateway for users to notify")
@@ -79,6 +80,7 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 		}
 
 		for _, id := range UIDs {
+			// Attempt to notify a given user (will not error if UID not registered)
 			_, err := nb.notifyFunc(nb.fcm, id, fc, nb.Storage)
 			if err != nil {
 				errChan <- errors.Wrapf(err, "Failed to notify user with ID %+v", id)
@@ -120,13 +122,15 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		}
 	}
 
+	// set up stored functions
 	impl.pollFunc = pollForNotifications
 	impl.notifyFunc = notifyUser
 
+	// Start notification comms server
 	handler := NewImplementation(impl)
-
 	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.PublicAddress, handler, cert, key)
 
+	// Set up firebase messaging client
 	if !noFirebase {
 		app, err := firebase.SetupMessagingApp(params.FBCreds)
 		if err != nil {
@@ -159,6 +163,7 @@ func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db
 	u, err := db.GetUser(uid)
 	if err != nil {
 		jww.DEBUG.Printf("No registration found for user with ID %+v", uid)
+		// This path is not an error.  if no results are returned, the user hasn't registered for notifications
 		return "", nil
 	}
 
@@ -210,7 +215,7 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 
 func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
 	gw := ndf.Gateways[len(ndf.Gateways)-1]
-	_, err := nb.Comms.AddHost("gw", gw.Address, []byte(gw.TlsCertificate), false, true)
+	_, err := nb.Comms.AddHost("gw", gw.Address, []byte(gw.TlsCertificate), true, true)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add gateway host from NDF")
 	}
