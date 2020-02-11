@@ -13,6 +13,7 @@ import (
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/notifications-bot/testutil"
+	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"os"
@@ -160,9 +161,11 @@ func (m mockPollErrComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*p
 func TestPollForNotifications(t *testing.T) {
 	impl := &Impl{
 		Comms: mockPollComm{},
+		gwId:  id.NewNodeFromBytes([]byte("test")).NewGateway(),
 	}
 	errImpl := &Impl{
 		Comms: mockPollErrComm{},
+		gwId:  id.NewNodeFromBytes([]byte("test")).NewGateway(),
 	}
 	_, err := pollForNotifications(errImpl)
 	if err == nil {
