@@ -10,6 +10,7 @@ package notifications
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/comms/connect"
@@ -17,6 +18,7 @@ import (
 	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
 	"strings"
+	"time"
 )
 
 // We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
@@ -44,11 +46,13 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationComms) (*ndf.N
 	//Send the hash to registration
 	response, err := comms.RequestNdf(regHost, msg)
 	if err != nil {
-		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
-		if  strings.Contains(errMsg.Error(), ndf.NO_NDF) {
-			jww.WARN.Println("Continuing without an updated NDF")
-			return nil, nil
+		for err != nil && strings.Contains(err.Error(), ndf.NO_NDF) {
+			jww.WARN.Println("Failed to get an ndf, possibly not ready yet. Retying now...")
+			time.Sleep(50*time.Millisecond)
+			response, err = comms.RequestNdf(regHost, msg)
 		}
+		// If it is not an issue with no ndf, return the error up the stack
+		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
 		return nil, errMsg
 	}
 
