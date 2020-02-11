@@ -50,6 +50,7 @@ type Impl struct {
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
 	fcm              *messaging.Client
+	gwId             *id.Gateway
 }
 
 // We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
@@ -177,7 +178,7 @@ func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
 func pollForNotifications(nb *Impl) (strings []string, e error) {
-	h, ok := nb.Comms.GetHost("gw")
+	h, ok := nb.Comms.GetHost(nb.gwId.String())
 	if !ok {
 		return nil, errors.New("Could not find gateway host")
 	}
@@ -213,9 +214,11 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 	return nil
 }
 
+// Update stored NDF and add host for gateway to poll
 func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
 	gw := ndf.Gateways[len(ndf.Gateways)-1]
-	_, err := nb.Comms.AddHost("gw", gw.Address, []byte(gw.TlsCertificate), true, true)
+	nb.gwId = id.NewNodeFromBytes(ndf.Nodes[len(ndf.Nodes)-1].ID).NewGateway()
+	_, err := nb.Comms.AddHost(nb.gwId.String(), gw.Address, []byte(gw.TlsCertificate), true, true)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add gateway host from NDF")
 	}
