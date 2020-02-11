@@ -10,7 +10,6 @@ package notifications
 
 import (
 	"crypto/sha256"
-	"fmt"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/comms/connect"
