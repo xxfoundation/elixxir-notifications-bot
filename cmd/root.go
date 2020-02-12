@@ -11,6 +11,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
@@ -18,8 +19,11 @@ import (
 	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/id"
+	"gitlab.com/elixxir/primitives/ndf"
+	"gitlab.com/elixxir/primitives/utils"
 	"os"
 	"path"
+	"strings"
 )
 
 var (
@@ -53,19 +57,20 @@ var rootCmd = &cobra.Command{
 		certPath := viper.GetString("certPath")
 		keyPath := viper.GetString("keyPath")
 		localAddress := fmt.Sprintf("0.0.0.0:%d", viper.GetInt("port"))
+		fbCreds := viper.GetString("firebaseCredentialsPath")
 
 		// Populate params
 		NotificationParams = notifications.Params{
 			Address:  localAddress,
 			CertPath: certPath,
 			KeyPath:  keyPath,
+			FBCreds:  fbCreds,
 		}
 		jww.INFO.Println("Starting Notifications...")
 
-		impl, err := notifications.StartNotifications(NotificationParams, noTLS)
+		impl, err := notifications.StartNotifications(NotificationParams, noTLS, false)
 		if err != nil {
-			err = fmt.Errorf("Failed to start notifications server: %+v", err)
-			panic(err)
+			jww.FATAL.Panicf("Failed to start notifications server: %+v", err)
 		}
 
 		impl.Storage = storage.NewDatabase(
@@ -75,23 +80,52 @@ var rootCmd = &cobra.Command{
 			viper.GetString("dbAddress"),
 		)
 
-		permissioningAddr := viper.GetString("permissioningAddress")
-		permissioningCertPath := viper.GetString("permissioningCertPath")
-		_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, []byte(permissioningCertPath), true, true)
-
-		if err != nil{
-			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
+		err = setupConnection(impl, viper.GetString("permissioningCertPath"), viper.GetString("permissioningAddress"))
+		if err != nil {
+			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
 		}
 
 		// Start notification loop
 		killChan := make(chan struct{})
-		go impl.RunNotificationLoop(viper.GetString("firebaseCredentialsPath"),
-			loopDelay,
-			killChan)
+		errChan := make(chan error)
+		go impl.RunNotificationLoop(loopDelay, killChan, errChan)
 
 		// Wait forever to prevent process from ending
-		select {}
+		err = <-errChan
+		panic(err)
 	},
+}
+
+// setupConnection handles connecting to permissioning and polling for the NDF once connected
+func setupConnection(impl *notifications.Impl, permissioningCertPath, permissioningAddr string) error {
+	// Read in permissioning certificate
+	cert, err := utils.ReadFile(permissioningCertPath)
+	if err != nil {
+		return errors.Wrap(err, "Could not read permissioning cert")
+	}
+
+	// Add host for permissioning server
+	_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, cert, true, false)
+	if err != nil {
+		return errors.Wrap(err, "Failed to Create permissioning host")
+	}
+
+	// Loop until an NDF is received
+	var def *ndf.NetworkDefinition
+	for def == nil {
+		def, err = notifications.PollNdf(nil, impl.Comms)
+		// Don't stop if error is expected
+		if err != nil && !strings.Contains(err.Error(), ndf.NO_NDF) {
+			return errors.Wrap(err, "Failed to get NDF")
+		}
+	}
+
+	// Update NDF & gateway host
+	err = impl.UpdateNdf(def)
+	if err != nil {
+		return errors.Wrap(err, "Failed to update impl's NDF")
+	}
+	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags
@@ -125,8 +159,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&noTLS, "noTLS", false,
 		"Runs without TLS enabled")
 
-	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 5,
-		"Set the delay between notification loops (in seconds)")
+	rootCmd.Flags().IntVarP(&loopDelay, "loopDelay", "", 500,
+		"Set the delay between notification loops (in milliseconds)")
 
 	// Bind config and command line flags of the same name
 	err := viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))

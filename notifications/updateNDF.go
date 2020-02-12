@@ -12,7 +12,6 @@ import (
 	"crypto/sha256"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/comms/connect"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
@@ -21,22 +20,19 @@ import (
 
 var noNDFErr = errors.Errorf("Permissioning server does not have an ndf to give to client")
 
-// We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
-type notificationComms interface {
-	GetHost(hostId string) (*connect.Host, bool)
-	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
-}
-
 // PollNdf, attempts to connect to the permissioning server to retrieve the latest ndf for the notifications bot
-func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationComms) (*ndf.NetworkDefinition, error) {
+func PollNdf(currentDef *ndf.NetworkDefinition, comms NotificationComms) (*ndf.NetworkDefinition, error) {
 	//Hash the notifications bot ndf for comparison with registration's ndf
-	hash := sha256.New()
-	ndfBytes := currentDef.Serialize()
-	hash.Write(ndfBytes)
-	ndfHash := hash.Sum(nil)
+	var ndfHash []byte
+	if currentDef != nil {
+		hash := sha256.New()
+		ndfBytes := currentDef.Serialize()
+		hash.Write(ndfBytes)
+		ndfHash = hash.Sum(nil)
+	}
 
 	//Put the hash in a message
-	msg := &pb.NDFHash{Hash: ndfHash}
+	msg := &pb.NDFHash{Hash: ndfHash} // TODO: this should be a helper somewhere
 
 	regHost, ok := comms.GetHost(id.PERMISSIONING)
 	if !ok {
@@ -46,8 +42,8 @@ func PollNdf(currentDef *ndf.NetworkDefinition, comms notificationComms) (*ndf.N
 	//Send the hash to registration
 	response, err := comms.RequestNdf(regHost, msg)
 	if err != nil {
-		errMsg := errors.Errorf("Failed to get ndf from permissioning: %v", err)
-		if  strings.Contains(errMsg.Error(), noNDFErr.Error()) {
+		errMsg := errors.Wrap(err, "Failed to get ndf from permissioning")
+		if strings.Contains(errMsg.Error(), noNDFErr.Error()) {
 			jww.WARN.Println("Continuing without an updated NDF")
 			return nil, nil
 		}

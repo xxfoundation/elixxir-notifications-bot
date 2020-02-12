@@ -6,7 +6,6 @@
 package notifications
 
 import (
-	"context"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/comms/connect"
@@ -14,6 +13,7 @@ import (
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/notifications-bot/testutil"
+	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
 	"os"
@@ -25,56 +25,39 @@ import (
 // Basic test to cover RunNotificationLoop, including error sending
 func TestRunNotificationLoop(t *testing.T) {
 	impl := getNewImpl()
-	impl.pollFunc = func(host *connect.Host, requestInterface RequestInterface) (i []string, e error) {
+	impl.pollFunc = func(*Impl) (i []string, e error) {
 		return []string{"test1", "test2"}, nil
 	}
-	impl.notifyFunc = func(s3 string, s2 string, comm *firebase.FirebaseComm, storage storage.Storage) (s string, e error) {
-		if s3 == "test1" {
-			return "", errors.New("Failed to notify")
-		}
+	impl.notifyFunc = func(fcm *messaging.Client, s3 string, comm *firebase.FirebaseComm, storage storage.Storage) (s string, e error) {
 		return "good", nil
 	}
 	killChan := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
 		time.Sleep(10 * time.Second)
 		killChan <- struct{}{}
 	}()
-	impl.RunNotificationLoop("", 3, killChan)
+	impl.RunNotificationLoop(3, killChan, errChan)
 }
 
 // Test notificationbot's notifyuser function
 // this mocks the setup and send functions, and only tests the core logic of this function
 func TestNotifyUser(t *testing.T) {
-	badsetup := func(string) (*messaging.Client, context.Context, error) {
-		ctx := context.Background()
-		return &messaging.Client{}, ctx, errors.New("Failed")
-	}
-	setup := func(string) (*messaging.Client, context.Context, error) {
-		ctx := context.Background()
-		return &messaging.Client{}, ctx, nil
-	}
-	badsend := func(firebase.FBSender, context.Context, string) (string, error) {
+	badsend := func(firebase.FBSender, string) (string, error) {
 		return "", errors.New("Failed")
 	}
-	send := func(firebase.FBSender, context.Context, string) (string, error) {
+	send := func(firebase.FBSender, string) (string, error) {
 		return "", nil
 	}
-	fc_badsetup := firebase.NewMockFirebaseComm(t, badsetup, send)
-	fc_badsend := firebase.NewMockFirebaseComm(t, setup, badsend)
-	fc := firebase.NewMockFirebaseComm(t, setup, send)
+	fc_badsend := firebase.NewMockFirebaseComm(t, badsend)
+	fc := firebase.NewMockFirebaseComm(t, send)
 
-	_, err := notifyUser("test", "testpath", fc_badsetup, testutil.MockStorage{})
-	if err == nil {
-		t.Error("Should have returned an error")
-		return
-	}
-
-	_, err = notifyUser("test", "testpath", fc_badsend, testutil.MockStorage{})
+	_, err := notifyUser(nil, "test", fc_badsend, testutil.MockStorage{})
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
 
-	_, err = notifyUser("test", "testpath", fc, testutil.MockStorage{})
+	_, err = notifyUser(nil, "test", fc, testutil.MockStorage{})
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -94,31 +77,31 @@ func TestStartNotifications(t *testing.T) {
 		PublicAddress: "0.0.0.0:42010",
 	}
 
-	n, err := StartNotifications(params, false)
+	n, err := StartNotifications(params, false, true)
 	if err == nil || !strings.Contains(err.Error(), "failed to read key at") {
 		t.Errorf("Should have thrown an error for no key path")
 	}
 
 	params.KeyPath = wd + "/../testutil/badkey"
-	n, err = StartNotifications(params, false)
+	n, err = StartNotifications(params, false, true)
 	if err == nil || !strings.Contains(err.Error(), "Failed to parse notifications server key") {
 		t.Errorf("Should have thrown an error bad key")
 	}
 
 	params.KeyPath = wd + "/../testutil/cmix.rip.key"
-	n, err = StartNotifications(params, false)
+	n, err = StartNotifications(params, false, true)
 	if err == nil || !strings.Contains(err.Error(), "failed to read certificate at") {
 		t.Errorf("Should have thrown an error for no cert path")
 	}
 
 	params.CertPath = wd + "/../testutil/badkey"
-	n, err = StartNotifications(params, false)
+	n, err = StartNotifications(params, false, true)
 	if err == nil || !strings.Contains(err.Error(), "Failed to parse notifications server cert") {
 		t.Errorf("Should have thrown an error for bad certificate")
 	}
 
 	params.CertPath = wd + "/../testutil/cmix.rip.crt"
-	n, err = StartNotifications(params, false)
+	n, err = StartNotifications(params, false, true)
 	if err != nil {
 		t.Errorf("Failed to start notifications successfully: %+v", err)
 	}
@@ -149,21 +132,47 @@ func (m mockPollComm) RequestNotifications(host *connect.Host) (*pb.IDList, erro
 		IDs: []string{"test"},
 	}, nil
 }
+func (m mockPollComm) GetHost(hostId string) (*connect.Host, bool) {
+	return &connect.Host{}, true
+}
+func (m mockPollComm) AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error) {
+	return nil, nil
+}
+func (m mockPollComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
+	return nil, nil
+}
 
 type mockPollErrComm struct{}
 
 func (m mockPollErrComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
 	return nil, errors.New("failed to poll")
 }
+func (m mockPollErrComm) GetHost(hostId string) (*connect.Host, bool) {
+	return nil, false
+}
+func (m mockPollErrComm) AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error) {
+	return nil, nil
+}
+func (m mockPollErrComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
+	return nil, nil
+}
 
 // Unit test for PollForNotifications
 func TestPollForNotifications(t *testing.T) {
-	_, err := pollForNotifications(nil, mockPollErrComm{})
+	impl := &Impl{
+		Comms: mockPollComm{},
+		gwId:  id.NewNodeFromBytes([]byte("test")).NewGateway(),
+	}
+	errImpl := &Impl{
+		Comms: mockPollErrComm{},
+		gwId:  id.NewNodeFromBytes([]byte("test")).NewGateway(),
+	}
+	_, err := pollForNotifications(errImpl)
 	if err == nil {
 		t.Errorf("Failed to poll for notifications: %+v", err)
 	}
 
-	_, err = pollForNotifications(nil, mockPollComm{})
+	_, err = pollForNotifications(impl)
 	if err != nil {
 		t.Errorf("Failed to poll for notifications: %+v", err)
 	}
@@ -192,11 +201,14 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 func TestImpl_UpdateNdf(t *testing.T) {
 	impl := getNewImpl()
 	testNdf, _, err := ndf.DecodeNDF(ExampleNdfJSON)
-	if err != nil{
+	if err != nil {
 		t.Logf("%+v", err)
 	}
 
-	impl.updateNdf(testNdf)
+	err = impl.UpdateNdf(testNdf)
+	if err != nil {
+		t.Errorf("Failed to update ndf")
+	}
 
 	if impl.ndf != testNdf {
 		t.Logf("Failed to change ndf")
@@ -231,7 +243,8 @@ func getNewImpl() *Impl {
 		KeyPath:       wd + "/../testutil/cmix.rip.key",
 		CertPath:      wd + "/../testutil/cmix.rip.crt",
 		PublicAddress: "0.0.0.0:0",
+		FBCreds:       "",
 	}
-	instance, _ := StartNotifications(params, false)
+	instance, _ := StartNotifications(params, false, true)
 	return instance
 }
