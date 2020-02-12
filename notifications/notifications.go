@@ -59,7 +59,7 @@ type NotificationComms interface {
 	AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error)
 	RequestNotifications(host *connect.Host) (*pb.IDList, error)
 	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
-	PollNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error)
+	RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error)
 }
 
 // Main function for this repo accepts credentials and an impl

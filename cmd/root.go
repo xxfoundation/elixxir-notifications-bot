@@ -114,7 +114,7 @@ func setupConnection(impl *notifications.Impl, permissioningCertPath, permission
 	var def *ndf.NetworkDefinition
 	emptyNdf := &ndf.NetworkDefinition{}
 	for def == nil {
-		def, err = impl.Comms.PollNdf(emptyNdf)
+		def, err = impl.Comms.RetrieveNdf(emptyNdf)
 		// Don't stop if error is expected
 		if err != nil && !strings.Contains(err.Error(), ndf.NO_NDF) {
 			return errors.Wrap(err, "Failed to get NDF")
