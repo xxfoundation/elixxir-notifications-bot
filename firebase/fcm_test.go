@@ -22,10 +22,9 @@ func (MockSender) Send(ctx context.Context, app *messaging.Message) (string, err
 // This tests the function which sends a notification to firebase.
 // Note: this requires you to have a valid token & service credentials
 func TestSendNotification(t *testing.T) {
-	ctx := context.Background()
 	app := MockSender{}
 
-	_, err := sendNotification(app, ctx, token)
+	_, err := sendNotification(app, token)
 	if err != nil {
 		t.Error(err.Error())
 	}
@@ -34,7 +33,7 @@ func TestSendNotification(t *testing.T) {
 // Unit test the NewFirebaseComm method
 func TestNewFirebaseComm(t *testing.T) {
 	comm := NewFirebaseComm()
-	if comm.SendNotification == nil || comm.SetupMessagingApp == nil {
+	if comm.SendNotification == nil {
 		t.Error("Failed to set functions in comm")
 	}
 }
