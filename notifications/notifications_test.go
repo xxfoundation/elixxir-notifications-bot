@@ -144,6 +144,9 @@ func (m mockPollComm) AddHost(id, address string, cert []byte, disableTimeout, e
 func (m mockPollComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
 	return nil, nil
 }
+func (m mockPollComm) PollNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error){
+	return nil, nil
+}
 
 type mockPollErrComm struct{}
 
@@ -157,6 +160,9 @@ func (m mockPollErrComm) AddHost(id, address string, cert []byte, disableTimeout
 	return nil, nil
 }
 func (m mockPollErrComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
+	return nil, nil
+}
+func (m mockPollErrComm) PollNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error){
 	return nil, nil
 }
 
