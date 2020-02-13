@@ -98,7 +98,7 @@ var rootCmd = &cobra.Command{
 
 		// Wait forever to prevent process from ending
 		err = <-errChan
-		panic(err)
+		jww.FATAL.Panicf("Notifications loop error received: %+v", err)
 	},
 }
 
