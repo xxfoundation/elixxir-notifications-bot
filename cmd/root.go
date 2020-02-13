@@ -57,7 +57,10 @@ var rootCmd = &cobra.Command{
 		certPath := viper.GetString("certPath")
 		keyPath := viper.GetString("keyPath")
 		localAddress := fmt.Sprintf("0.0.0.0:%d", viper.GetInt("port"))
-		fbCreds := viper.GetString("firebaseCredentialsPath")
+		fbCreds, err := utils.ExpandPath(viper.GetString("firebaseCredentialsPath"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand credentials path: %+v", err)
+		}
 
 		// Populate params
 		NotificationParams = notifications.Params{
@@ -66,13 +69,15 @@ var rootCmd = &cobra.Command{
 			KeyPath:  keyPath,
 			FBCreds:  fbCreds,
 		}
-		jww.INFO.Println("Starting Notifications...")
 
+		// Start notifications server
+		jww.INFO.Println("Starting Notifications...")
 		impl, err := notifications.StartNotifications(NotificationParams, noTLS, false)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to start notifications server: %+v", err)
 		}
 
+		// Initialize the storage backend
 		impl.Storage = storage.NewDatabase(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
@@ -80,6 +85,7 @@ var rootCmd = &cobra.Command{
 			viper.GetString("dbAddress"),
 		)
 
+		// Set up the notifications server connections
 		err = setupConnection(impl, viper.GetString("permissioningCertPath"), viper.GetString("permissioningAddress"))
 		if err != nil {
 			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
