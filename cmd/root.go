@@ -57,9 +57,15 @@ var rootCmd = &cobra.Command{
 		certPath := viper.GetString("certPath")
 		keyPath := viper.GetString("keyPath")
 		localAddress := fmt.Sprintf("0.0.0.0:%d", viper.GetInt("port"))
-		fbCreds, err := utils.ExpandPath(viper.GetString("firebaseCredentialsPath"))
+		fbCreds, err := utils.ExpandPath(
+			viper.GetString("firebaseCredentialsPath"))
 		if err != nil {
 			jww.FATAL.Panicf("Unable to expand credentials path: %+v", err)
+		}
+		permissioningCert, err := utils.ExpandPath(
+			viper.GetString("permissioningCertPath"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand permissioning certificate path: %+v", err)
 		}
 
 		// Populate params
@@ -86,7 +92,8 @@ var rootCmd = &cobra.Command{
 		)
 
 		// Set up the notifications server connections
-		err = setupConnection(impl, viper.GetString("permissioningCertPath"), viper.GetString("permissioningAddress"))
+		err = setupConnection(impl, permissioningCert,
+			viper.GetString("permissioningAddress"))
 		if err != nil {
 			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
 		}
