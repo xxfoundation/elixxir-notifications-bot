@@ -32,11 +32,10 @@ type NotifyFunc func(*messaging.Client, string, *firebase.FirebaseComm, storage.
 
 // Params struct holds info passed in for configuration
 type Params struct {
-	Address       string
-	CertPath      string
-	KeyPath       string
-	PublicAddress string
-	FBCreds       string
+	Address  string
+	CertPath string
+	KeyPath  string
+	FBCreds  string
 }
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
@@ -130,7 +129,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 
 	// Start notification comms server
 	handler := NewImplementation(impl)
-	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.PublicAddress, handler, cert, key)
+	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.Address, handler, cert, key)
 
 	// Set up firebase messaging client
 	if !noFirebase {
