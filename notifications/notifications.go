@@ -32,10 +32,11 @@ type NotifyFunc func(*messaging.Client, string, *firebase.FirebaseComm, storage.
 
 // Params struct holds info passed in for configuration
 type Params struct {
-	Address  string
-	CertPath string
-	KeyPath  string
-	FBCreds  string
+	Address       string
+	CertPath      string
+	KeyPath       string
+	PublicAddress string
+	FBCreds       string
 }
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
@@ -59,6 +60,7 @@ type NotificationComms interface {
 	RequestNotifications(host *connect.Host) (*pb.IDList, error)
 	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
 	RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error)
+	StartNotificationBot() error
 }
 
 // Main function for this repo accepts credentials and an impl
@@ -127,9 +129,18 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	impl.pollFunc = pollForNotifications
 	impl.notifyFunc = notifyUser
 
-	// Start notification comms server
+	// Create notification comms server
 	handler := NewImplementation(impl)
-	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.Address, handler, cert, key)
+	impl.Comms, err = notificationBot.CreateNotificationBot(id.NOTIFICATION_BOT, params.PublicAddress, handler, cert, key)
+	if err != nil {
+		return nil, errors.Errorf("Failed to create notification bot's comm: %+v", err)
+	}
+
+	// Start up notification bot server
+	err = impl.Comms.StartNotificationBot()
+	if err != nil {
+		return nil, errors.Errorf("Could not start notification bot's server: %+v", err)
+	}
 
 	// Set up firebase messaging client
 	if !noFirebase {
@@ -193,9 +204,6 @@ func pollForNotifications(nb *Impl) (strings []string, e error) {
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
 func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot register for notifications: client is not authenticated")
-	}
 	// Implement this
 	u := &storage.User{
 		Id:    auth.Sender.GetId(),
@@ -210,9 +218,6 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
 func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot unregister for notifications: client is not authenticated")
-	}
 	err := nb.Storage.DeleteUser(auth.Sender.GetId())
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")

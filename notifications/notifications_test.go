@@ -148,6 +148,10 @@ func (m mockPollComm) RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.Netwo
 	return nil, nil
 }
 
+func (m mockPollComm) StartNotificationBot() error {
+	return nil
+}
+
 type mockPollErrComm struct{}
 
 func (m mockPollErrComm) RequestNotifications(host *connect.Host) (*pb.IDList, error) {
@@ -164,6 +168,10 @@ func (m mockPollErrComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*p
 }
 func (m mockPollErrComm) RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error) {
 	return nil, nil
+}
+
+func (m mockPollErrComm) StartNotificationBot() error {
+	return nil
 }
 
 // Unit test for PollForNotifications
