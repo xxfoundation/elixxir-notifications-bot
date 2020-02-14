@@ -37,7 +37,7 @@ func (impl *DatabaseImpl) DeleteUser(userId string) error {
 func (impl *DatabaseImpl) UpsertUser(user *User) error {
 	_, err := impl.db.Model(user).
 		OnConflict("(Id) DO UPDATE").
-		Set("Token = EXCLUDED.Token").Returning("").Insert()
+		Set("Token = EXCLUDED.Token").Insert()
 	if err != nil {
 		return errors.Errorf("Failed to insert user %s: %+v", user.Id, err)
 	}
