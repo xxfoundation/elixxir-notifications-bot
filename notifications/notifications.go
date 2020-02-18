@@ -204,6 +204,10 @@ func pollForNotifications(nb *Impl) (strings []string, e error) {
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
 func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth) error {
+	if !auth.IsAuthenticated {
+		return errors.New("Cannot register for notifications: client is not authenticated")
+	}
+
 	// Implement this
 	u := &storage.User{
 		Id:    auth.Sender.GetId(),
@@ -218,6 +222,10 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
 func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
+	if !auth.IsAuthenticated {
+		return errors.New("Cannot unregister for notifications: client is not authenticated")
+	}
+
 	err := nb.Storage.DeleteUser(auth.Sender.GetId())
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
