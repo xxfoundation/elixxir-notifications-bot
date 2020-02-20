@@ -209,6 +209,9 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 	if !auth.IsAuthenticated {
 		return errors.New("Cannot register for notifications: client is not authenticated")
 	}
+	if string(clientToken) == "" {
+		return errors.New("Cannot register for notifications with empty client token")
+	}
 	// Implement this
 	u := &storage.User{
 		Id:    auth.Sender.GetId(),
