@@ -23,6 +23,7 @@ import (
 	"gitlab.com/elixxir/primitives/id"
 	"gitlab.com/elixxir/primitives/ndf"
 	"gitlab.com/elixxir/primitives/utils"
+	"strings"
 	"time"
 )
 
@@ -181,7 +182,19 @@ func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db
 
 	resp, err := fc.SendNotification(fcm, u.Token)
 	if err != nil {
-		return "", errors.Errorf("Failed to send notification to user with ID %+v: %+v", uid, err)
+		// Catch two firebase errors that we don't want to crash on
+		// 403 and 404 indicate that the token stored is incorrect
+		// this means rather than crashing we should log and unregister the user
+		// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
+		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
+			jww.ERROR.Printf("User with ID %+v has invalid token, unregistering...", uid)
+			err := db.DeleteUser(uid)
+			if err != nil {
+				return "", errors.Wrapf(err, "Failed to remove user registration for uid: %+v", uid)
+			}
+		} else {
+			return "", errors.Wrapf(err, "Failed to send notification to user with ID %+v", uid)
+		}
 	}
 	return resp, nil
 }
@@ -207,7 +220,9 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 	if !auth.IsAuthenticated {
 		return errors.New("Cannot register for notifications: client is not authenticated")
 	}
-
+	if string(clientToken) == "" {
+		return errors.New("Cannot register for notifications with empty client token")
+	}
 	// Implement this
 	u := &storage.User{
 		Id:    auth.Sender.GetId(),

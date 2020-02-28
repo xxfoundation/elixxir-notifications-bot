@@ -82,7 +82,7 @@ func sendNotification(app FBSender, token string) (string, error) {
 
 	resp, err := app.Send(ctx, message)
 	if err != nil {
-		return "", errors.Wrap(err, "Failed to send notification")
+		return resp, errors.Wrapf(err, "Failed to send notification.  Response: %+v", resp)
 	}
 	return resp, nil
 }
