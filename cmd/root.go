@@ -111,7 +111,7 @@ func setupConnection(impl *notifications.Impl, permissioningCertPath, permission
 	}
 
 	// Add host for permissioning server
-	_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, cert, true, false)
+	_, err = impl.Comms.AddHost(&id.Permissioning, permissioningAddr, cert, true, false)
 	if err != nil {
 		return errors.Wrap(err, "Failed to Create permissioning host")
 	}

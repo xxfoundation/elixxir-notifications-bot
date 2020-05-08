@@ -9,9 +9,12 @@
 package storage
 
 import (
+	"encoding/base64"
 	"github.com/go-pg/pg"
 	"github.com/go-pg/pg/orm"
+	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/primitives/id"
 	"sync"
 )
 
@@ -28,9 +31,9 @@ type MapImpl struct {
 // Interface for backend storage operations
 type Storage interface {
 	// Obtain User from backend by primary key
-	GetUser(userId string) (*User, error)
+	GetUser(userId *id.ID) (*User, error)
 	// Delete User from backend by primary key
-	DeleteUser(userId string) error
+	DeleteUser(userId *id.ID) error
 	// Insert or Update User into backend
 	UpsertUser(user *User) error
 }
@@ -45,6 +48,13 @@ type User struct {
 
 	// User notifications token
 	Token string
+}
+
+func NewUser(userID *id.ID, token string) *User {
+	return &User{
+		Id:    encodeUser(userID),
+		Token: token,
+	}
 }
 
 // Initialize the Storage interface with a proper backend type
@@ -100,4 +110,30 @@ func createSchema(db *pg.DB) error {
 	}
 	// No error, return nil
 	return nil
+}
+
+func encodeUser(userId *id.ID) string {
+	return base64.StdEncoding.EncodeToString(userId.Marshal())
+}
+
+func decodeUser(userIdDB string) *id.ID {
+	userIdBytes, err := base64.StdEncoding.DecodeString(userIdDB)
+
+	if err != nil {
+		err = errors.New(err.Error())
+		jww.ERROR.Printf("decodeUser: Got error decoding user ID: %+v,"+
+			" Returning zero ID instead", err)
+		return &id.ZeroUser
+	}
+
+	// Unmarshal user ID from bytes into id.ID
+	userID, err := id.Unmarshal(userIdBytes)
+	if err != nil {
+		err = errors.New(err.Error())
+		jww.ERROR.Printf("decodeUser: Got error unmarshalling user ID: %+v,"+
+			" Returning zero ID instead", err)
+		return &id.ZeroUser
+	}
+
+	return userID
 }

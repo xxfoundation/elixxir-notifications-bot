@@ -28,8 +28,8 @@ import (
 )
 
 // Function type definitions for the main operations (poll and notify)
-type PollFunc func(*Impl) ([]string, error)
-type NotifyFunc func(*messaging.Client, string, *firebase.FirebaseComm, storage.Storage) (string, error)
+type PollFunc func(*Impl) ([]*id.ID, error)
+type NotifyFunc func(*messaging.Client, *id.ID, *firebase.FirebaseComm, storage.Storage) (string, error)
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -50,14 +50,15 @@ type Impl struct {
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
 	fcm              *messaging.Client
-	gwId             *id.Gateway
+	gwId             *id.ID
 }
 
 // We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
 type NotificationComms interface {
-	GetHost(hostId string) (*connect.Host, bool)
-	AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error)
-	RequestNotifications(host *connect.Host) (*pb.IDList, error)
+	GetHost(hostId *id.ID) (*connect.Host, bool)
+	AddHost(id *id.ID, address string, cert []byte, disableTimeout,
+		enableAuth bool) (host *connect.Host, err error)
+	RequestNotifications(host *connect.Host) (*pb.UserIdList, error)
 	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
 	RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error)
 }
@@ -81,11 +82,11 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 			return
 		}
 
-		for _, id := range UIDs {
+		for _, userID := range UIDs {
 			// Attempt to notify a given user (will not error if UID not registered)
-			_, err := nb.notifyFunc(nb.fcm, id, fc, nb.Storage)
+			_, err := nb.notifyFunc(nb.fcm, userID, fc, nb.Storage)
 			if err != nil {
-				errChan <- errors.Wrapf(err, "Failed to notify user with ID %+v", id)
+				errChan <- errors.Wrapf(err, "Failed to notify user with ID %+v", userID)
 				return
 			}
 		}
@@ -130,7 +131,8 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 
 	// Start notification comms server
 	handler := NewImplementation(impl)
-	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.Address, handler, cert, key)
+	impl.Comms = notificationBot.StartNotificationBot(&id.NotificationBot,
+		params.Address, handler, cert, key)
 
 	// Set up firebase messaging client
 	if !noFirebase {
@@ -161,7 +163,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db storage.Storage) (string, error) {
+func notifyUser(fcm *messaging.Client, uid *id.ID, fc *firebase.FirebaseComm, db storage.Storage) (string, error) {
 	u, err := db.GetUser(uid)
 	if err != nil {
 		jww.DEBUG.Printf("No registration found for user with ID %+v", uid)
@@ -190,8 +192,8 @@ func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db
 
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
-func pollForNotifications(nb *Impl) (strings []string, e error) {
-	h, ok := nb.Comms.GetHost(nb.gwId.String())
+func pollForNotifications(nb *Impl) (strings []*id.ID, e error) {
+	h, ok := nb.Comms.GetHost(nb.gwId)
 	if !ok {
 		return nil, errors.New("Could not find gateway host")
 	}
@@ -201,7 +203,12 @@ func pollForNotifications(nb *Impl) (strings []string, e error) {
 		return nil, errors.Wrap(err, "Failed to retrieve notifications from gateway")
 	}
 
-	return users.IDs, nil
+	idList, err := id.NewIDListFromBytes(users.IDs)
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to make new list of IDs from bytes")
+	}
+
+	return idList, nil
 }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
@@ -213,10 +220,7 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 		return errors.New("Cannot register for notifications with empty client token")
 	}
 	// Implement this
-	u := &storage.User{
-		Id:    auth.Sender.GetId(),
-		Token: string(clientToken),
-	}
+	u := storage.NewUser(auth.Sender.GetId(), string(clientToken))
 	err := nb.Storage.UpsertUser(u)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
@@ -239,8 +243,15 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 // Update stored NDF and add host for gateway to poll
 func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
 	gw := ndf.Gateways[len(ndf.Gateways)-1]
-	nb.gwId = id.NewNodeFromBytes(ndf.Nodes[len(ndf.Nodes)-1].ID).NewGateway()
-	_, err := nb.Comms.AddHost(nb.gwId.String(), gw.Address, []byte(gw.TlsCertificate), true, true)
+
+	gwID, err := id.Unmarshal(ndf.Nodes[len(ndf.Nodes)-1].ID)
+	if err != nil {
+		return err
+	}
+	gwID.SetType(id.Gateway)
+	nb.gwId = gwID
+
+	_, err = nb.Comms.AddHost(nb.gwId, gw.Address, []byte(gw.TlsCertificate), true, true)
 	if err != nil {
 		return errors.Wrap(err, "Failed to add gateway host from NDF")
 	}

@@ -8,12 +8,15 @@
 
 package storage
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+	"gitlab.com/elixxir/primitives/id"
+)
 
 // Obtain User from backend by primary key
-func (impl *DatabaseImpl) GetUser(userId string) (*User, error) {
+func (impl *DatabaseImpl) GetUser(userId *id.ID) (*User, error) {
 	u := &User{
-		Id: userId,
+		Id: encodeUser(userId),
 	}
 	err := impl.db.Select(u)
 	if err != nil {
@@ -23,9 +26,9 @@ func (impl *DatabaseImpl) GetUser(userId string) (*User, error) {
 }
 
 // Delete User from backend by primary key
-func (impl *DatabaseImpl) DeleteUser(userId string) error {
+func (impl *DatabaseImpl) DeleteUser(userId *id.ID) error {
 	err := impl.db.Delete(&User{
-		Id: userId,
+		Id: encodeUser(userId),
 	})
 	if err != nil {
 		return errors.Errorf("Failed to delete user with ID %s: %+v", userId, err)

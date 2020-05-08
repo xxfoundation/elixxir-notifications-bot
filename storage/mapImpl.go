@@ -10,12 +10,13 @@ package storage
 
 import (
 	"errors"
+	"gitlab.com/elixxir/primitives/id"
 )
 
 // Obtain User from backend by primary key
-func (m *MapImpl) GetUser(userId string) (*User, error) {
+func (m *MapImpl) GetUser(userId *id.ID) (*User, error) {
 	// Attempt to load from map
-	v, found := m.users.Load(userId)
+	v, found := m.users.Load(*userId)
 	// Check if it was found, Load function sets it as a bool
 	if found == false {
 		return nil, errors.New("user could not be found")
@@ -25,7 +26,7 @@ func (m *MapImpl) GetUser(userId string) (*User, error) {
 }
 
 // Delete User from backend by primary key
-func (m *MapImpl) DeleteUser(userId string) error {
+func (m *MapImpl) DeleteUser(userId *id.ID) error {
 	m.users.Delete(userId)
 
 	return nil
@@ -34,7 +35,7 @@ func (m *MapImpl) DeleteUser(userId string) error {
 // Insert or Update User into backend
 func (m *MapImpl) UpsertUser(user *User) error {
 	// Insert new user
-	m.users.Store(user.Id, user)
+	m.users.Store(*decodeUser(user.Id), user)
 
 	return nil
 }

@@ -1,16 +1,22 @@
 package storage
 
-import "testing"
+import (
+	"gitlab.com/elixxir/primitives/id"
+	"testing"
+)
 
 // This file contains testing for mapImpl.go
 
 // This tests getting a user that does exist in the database
 func TestMapImpl_GetUser_Happy(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
-	m.users.Store(u.Id, &u)
+	u := User{
+		Id:    encodeUser(id.NewIdFromString("test", id.User, t)),
+		Token: "token",
+	}
+	m.users.Store(*decodeUser(u.Id), &u)
 
-	user, err := m.GetUser(u.Id)
+	user, err := m.GetUser(decodeUser(u.Id))
 
 	// Check that we got a user back
 	if user == nil {
@@ -29,16 +35,19 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 	}
 
 	if err != nil {
-		t.Errorf("TestMapImpl_GetUser_Happy: function returned an error\n\tGot: %s", err)
+		t.Errorf("TestMapImpl_GetUser_Happy: function returned an error\n\tGot: %+v", err)
 	}
 }
 
 // This tests getting a user that does *not* exist in the database
 func TestMapImpl_GetUser_NoUser(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
+	u := User{
+		Id:    encodeUser(id.NewIdFromString("test", id.User, t)),
+		Token: "token",
+	}
 
-	user, err := m.GetUser(u.Id)
+	user, err := m.GetUser(decodeUser(u.Id))
 
 	if user != nil {
 		t.Errorf("TestMapImpl_GetUser_NoUser: function returned a user\n\tGot: %s", user.Id)
@@ -52,10 +61,13 @@ func TestMapImpl_GetUser_NoUser(t *testing.T) {
 // This tests deleting a user that does exist in the database
 func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
-	m.users.Store(u.Id, &u)
+	u := User{
+		Id:    encodeUser(id.NewIdFromString("test", id.User, t)),
+		Token: "token",
+	}
+	m.users.Store(decodeUser(u.Id), &u)
 
-	err := m.DeleteUser(u.Id)
+	err := m.DeleteUser(decodeUser(u.Id))
 
 	if err != nil {
 		t.Errorf("TestMapImpl_DeleteUser_Happy: function returned error\n\tGot: %s", err)
@@ -71,7 +83,10 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 // This tests inserting a user once and verifying we can read it back right
 func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
+	u := User{
+		Id:    encodeUser(id.NewIdFromString("test", id.User, t)),
+		Token: "token",
+	}
 
 	err := m.UpsertUser(&u)
 
@@ -80,7 +95,7 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 	}
 
 	// Load user from map manually
-	user, ok := m.users.Load(u.Id)
+	user, ok := m.users.Load(*decodeUser(u.Id))
 	// Check that a user was found
 	if ok != true {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
@@ -101,7 +116,10 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 // This tests inserting a user *twice* and verifying we can read it back right each time
 func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
+	u := User{
+		Id:    encodeUser(id.NewIdFromString("test", id.User, t)),
+		Token: "token",
+	}
 
 	err := m.UpsertUser(&u)
 
@@ -110,7 +128,7 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	}
 
 	// Load user from map manually
-	user, ok := m.users.Load(u.Id)
+	user, ok := m.users.Load(*decodeUser(u.Id))
 	// Check that a user was found
 	if ok != true {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
@@ -128,11 +146,14 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	}
 
 	// Create user with the same ID but change the token
-	u2 := User{Id: "test", Token: "othertoken"}
+	u2 := User{
+		Id:    encodeUser(id.NewIdFromString("test", id.User, t)),
+		Token: "othertoken",
+	}
 	err = m.UpsertUser(&u2)
 
 	// Load user from map manually
-	user, ok = m.users.Load(u2.Id)
+	user, ok = m.users.Load(*decodeUser(u2.Id))
 	// Check that a user was found
 	if ok != true {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
