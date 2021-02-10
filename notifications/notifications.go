@@ -13,22 +13,22 @@ import (
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/comms/connect"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/notificationBot"
-	"gitlab.com/elixxir/crypto/signature/rsa"
-	"gitlab.com/elixxir/crypto/tls"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
-	"gitlab.com/elixxir/primitives/id"
-	"gitlab.com/elixxir/primitives/ndf"
-	"gitlab.com/elixxir/primitives/utils"
+	"gitlab.com/xx_network/comms/connect"
+	"gitlab.com/xx_network/crypto/signature/rsa"
+	"gitlab.com/xx_network/crypto/tls"
+	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/ndf"
+	"gitlab.com/xx_network/primitives/utils"
 	"strings"
 	"time"
 )
 
 // Function type definitions for the main operations (poll and notify)
-type PollFunc func(*Impl) ([]string, error)
+type PollFunc func(*Impl) ([][]byte, error)
 type NotifyFunc func(*messaging.Client, string, *firebase.FirebaseComm, storage.Storage) (string, error)
 
 // Params struct holds info passed in for configuration
@@ -50,16 +50,15 @@ type Impl struct {
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
 	fcm              *messaging.Client
-	gwId             *id.Gateway
+	gwId             *id.ID
 }
 
-// We use an interface here inorder to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
+// We use an interface here in order to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
 type NotificationComms interface {
-	GetHost(hostId string) (*connect.Host, bool)
-	AddHost(id, address string, cert []byte, disableTimeout, enableAuth bool) (host *connect.Host, err error)
-	RequestNotifications(host *connect.Host) (*pb.IDList, error)
+	GetHost(hostId *id.ID) (*connect.Host, bool)
+	AddHost(hid *id.ID, address string, cert []byte, params connect.HostParams) (host *connect.Host, err error)
+	RequestNotifications(host *connect.Host) (*pb.UserIdList, error)
 	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
-	RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error)
 }
 
 // Main function for this repo accepts credentials and an impl
@@ -83,7 +82,7 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 
 		for _, id := range UIDs {
 			// Attempt to notify a given user (will not error if UID not registered)
-			_, err := nb.notifyFunc(nb.fcm, id, fc, nb.Storage)
+			_, err := nb.notifyFunc(nb.fcm, string(id), fc, nb.Storage)
 			if err != nil {
 				errChan <- errors.Wrapf(err, "Failed to notify user with ID %+v", id)
 				return
@@ -130,8 +129,8 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 
 	// Start notification comms server
 	handler := NewImplementation(impl)
-	impl.Comms = notificationBot.StartNotificationBot(id.NOTIFICATION_BOT, params.Address, handler, cert, key)
-
+	comms := notificationBot.StartNotificationBot(&id.NotificationBot, params.Address, handler, cert, key)
+	impl.Comms = comms
 	// Set up firebase messaging client
 	if !noFirebase {
 		app, err := firebase.SetupMessagingApp(params.FBCreds)
@@ -190,8 +189,8 @@ func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db
 
 // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
 // It retrieves a list of user ids to be notified from the gateway
-func pollForNotifications(nb *Impl) (strings []string, e error) {
-	h, ok := nb.Comms.GetHost(nb.gwId.String())
+func pollForNotifications(nb *Impl) (uids [][]byte, e error) {
+	h, ok := nb.Comms.GetHost(nb.gwId)
 	if !ok {
 		return nil, errors.New("Could not find gateway host")
 	}
@@ -214,7 +213,7 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 	}
 	// Implement this
 	u := &storage.User{
-		Id:    auth.Sender.GetId(),
+		Id:    auth.Sender.GetId().String(),
 		Token: string(clientToken),
 	}
 	err := nb.Storage.UpsertUser(u)
@@ -229,7 +228,7 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 	if !auth.IsAuthenticated {
 		return errors.New("Cannot unregister for notifications: client is not authenticated")
 	}
-	err := nb.Storage.DeleteUser(auth.Sender.GetId())
+	err := nb.Storage.DeleteUser(auth.Sender.GetId().String())
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}
@@ -239,8 +238,12 @@ func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
 // Update stored NDF and add host for gateway to poll
 func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
 	gw := ndf.Gateways[len(ndf.Gateways)-1]
-	nb.gwId = id.NewNodeFromBytes(ndf.Nodes[len(ndf.Nodes)-1].ID).NewGateway()
-	_, err := nb.Comms.AddHost(nb.gwId.String(), gw.Address, []byte(gw.TlsCertificate), true, true)
+	var err error
+	nb.gwId, err = id.Unmarshal(ndf.Nodes[len(ndf.Nodes)-1].ID)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to unmarshal ID")
+	}
+	_, err = nb.Comms.AddHost(nb.gwId, gw.Address, []byte(gw.TlsCertificate), connect.GetDefaultHostParams())
 	if err != nil {
 		return errors.Wrap(err, "Failed to add gateway host from NDF")
 	}
