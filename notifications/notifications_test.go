@@ -10,10 +10,12 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	pb "gitlab.com/elixxir/comms/mixmessages"
+	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
-	"gitlab.com/elixxir/notifications-bot/testutil"
 	"gitlab.com/xx_network/comms/connect"
+	"gitlab.com/xx_network/crypto/csprng"
+	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
@@ -32,7 +34,7 @@ func TestRunNotificationLoop(t *testing.T) {
 	impl.pollFunc = func(*Impl) (i [][]byte, e error) {
 		return [][]byte{[]byte("test1"), []byte("test2")}, nil
 	}
-	impl.notifyFunc = func(fcm *messaging.Client, s3 string, comm *firebase.FirebaseComm, storage storage.Storage) (s string, e error) {
+	impl.notifyFunc = func(fcm *messaging.Client, s3 []byte, comm *firebase.FirebaseComm, storage *storage.Storage) (s string, e error) {
 		return "good", nil
 	}
 	killChan := make(chan struct{})
@@ -56,12 +58,20 @@ func TestNotifyUser(t *testing.T) {
 	fc_badsend := firebase.NewMockFirebaseComm(t, badsend)
 	fc := firebase.NewMockFirebaseComm(t, send)
 
-	_, err := notifyUser(nil, "test", fc_badsend, testutil.MockStorage{})
+	s, err := storage.NewStorage("", "", "", "", "")
+	if err != nil {
+		t.Errorf("Failed to make new storage: %+v", err)
+	}
+	err = s.AddUser([]byte("zezima"), []byte("rsacert"), "token")
+	if err != nil {
+		t.Errorf("Failed to add fake user: %+v", err)
+	}
+	_, err = notifyUser(nil, []byte("zezima"), fc_badsend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
 
-	_, err = notifyUser(nil, "test", fc, testutil.MockStorage{})
+	_, err = notifyUser(nil, []byte("zezima"), fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -187,14 +197,52 @@ func TestPollForNotifications(t *testing.T) {
 // Unit test for RegisterForNotifications
 func TestImpl_RegisterForNotifications(t *testing.T) {
 	impl := getNewImpl()
-	impl.Storage = testutil.MockStorage{}
-	wd, _ := os.Getwd()
-	crt, _ := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
+	var err error
+	impl.Storage, err = storage.NewStorage("", "", "", "", "")
+	if err != nil {
+		t.Errorf("Failed to create storage: %+v", err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Errorf("Failed to get working dir: %+v", err)
+	}
+	crt, err := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
+	if err != nil {
+		t.Errorf("Failed to read test cert file: %+v", err)
+	}
+	key, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
+	if err != nil {
+		t.Errorf("Failed to reat test key file: %+v", err)
+	}
+	iid := []byte("zezima")
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		t.Errorf("Failed to make cmix hash: %+v", err)
+	}
+	_, err = h.Write(iid)
+	if err != nil {
+		t.Errorf("Failed to write to hash: %+v", err)
+	}
+	pk, err := rsa.LoadPrivateKeyFromPem(key)
+	if err != nil {
+		t.Errorf("Failed to load pk from pem: %+v", err)
+	}
+	sig, err := rsa.Sign(csprng.NewSystemRNG(), pk, hash.CMixHash, h.Sum(nil), nil)
+	if err != nil {
+		t.Errorf("Failed to sign: %+v", err)
+	}
 	host, err := connect.NewHost(id.NewIdFromString("test", id.User, t), "0.0.0.0:420", crt, connect.GetDefaultHostParams())
 	if err != nil {
 		t.Errorf("Failed to create dummy host: %+v", err)
 	}
-	err = impl.RegisterForNotifications([]byte("token"), &connect.Auth{
+	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
+		Token:                 []byte("token"),
+		IntermediaryId:        iid,
+		TransmissionRsa:       nil,
+		TransmissionSalt:      nil,
+		TransmissionRsaSig:    nil,
+		IIDTransmissionRsaSig: sig,
+	}, &connect.Auth{
 		IsAuthenticated: true,
 		Sender:          host,
 	})
@@ -225,14 +273,49 @@ func TestImpl_UpdateNdf(t *testing.T) {
 // Unit test for UnregisterForNotifications
 func TestImpl_UnregisterForNotifications(t *testing.T) {
 	impl := getNewImpl()
-	impl.Storage = testutil.MockStorage{}
-	wd, _ := os.Getwd()
-	crt, _ := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
+	var err error
+	impl.Storage, err = storage.NewStorage("", "", "", "", "")
+	if err != nil {
+		t.Errorf("Failed to create storage: %+v", err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Errorf("Failed to get working dir: %+v", err)
+	}
+	crt, err := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
+	if err != nil {
+		t.Errorf("Failed to read test cert file: %+v", err)
+	}
+	key, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
+	if err != nil {
+		t.Errorf("Failed to reat test key file: %+v", err)
+	}
+	iid := []byte("zezima")
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		t.Errorf("Failed to make cmix hash: %+v", err)
+	}
+	_, err = h.Write(iid)
+	if err != nil {
+		t.Errorf("Failed to write to hash: %+v", err)
+	}
+	pk, err := rsa.LoadPrivateKeyFromPem(key)
+	if err != nil {
+		t.Errorf("Failed to load pk from pem: %+v", err)
+	}
+	sig, err := rsa.Sign(csprng.NewSystemRNG(), pk, hash.CMixHash, h.Sum(nil), nil)
+	if err != nil {
+		t.Errorf("Failed to sign: %+v", err)
+	}
+
 	host, err := connect.NewHost(id.NewIdFromString("test", id.User, t), "0.0.0.0:420", crt, connect.GetDefaultHostParams())
 	if err != nil {
 		t.Errorf("Failed to create dummy host: %+v", err)
 	}
-	err = impl.UnregisterForNotifications(&connect.Auth{
+	err = impl.UnregisterForNotifications(&pb.NotificationUnregisterRequest{
+		IntermediaryId:        iid,
+		IIDTransmissionRsaSig: sig,
+	}, &connect.Auth{
 		IsAuthenticated: true,
 		Sender:          host,
 	})

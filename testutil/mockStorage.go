@@ -4,15 +4,15 @@ import "gitlab.com/elixxir/notifications-bot/storage"
 
 type MockStorage struct{}
 
-func (ms MockStorage) GetUser(userId string) (*storage.User, error) {
+func (ms MockStorage) GetUser(userId []byte) (*storage.User, error) {
 	return &storage.User{
-		Id:    "test",
+		Id:    []byte("test"),
 		Token: "test",
 	}, nil
 }
 
 // Delete User from backend by primary key
-func (ms MockStorage) DeleteUser(userId string) error {
+func (ms MockStorage) DeleteUser(userId []byte) error {
 	return nil
 }
 

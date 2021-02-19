@@ -15,6 +15,7 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/notificationBot"
+	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
@@ -29,7 +30,7 @@ import (
 
 // Function type definitions for the main operations (poll and notify)
 type PollFunc func(*Impl) ([][]byte, error)
-type NotifyFunc func(*messaging.Client, string, *firebase.FirebaseComm, storage.Storage) (string, error)
+type NotifyFunc func(*messaging.Client, []byte, *firebase.FirebaseComm, *storage.Storage) (string, error)
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -42,7 +43,7 @@ type Params struct {
 // Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
 	Comms            NotificationComms
-	Storage          storage.Storage
+	Storage          *storage.Storage
 	notificationCert *x509.Certificate
 	notificationKey  *rsa.PrivateKey
 	certFromFile     string
@@ -82,7 +83,7 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 
 		for _, id := range UIDs {
 			// Attempt to notify a given user (will not error if UID not registered)
-			_, err := nb.notifyFunc(nb.fcm, string(id), fc, nb.Storage)
+			_, err := nb.notifyFunc(nb.fcm, id, fc, nb.Storage)
 			if err != nil {
 				errChan <- errors.Wrapf(err, "Failed to notify user with ID %+v", id)
 				return
@@ -147,12 +148,12 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	impl := notificationBot.NewImplementation()
 
-	impl.Functions.RegisterForNotifications = func(clientToken []byte, auth *connect.Auth) error {
-		return instance.RegisterForNotifications(clientToken, auth)
+	impl.Functions.RegisterForNotifications = func(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
+		return instance.RegisterForNotifications(request, auth)
 	}
 
-	impl.Functions.UnregisterForNotifications = func(auth *connect.Auth) error {
-		return instance.UnregisterForNotifications(auth)
+	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
+		return instance.UnregisterForNotifications(request, auth)
 	}
 
 	return impl
@@ -160,7 +161,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db storage.Storage) (string, error) {
+func notifyUser(fcm *messaging.Client, uid []byte, fc *firebase.FirebaseComm, db *storage.Storage) (string, error) {
 	u, err := db.GetUser(uid)
 	if err != nil {
 		jww.DEBUG.Printf("No registration found for user with ID %+v", uid)
@@ -176,7 +177,7 @@ func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db
 		// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
 		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
 			jww.ERROR.Printf("User with ID %+v has invalid token, unregistering...", uid)
-			err := db.DeleteUser(uid)
+			err := db.DeleteUserByHash(u.TransmissionRSAHash)
 			if err != nil {
 				return "", errors.Wrapf(err, "Failed to remove user registration for uid: %+v", uid)
 			}
@@ -204,19 +205,31 @@ func pollForNotifications(nb *Impl) (uids [][]byte, e error) {
 }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
-func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth) error {
+func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
+	var err error
 	if !auth.IsAuthenticated {
 		return errors.New("Cannot register for notifications: client is not authenticated")
 	}
-	if string(clientToken) == "" {
+	if string(request.Token) == "" {
 		return errors.New("Cannot register for notifications with empty client token")
 	}
-	// Implement this
-	u := &storage.User{
-		Id:    auth.Sender.GetId().String(),
-		Token: string(clientToken),
+
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		return errors.Wrap(err, "Failed to create cmix hash")
 	}
-	err := nb.Storage.UpsertUser(u)
+	_, err = h.Write(request.IntermediaryId)
+	if err != nil {
+		return errors.Wrap(err, "Failed to write intermediary id to hash")
+	}
+
+	err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	if err != nil {
+		return errors.Wrap(err, "Failed to verify signature")
+	}
+
+	// Implement this
+	err = nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, string(request.Token))
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
@@ -224,11 +237,26 @@ func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth)
 }
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
-func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
+func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
 	if !auth.IsAuthenticated {
 		return errors.New("Cannot unregister for notifications: client is not authenticated")
 	}
-	err := nb.Storage.DeleteUser(auth.Sender.GetId().String())
+
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		return errors.Wrap(err, "Failed to create cmix hash")
+	}
+	_, err = h.Write(request.IntermediaryId)
+	if err != nil {
+		return errors.Wrap(err, "Failed to write intermediary id to hash")
+	}
+
+	err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	if err != nil {
+		return errors.Wrap(err, "Failed to verify signature")
+	}
+
+	err = nb.Storage.DeleteUser(rsa.CreatePublicKeyPem(auth.Sender.GetPubKey()))
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}

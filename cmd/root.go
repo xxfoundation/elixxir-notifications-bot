@@ -23,6 +23,7 @@ import (
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -79,12 +80,21 @@ var rootCmd = &cobra.Command{
 			jww.FATAL.Panicf("Failed to start notifications server: %+v", err)
 		}
 
+		rawAddr := viper.GetString("dbAddress")
+		var addr, port string
+		if rawAddr != "" {
+			addr, port, err = net.SplitHostPort(rawAddr)
+			if err != nil {
+				jww.FATAL.Panicf("Unable to get database port from %s: %+v", rawAddr, err)
+			}
+		}
 		// Initialize the storage backend
-		impl.Storage = storage.NewDatabase(
+		impl.Storage, err = storage.NewStorage(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
 			viper.GetString("dbName"),
-			viper.GetString("dbAddress"),
+			addr,
+			port,
 		)
 
 		// Set up the notifications server connections
