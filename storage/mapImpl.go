@@ -44,6 +44,15 @@ func (m *MapImpl) deleteUser(transmissionRsaHash []byte) error {
 
 // Insert or Update User into backend
 func (m *MapImpl) upsertUser(user *User) error {
+	if u, ok := m.usersByRsaHash[string(user.TransmissionRSAHash)]; ok {
+		if u.Token == user.Token {
+			return nil
+		}
+		err := m.deleteUser(user.TransmissionRSAHash)
+		if err != nil {
+			return err
+		}
+	}
 	// Insert new user
 	m.usersByRsaHash[string(user.TransmissionRSAHash)] = user
 	m.usersById[string(user.Id)] = user
