@@ -17,14 +17,14 @@ func NewStorage(username, password, dbName, address, port string) (*Storage, err
 	return storage, err
 }
 
-func (s *Storage) AddUser(iid, transmissionRSA []byte, token string) error {
+func (s *Storage) AddUser(iid, transmissionRSA []byte, token string) (*User, error) {
 	h, err := hash.NewCMixHash()
 	if err != nil {
-		return errors.WithMessage(err, "Failed to create cmix hash")
+		return nil, errors.WithMessage(err, "Failed to create cmix hash")
 	}
 	_, err = h.Write(transmissionRSA)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to hash transmission RSA")
+		return nil, errors.WithMessage(err, "Failed to hash transmission RSA")
 	}
 	u := &User{
 		Id:                  iid,
@@ -32,7 +32,7 @@ func (s *Storage) AddUser(iid, transmissionRSA []byte, token string) error {
 		TransmissionRSA:     transmissionRSA,
 		Token:               token,
 	}
-	return s.upsertUser(u)
+	return u, s.upsertUser(u)
 }
 
 func (s *Storage) DeleteUser(transmissionRSA []byte) error {
