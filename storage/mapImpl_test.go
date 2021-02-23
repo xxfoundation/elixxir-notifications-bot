@@ -15,7 +15,7 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 	uid := []byte("zezima")
 	token1 := "i'm a token"
-	err = s.AddUser(uid, []byte("rsa"), token1)
+	_, err = s.AddUser(uid, []byte("rsa"), token1)
 	if err != nil {
 		t.Errorf("Failed to upsert user: %+v", err)
 	}
@@ -29,7 +29,7 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 
 	token2 := "you're a token"
-	err = s.AddUser(uid, []byte("rsa"), token2)
+	_, err = s.AddUser(uid, []byte("rsa"), token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
@@ -42,7 +42,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
 	}
 
-	err = s.AddUser([]byte("jakexx360"), []byte("rsa2"), token2)
+	_, err = s.AddUser([]byte("jakexx360"), []byte("rsa2"), token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
@@ -67,21 +67,21 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
 	}
-	u := &User{Id: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
-	m.usersById[string(u.Id)] = u
+	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
+	m.usersById[string(u.IntermediaryId)] = u
 	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
 	m.allUsers = append(m.allUsers, u)
 
-	user, err := m.GetUser(u.Id)
+	user, err := m.GetUser(u.IntermediaryId)
 
 	// Check that we got a user back
 	if user == nil {
 		t.Errorf("TestMapImpl_GetUser_Happy: function did not return a user")
 	} else {
 		// Perform additional tests on the user var if we're sure it's populated
-		if bytes.Compare(user.Id, u.Id) != 0 {
+		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.Id, u.Id)
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u.Token {
@@ -101,12 +101,12 @@ func TestMapImpl_GetUser_NoUser(t *testing.T) {
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
 	}
-	u := &User{Id: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
+	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 
-	user, err := m.GetUser(u.Id)
+	user, err := m.GetUser(u.IntermediaryId)
 
 	if user != nil {
-		t.Errorf("TestMapImpl_GetUser_NoUser: function returned a user\n\tGot: %s", user.Id)
+		t.Errorf("TestMapImpl_GetUser_NoUser: function returned a user\n\tGot: %s", user.IntermediaryId)
 	}
 
 	if err == nil {
@@ -120,8 +120,8 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
 	}
-	u := &User{Id: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
-	m.usersById[string(u.Id)] = u
+	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
+	m.usersById[string(u.IntermediaryId)] = u
 	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
 	m.allUsers = append(m.allUsers, u)
 
@@ -132,7 +132,7 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 	}
 
 	// Try to load user from map manually
-	_, ok := m.usersById[string(u.Id)]
+	_, ok := m.usersById[string(u.IntermediaryId)]
 	if ok == true {
 		t.Errorf("TestMapImpl_DeleteUser_Happy: user existed in database after deletion called")
 	}
@@ -151,7 +151,7 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
 	}
-	u := User{Id: []byte("test"), Token: "token", TransmissionRSAHash: []byte("rsahash")}
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("rsahash")}
 
 	err := m.upsertUser(&u)
 
@@ -166,9 +166,9 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
-		if bytes.Compare(user.Id, u.Id) != 0 {
+		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.Id, u.Id)
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u.Token {
@@ -184,7 +184,7 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
 	}
-	u := User{Id: []byte("test"), Token: "token", TransmissionRSAHash: []byte("RsaHash")}
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("RsaHash")}
 
 	err := m.upsertUser(&u)
 
@@ -199,9 +199,9 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
-		if bytes.Compare(user.Id, u.Id) != 0 {
+		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.Id, u.Id)
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u.Token {
@@ -211,7 +211,7 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	}
 
 	// Create user with the same ID but change the token
-	u2 := User{Id: []byte("test"), Token: "othertoken", TransmissionRSAHash: []byte("othertransmissionrsahash")}
+	u2 := User{IntermediaryId: []byte("test"), Token: "othertoken", TransmissionRSAHash: []byte("othertransmissionrsahash")}
 	err = m.upsertUser(&u2)
 
 	// Load user from map manually
@@ -221,9 +221,9 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
-		if bytes.Compare(user.Id, u2.Id) != 0 {
+		if bytes.Compare(user.IntermediaryId, u2.IntermediaryId) != 0 {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.Id, u.Id)
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u2.Token {

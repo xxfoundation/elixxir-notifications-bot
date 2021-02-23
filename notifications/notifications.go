@@ -53,7 +53,7 @@ type Impl struct {
 	fcm              *messaging.Client
 	gwId             *id.ID
 
-	ephemeralIds EphemeralIds
+	ephemeralUpdates chan *storage.User
 }
 
 // We use an interface here in order to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
@@ -236,9 +236,9 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
 
-	err = nb.ephemeralIds.AddOrUpdate(u)
+	err = nb.AddEphemeralID(u)
 	if err != nil {
-		return errors.Wrap(err, "Failed to add user to ephemeral ID tracking")
+		return errors.WithMessage(err, "Failed to add ephemeral ID for user")
 	}
 
 	return nil

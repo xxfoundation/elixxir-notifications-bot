@@ -11,12 +11,13 @@ package storage
 import (
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Obtain User from backend by primary key
 func (impl *DatabaseImpl) GetUser(userId []byte) (*User, error) {
 	u := &User{}
-	err := impl.db.Take(u, "id = ?", userId).Error
+	err := impl.db.Take(u, "intermediary_id = ?", userId).Error
 	if err != nil {
 		return nil, errors.Errorf("Failed to retrieve user with ID %s: %+v", userId, err)
 	}
@@ -55,4 +56,15 @@ func (impl *DatabaseImpl) upsertUser(user *User) error {
 func (impl *DatabaseImpl) GetAllUsers() ([]*User, error) {
 	var dest []*User
 	return dest, impl.db.Find(&dest).Error
+}
+
+func (impl *DatabaseImpl) UpsertEphemeral(ephemeral *Ephemeral) error {
+	return impl.db.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&ephemeral).Error
+}
+
+func (impl *DatabaseImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, error) {
+	var result *Ephemeral
+	return result, impl.db.Find(result, "transmission_rsa_hash = ?", transmissionRSAHash).Error
 }

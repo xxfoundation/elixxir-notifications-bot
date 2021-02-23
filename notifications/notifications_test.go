@@ -17,6 +17,7 @@ import (
 	"gitlab.com/xx_network/crypto/csprng"
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"os"
@@ -62,7 +63,7 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make new storage: %+v", err)
 	}
-	err = s.AddUser([]byte("zezima"), []byte("rsacert"), "token")
+	_, err = s.AddUser([]byte("zezima"), []byte("rsacert"), "token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
@@ -214,7 +215,11 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to reat test key file: %+v", err)
 	}
-	iid := []byte("zezima")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to make iid: %+v", err)
+	}
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		t.Errorf("Failed to make cmix hash: %+v", err)

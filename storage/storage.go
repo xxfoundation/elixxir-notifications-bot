@@ -27,7 +27,7 @@ func (s *Storage) AddUser(iid, transmissionRSA []byte, token string) (*User, err
 		return nil, errors.WithMessage(err, "Failed to hash transmission RSA")
 	}
 	u := &User{
-		Id:                  iid,
+		IntermediaryId:      iid,
 		TransmissionRSAHash: h.Sum(nil),
 		TransmissionRSA:     transmissionRSA,
 		Token:               token,

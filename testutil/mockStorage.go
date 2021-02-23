@@ -6,8 +6,8 @@ type MockStorage struct{}
 
 func (ms MockStorage) GetUser(userId []byte) (*storage.User, error) {
 	return &storage.User{
-		Id:    []byte("test"),
-		Token: "test",
+		IntermediaryId: []byte("test"),
+		Token:          "test",
 	}, nil
 }
 

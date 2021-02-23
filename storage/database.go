@@ -18,6 +18,9 @@ type database interface {
 	upsertUser(user *User) error
 
 	GetAllUsers() ([]*User, error)
+
+	UpsertEphemeral(ephemeral *Ephemeral) error
+	GetEphemeral(transmissionRsaHash []byte) (*Ephemeral, error)
 }
 
 // Struct implementing the Database Interface with an underlying DB
@@ -30,12 +33,12 @@ type MapImpl struct {
 	usersById      map[string]*User
 	usersByRsaHash map[string]*User
 	allUsers       []*User
+	ephemerals     map[string]*Ephemeral
 }
 
 // Structure representing a User in the Storage backend
 type User struct {
-	// intermediary user ID byte slice
-	Id []byte `gorm:"not null;index"`
+	IntermediaryId []byte `gorm:"not null; index"`
 
 	TransmissionRSAHash []byte `gorm:"primaryKey"`
 
@@ -43,6 +46,13 @@ type User struct {
 
 	// User notifications token
 	Token string `gorm:"not null"`
+}
+
+type Ephemeral struct {
+	TransmissionRSAHash []byte `gorm:"primaryKey"`
+	EphemeralId         []byte `gorm:"not null"`
+	Epoch               int64  `gorm:"not null"`
+	User                User   `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash"`
 }
 
 // Initialize the database interface with database backend
@@ -83,6 +93,7 @@ func newDatabase(username, password, dbName, address,
 			usersById:      map[string]*User{},
 			usersByRsaHash: map[string]*User{},
 			allUsers:       nil,
+			ephemerals:     map[string]*Ephemeral{},
 		}
 
 		return database(mapImpl), nil
@@ -90,7 +101,7 @@ func newDatabase(username, password, dbName, address,
 
 	// Initialize the database schema
 	// WARNING: Order is important. Do not change without database testing
-	models := []interface{}{&User{}}
+	models := []interface{}{&User{}, &Ephemeral{}}
 	for _, model := range models {
 		err = db.AutoMigrate(model)
 		if err != nil {

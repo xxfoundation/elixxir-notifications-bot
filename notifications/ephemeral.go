@@ -6,69 +6,27 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
-	"sync"
 	"time"
 )
 
-type EphemeralIds struct {
-	ids        map[string]*EphemeralUser
-	updateChan chan *EphemeralUser
-	sync.RWMutex
-}
-
-type EphemeralUser struct {
-	sync.RWMutex
-	u       *storage.User
-	id      ephemeral.Id
-	tracked bool
-}
-
-func (e *EphemeralIds) AddOrUpdate(u *storage.User) error {
-	e.Lock()
-	defer e.Unlock()
-
-	id, _, end, err := ephemeral.GetIdFromIntermediary(u.Id, 32, time.Now().UnixNano())
-	if err != nil {
-		return errors.WithMessage(err, fmt.Sprintf("Failed to get ephemeral ID for IID %+v", u.Id))
-	}
-
-	stored, ok := e.ids[string(u.Id)]
-	if !ok {
-		e.ids[string(u.Id)] = &EphemeralUser{
-			u:  u,
-			id: id,
-		}
-		go e.refresh(end, e.ids[string(u.Id)])
-	} else {
-		stored.id = id
-		stored.u = u
-		if !stored.tracked {
-			go e.refresh(end, stored)
-		}
-	}
-
-	return nil
-}
-
-func (e *EphemeralIds) refresh(end time.Time, user *EphemeralUser) {
+func (nb *Impl) refresh(end time.Time, user *storage.User) {
 	time.Sleep(time.Until(end))
-	user.tracked = false
-	e.updateChan <- user
+	nb.ephemeralUpdates <- user
 }
 
-func (e *EphemeralIds) updateEphemeralIds() {
+func (nb *Impl) updateEphemeralIds() {
 	for true {
-		u := <-e.updateChan
-		err := e.AddOrUpdate(u)
+		u := <-nb.ephemeralUpdates
+		err := nb.AddEphemeralID(u)
 		if err != nil {
-			jww.ERROR.Printf("Failed to update ephemeral ID for %+v", u)
+			jww.ERROR.Println(fmt.Sprintf("Error adding new ephemeral ID: %+v", err))
 		}
 	}
 }
 
 func (nb *Impl) StartEphemeralTracking() error {
 	// Start update thread for ephemeral IDs
-	go nb.ephemeralIds.updateEphemeralIds()
+	go nb.updateEphemeralIds()
 
 	// Get all users in DB and add them to the eid map
 	users, err := nb.Storage.GetAllUsers()
@@ -76,13 +34,36 @@ func (nb *Impl) StartEphemeralTracking() error {
 		return err
 	}
 	for _, u := range users {
-		err := nb.ephemeralIds.AddOrUpdate(u)
+		err = nb.AddEphemeralID(u)
 		if err != nil {
-			err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
-			if err != nil {
-				return errors.WithMessage(err, fmt.Sprintf("Failed to delete user with bad iid %+v: %+v", u, err))
-			}
+			return errors.WithMessage(err, "Failed to add ephemeral ID for user")
 		}
 	}
 	return nil
+}
+
+func (nb *Impl) AddEphemeralID(u *storage.User) error {
+	eph, end, err := getUpdatedEphemeral(u)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to get ephemeral for user")
+	}
+	err = nb.Storage.UpsertEphemeral(eph)
+	if err != nil {
+		return errors.Wrap(err, "Failed to add user to ephemeral ID tracking")
+	}
+	go nb.refresh(end, u)
+	return nil
+}
+
+func getUpdatedEphemeral(u *storage.User) (*storage.Ephemeral, time.Time, error) {
+	id, _, end, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, 32, time.Now().UnixNano())
+	if err != nil {
+		return nil, time.Time{}, errors.WithMessage(err, fmt.Sprintf("Failed to get ephemeral ID for IID %+v", u.IntermediaryId))
+	}
+	return &storage.Ephemeral{
+		TransmissionRSAHash: u.TransmissionRSAHash,
+		EphemeralId:         id[:],
+		Epoch:               end.UnixNano(),
+		User:                *u,
+	}, end, nil
 }

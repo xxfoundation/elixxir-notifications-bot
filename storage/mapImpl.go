@@ -11,6 +11,7 @@ package storage
 import (
 	"bytes"
 	"errors"
+	"fmt"
 )
 
 // Obtain User from backend by primary key
@@ -32,7 +33,7 @@ func (m *MapImpl) deleteUser(transmissionRsaHash []byte) error {
 		return nil
 	}
 	delete(m.usersByRsaHash, string(transmissionRsaHash))
-	delete(m.usersById, string(u.Id))
+	delete(m.usersById, string(u.IntermediaryId))
 	for i, u := range m.allUsers {
 		if bytes.Compare(transmissionRsaHash, u.TransmissionRSAHash) == 0 {
 			m.allUsers = append(m.allUsers[:i], m.allUsers[i+1:]...)
@@ -55,7 +56,7 @@ func (m *MapImpl) upsertUser(user *User) error {
 	}
 	// Insert new user
 	m.usersByRsaHash[string(user.TransmissionRSAHash)] = user
-	m.usersById[string(user.Id)] = user
+	m.usersById[string(user.IntermediaryId)] = user
 	m.allUsers = append(m.allUsers, user)
 
 	return nil
@@ -63,4 +64,17 @@ func (m *MapImpl) upsertUser(user *User) error {
 
 func (m *MapImpl) GetAllUsers() ([]*User, error) {
 	return m.allUsers, nil
+}
+
+func (m *MapImpl) UpsertEphemeral(ephemeral *Ephemeral) error {
+	m.ephemerals[string(ephemeral.TransmissionRSAHash)] = ephemeral
+	return nil
+}
+
+func (m *MapImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, error) {
+	e, ok := m.ephemerals[string(transmissionRSAHash)]
+	if !ok {
+		return nil, errors.New(fmt.Sprintf("Could not find ephemeral with transmission RSA hash %+v", transmissionRSAHash))
+	}
+	return e, nil
 }
