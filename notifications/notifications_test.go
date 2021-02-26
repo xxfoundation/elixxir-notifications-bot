@@ -63,7 +63,7 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make new storage: %+v", err)
 	}
-	_, err = s.AddUser([]byte("zezima"), []byte("rsacert"), "token")
+	_, err = s.AddUser([]byte("zezima"), []byte("rsacert"), []byte("sig"), "token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}

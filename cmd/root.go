@@ -103,11 +103,6 @@ var rootCmd = &cobra.Command{
 			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
 		}
 
-		err = impl.StartEphemeralTracking()
-		if err != nil {
-			jww.FATAL.Panicf("Failed to set up ephemeral tracking: %+v", err)
-		}
-
 		// Start notification loop
 		killChan := make(chan struct{})
 		errChan := make(chan error)

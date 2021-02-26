@@ -66,7 +66,7 @@ func (m *MapImpl) GetAllUsers() ([]*User, error) {
 	return m.allUsers, nil
 }
 
-func (m *MapImpl) UpsertEphemeral(ephemeral *Ephemeral) error {
+func (m *MapImpl) upsertEphemeral(ephemeral *Ephemeral) error {
 	m.ephemerals[string(ephemeral.TransmissionRSAHash)] = ephemeral
 	return nil
 }
@@ -77,4 +77,12 @@ func (m *MapImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, error) {
 		return nil, errors.New(fmt.Sprintf("Could not find ephemeral with transmission RSA hash %+v", transmissionRSAHash))
 	}
 	return e, nil
+}
+
+func (m *MapImpl) getUsersByOffset(offset int64) ([]*User, error) {
+	return nil, nil
+}
+
+func (m *MapImpl) DeleteOldEphemerals(offset int64) error {
+	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"time"
 )
 
 // Obtain User from backend by primary key
@@ -58,7 +59,7 @@ func (impl *DatabaseImpl) GetAllUsers() ([]*User, error) {
 	return dest, impl.db.Find(&dest).Error
 }
 
-func (impl *DatabaseImpl) UpsertEphemeral(ephemeral *Ephemeral) error {
+func (impl *DatabaseImpl) upsertEphemeral(ephemeral *Ephemeral) error {
 	return impl.db.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(&ephemeral).Error
@@ -67,4 +68,15 @@ func (impl *DatabaseImpl) UpsertEphemeral(ephemeral *Ephemeral) error {
 func (impl *DatabaseImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, error) {
 	var result *Ephemeral
 	return result, impl.db.Find(result, "transmission_rsa_hash = ?", transmissionRSAHash).Error
+}
+
+func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
+	var result []*User
+	return result, impl.db.Find(result, "offset = ?", offset).Error
+}
+
+func (impl *DatabaseImpl) DeleteOldEphemerals(offset int64) error {
+	err := impl.db.Where("offset = ?", offset).Where("valid_until < ?",
+		time.Now().Add(time.Minute*-1)).Delete(Ephemeral{}).Error
+	return err
 }

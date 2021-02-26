@@ -2,6 +2,8 @@ package storage
 
 import (
 	"bytes"
+	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
 )
 
@@ -13,14 +15,19 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Failed to create db: %+v", err)
 		t.FailNow()
 	}
-	uid := []byte("zezima")
+	sig := []byte("sig")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to make iid: %+v", err)
+	}
 	token1 := "i'm a token"
-	_, err = s.AddUser(uid, []byte("rsa"), token1)
+	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
 	if err != nil {
 		t.Errorf("Failed to upsert user: %+v", err)
 	}
 
-	u, err := s.GetUser(uid)
+	u, err := s.GetUser(iid)
 	if err != nil {
 		t.Errorf("Failed to get user: %+v", err)
 	}
@@ -29,12 +36,12 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 
 	token2 := "you're a token"
-	_, err = s.AddUser(uid, []byte("rsa"), token2)
+	_, err = s.AddUser(iid, []byte("rsa"), sig, token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
 
-	u, err = s.GetUser(uid)
+	u, err = s.GetUser(iid)
 	if err != nil {
 		t.Errorf("Failed to get user: %+v", err)
 	}
@@ -42,7 +49,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
 	}
 
-	_, err = s.AddUser([]byte("jakexx360"), []byte("rsa2"), token2)
+	_, err = s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}

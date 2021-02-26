@@ -6,6 +6,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"time"
 )
 
 // interface declaration for storae methods
@@ -17,10 +18,13 @@ type database interface {
 	// Insert or Update User into backend
 	upsertUser(user *User) error
 
+	getUsersByOffset(offset int64) ([]*User, error)
+
 	GetAllUsers() ([]*User, error)
 
-	UpsertEphemeral(ephemeral *Ephemeral) error
+	upsertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(transmissionRsaHash []byte) (*Ephemeral, error)
+	DeleteOldEphemerals(offset int64) error
 }
 
 // Struct implementing the Database Interface with an underlying DB
@@ -38,21 +42,21 @@ type MapImpl struct {
 
 // Structure representing a User in the Storage backend
 type User struct {
-	IntermediaryId []byte `gorm:"not null; index"`
-
-	TransmissionRSAHash []byte `gorm:"primaryKey"`
-
-	TransmissionRSA []byte `gorm:"not null"`
-
-	// User notifications token
-	Token string `gorm:"not null"`
+	TransmissionRSAHash []byte      `gorm:"primaryKey"`
+	IntermediaryId      []byte      `gorm:"not null; index"`
+	Offset              int64       `gorm:"not null; index"`
+	TransmissionRSA     []byte      `gorm:"not null"`
+	Signature           []byte      `gorm:"not null"`
+	Token               string      `gorm:"not null"`
+	Ephemerals          []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash"`
 }
 
 type Ephemeral struct {
-	TransmissionRSAHash []byte `gorm:"primaryKey"`
-	EphemeralId         []byte `gorm:"not null"`
-	Epoch               int64  `gorm:"not null"`
-	User                User   `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash"`
+	ID                  uint      `gorm:"primaryKey"`
+	Offset              int64     `gorm:"not null; index"`
+	TransmissionRSAHash []byte    `gorm:"not null"`
+	EphemeralId         []byte    `gorm:"not null; index"`
+	ValidUntil          time.Time `gorm:"not null; index"`
 }
 
 // Initialize the database interface with database backend
