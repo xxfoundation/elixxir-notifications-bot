@@ -63,16 +63,21 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make new storage: %+v", err)
 	}
-	_, err = s.AddUser([]byte("zezima"), []byte("rsacert"), []byte("sig"), "token")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create iid: %+v", err)
+	}
+	_, err = s.AddUser(iid, []byte("rsacert"), []byte("sig"), "token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
-	_, err = notifyUser(nil, []byte("zezima"), fc_badsend, s)
+	_, err = notifyUser(nil, iid, fc_badsend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
 
-	_, err = notifyUser(nil, []byte("zezima"), fc, s)
+	_, err = notifyUser(nil, iid, fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}

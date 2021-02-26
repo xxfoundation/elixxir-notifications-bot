@@ -55,8 +55,7 @@ type Impl struct {
 	fcm              *messaging.Client
 	gwId             *id.ID
 
-	offsetTimers chan int64
-	offsets      map[int64]*sync.Once
+	offsets map[int64]*sync.Once
 }
 
 // We use an interface here in order to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
@@ -99,7 +98,9 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 
 // StartNotifications creates an Impl from the information passed in
 func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
-	impl := &Impl{}
+	impl := &Impl{
+		offsets: map[int64]*sync.Once{},
+	}
 
 	var cert, key []byte
 	var err error
