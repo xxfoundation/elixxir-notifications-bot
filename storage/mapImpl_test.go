@@ -73,6 +73,7 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 	m := &MapImpl{
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 	m.usersById[string(u.IntermediaryId)] = u
@@ -107,6 +108,7 @@ func TestMapImpl_GetUser_NoUser(t *testing.T) {
 	m := &MapImpl{
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 
@@ -126,6 +128,7 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 	m := &MapImpl{
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 	m.usersById[string(u.IntermediaryId)] = u
@@ -157,6 +160,7 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 	m := &MapImpl{
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("rsahash")}
 
@@ -190,6 +194,7 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	m := &MapImpl{
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("RsaHash")}
 

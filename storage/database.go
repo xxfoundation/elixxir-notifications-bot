@@ -34,10 +34,13 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
-	usersById      map[string]*User
-	usersByRsaHash map[string]*User
-	allUsers       []*User
-	ephemerals     map[string]*Ephemeral
+	usersById          map[string]*User
+	usersByRsaHash     map[string]*User
+	usersByOffset      map[int64][]*User
+	allUsers           []*User
+	ephemeralsByUser   map[string][]*Ephemeral
+	ephemeralsByOffset map[int64][]*Ephemeral
+	ephIDSeq           uint
 }
 
 // Structure representing a User in the Storage backend
@@ -94,10 +97,13 @@ func newDatabase(username, password, dbName, address,
 		defer jww.INFO.Println("Map backend initialized successfully!")
 
 		mapImpl := &MapImpl{
-			usersById:      map[string]*User{},
-			usersByRsaHash: map[string]*User{},
-			allUsers:       nil,
-			ephemerals:     map[string]*Ephemeral{},
+			usersById:          map[string]*User{},
+			usersByRsaHash:     map[string]*User{},
+			usersByOffset:      map[int64][]*User{},
+			allUsers:           nil,
+			ephemeralsByUser:   map[string][]*Ephemeral{},
+			ephemeralsByOffset: map[int64][]*Ephemeral{},
+			ephIDSeq:           0,
 		}
 
 		return database(mapImpl), nil
