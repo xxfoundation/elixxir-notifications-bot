@@ -11,16 +11,11 @@ import (
 
 // interface declaration for storae methods
 type database interface {
-	// Obtain User from backend by primary key
-	GetUser(iid []byte) (*User, error)
-	// Delete User from backend by primary key
-	deleteUser(transmissionRsaHash []byte) error
-	// Insert or Update User into backend
 	upsertUser(user *User) error
-
+	GetUser(iid []byte) (*User, error)
 	getUsersByOffset(offset int64) ([]*User, error)
-
 	GetAllUsers() ([]*User, error)
+	DeleteUserByHash(transmissionRsaHash []byte) error
 
 	upsertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(transmissionRsaHash []byte) (*Ephemeral, error)

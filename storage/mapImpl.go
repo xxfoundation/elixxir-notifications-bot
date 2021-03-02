@@ -28,7 +28,7 @@ func (m *MapImpl) GetUser(userId []byte) (*User, error) {
 }
 
 // Delete User from backend by primary key
-func (m *MapImpl) deleteUser(transmissionRsaHash []byte) error {
+func (m *MapImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 	user, ok := m.usersByRsaHash[string(transmissionRsaHash)]
 	if !ok {
 		return nil
@@ -56,7 +56,7 @@ func (m *MapImpl) upsertUser(user *User) error {
 		if u.Token == user.Token {
 			return nil
 		}
-		err := m.deleteUser(user.TransmissionRSAHash)
+		err := m.DeleteUserByHash(user.TransmissionRSAHash)
 		if err != nil {
 			return err
 		}

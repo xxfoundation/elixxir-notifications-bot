@@ -9,6 +9,7 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -26,7 +27,7 @@ func (impl *DatabaseImpl) GetUser(userId []byte) (*User, error) {
 }
 
 // Delete User from backend by primary key
-func (impl *DatabaseImpl) deleteUser(transmissionRsaHash []byte) error {
+func (impl *DatabaseImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 	err := impl.db.Delete(&User{
 		TransmissionRSAHash: transmissionRsaHash,
 	}).Error
@@ -72,11 +73,12 @@ func (impl *DatabaseImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, 
 
 func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
 	var result []*User
-	return result, impl.db.Find(result, "offset = ?", offset).Error
+	err := impl.db.Where(&User{Offset: offset}).Find(&result).Error
+	return result, err
 }
 
 func (impl *DatabaseImpl) DeleteOldEphemerals(offset int64) error {
-	err := impl.db.Where("offset = ?", offset).Where("valid_until < ?",
-		time.Now().Add(time.Minute*-1)).Delete(Ephemeral{}).Error
-	return err
+	res := impl.db.Where(&Ephemeral{Offset: offset}).Where("valid_until < ?", time.Now()).Delete(&Ephemeral{})
+	fmt.Println(res.RowsAffected)
+	return res.Error
 }

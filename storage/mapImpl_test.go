@@ -5,6 +5,7 @@ import (
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
+	"time"
 )
 
 // This file contains testing for mapImpl.go
@@ -36,7 +37,7 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 
 	token2 := "you're a token"
-	_, err = s.AddUser(iid, []byte("rsa"), sig, token2)
+	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
@@ -49,9 +50,24 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
 	}
 
-	_, err = s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
+	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
+	}
+
+	err = s.AddLatestEphemeral(u2)
+	if err != nil {
+		t.Errorf("Failed to add latest ephemeral: %+v", err)
+	}
+	_, end, _ := ephemeral.GetOffsetBounds(u1.Offset, time.Now().UnixNano())
+	err = s.UpdateEphemeralsForOffset(u1.Offset, end)
+	if err != nil {
+		t.Errorf("failed to update ephemerals for offset: %+v", err)
+	}
+
+	err = s.DeleteOldEphemerals(u1.Offset)
+	if err != nil {
+		t.Errorf("Failed to delete old ephemerals: %+v", err)
 	}
 
 	us, err := s.GetAllUsers()
@@ -60,11 +76,6 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 	if len(us) != 2 {
 		t.Errorf("Did not get enough users: %+v", us)
-	}
-
-	err = s.deleteUser(u.TransmissionRSAHash)
-	if err != nil {
-		t.Errorf("Failed to delete user: %+v", err)
 	}
 }
 
@@ -135,7 +146,7 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
 	m.allUsers = append(m.allUsers, u)
 
-	err := m.deleteUser(u.TransmissionRSAHash)
+	err := m.DeleteUserByHash(u.TransmissionRSAHash)
 
 	if err != nil {
 		t.Errorf("TestMapImpl_DeleteUser_Happy: function returned error\n\tGot: %s", err)
@@ -196,51 +207,59 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 		usersById:      map[string]*User{},
 		usersByOffset:  map[int64][]*User{},
 	}
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("RsaHash")}
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("TransmissionRSAHash")}
 
 	err := m.upsertUser(&u)
 
 	if err != nil {
-		t.Errorf("TestMapImpl_UpsertUser_Happy: function returned an error\n\tGot: %s", err)
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
 	}
 
 	// Load user from map manually
 	user, ok := m.usersByRsaHash[string(u.TransmissionRSAHash)]
 	// Check that a user was found
 	if ok != true {
-		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
 		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
 				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
 				"user with different token\n\tGot: %s\n\tExpected: %s", user.Token, u.Token)
 		}
 	}
 
 	// Create user with the same ID but change the token
-	u2 := User{IntermediaryId: []byte("test"), Token: "othertoken", TransmissionRSAHash: []byte("othertransmissionrsahash")}
+	u2 := User{IntermediaryId: []byte("testtwo"), Token: "othertoken", TransmissionRSAHash: []byte("TransmissionRSAHash")}
 	err = m.upsertUser(&u2)
 
 	// Load user from map manually
 	user, ok = m.usersByRsaHash[string(u2.TransmissionRSAHash)]
 	// Check that a user was found
 	if ok != true {
-		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
 		if bytes.Compare(user.IntermediaryId, u2.IntermediaryId) != 0 {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
 				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u2.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
 				"user with different token\n\tGot: %s\n\tExpected: %s", user.Token, u2.Token)
 		}
 	}
+}
+
+func TestMapImpl_GetEphemeral(t *testing.T) {
+
+}
+
+func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
+
 }

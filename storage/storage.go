@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
@@ -61,19 +62,18 @@ func (s *Storage) DeleteUser(transmissionRSA []byte) error {
 	if err != nil {
 		return errors.WithMessage(err, "Failed to hash transmission RSA")
 	}
-	return s.deleteUser(h.Sum(nil))
-}
-
-func (s *Storage) DeleteUserByHash(transmissionRSAHash []byte) error {
-	return s.deleteUser(transmissionRSAHash)
+	return s.DeleteUserByHash(h.Sum(nil))
 }
 
 func (s *Storage) UpdateEphemeralsForOffset(offset int64, end time.Time) error {
+	fmt.Println(1)
 	users, err := s.getUsersByOffset(offset)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get users for given offset")
 	}
+	fmt.Println(2)
 	for _, u := range users {
+		fmt.Println(3)
 		eid, _, end, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, 16, end.UnixNano()+1)
 		if err != nil {
 			return errors.WithMessage(err, "Failed to get eid for user")
