@@ -37,21 +37,8 @@ func TestStorage_DeleteUser(t *testing.T) {
 		t.Errorf("Failed to add user: %+v", err)
 	}
 	err = s.DeleteUser(u.TransmissionRSA)
-}
-
-func TestStorage_DeleteUserByHash(t *testing.T) {
-	s, err := NewStorage("", "", "", "", "")
 	if err != nil {
-		t.Errorf("Failed to create new storage object: %+v", err)
-	}
-	uid := id.NewIdFromString("zezima", id.User, t)
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Errorf("Failed to create iid: %+v", err)
-	}
-	_, err = s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
-	if err != nil {
-		t.Errorf("Failed to add user: %+v", err)
+		t.Errorf("Failed to delete user: %+v", err)
 	}
 }
 
@@ -65,9 +52,13 @@ func TestStorage_AddLatestEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
 	}
-	_, err = s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
+	}
+	err = s.AddLatestEphemeral(u)
+	if err != nil {
+		t.Errorf("Failed to add latest ephemeral: %+V", err)
 	}
 }
 

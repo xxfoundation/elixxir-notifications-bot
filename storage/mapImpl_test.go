@@ -60,7 +60,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}
 	_, end, _ := ephemeral.GetOffsetBounds(u1.Offset, time.Now().UnixNano())
-	err = s.UpdateEphemeralsForOffset(u1.Offset, end)
+	err = s.AddEphemeralsForOffset(u1.Offset, end)
 	if err != nil {
 		t.Errorf("failed to update ephemerals for offset: %+v", err)
 	}

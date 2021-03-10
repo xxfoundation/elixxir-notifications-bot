@@ -22,7 +22,6 @@ import (
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/crypto/tls"
 	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"strings"
@@ -55,7 +54,8 @@ type Impl struct {
 	fcm              *messaging.Client
 	gwId             *id.ID
 
-	offsets map[int64]*sync.Once
+	offsets                map[int64]*sync.Once
+	updateChan, deleteChan chan int64
 }
 
 // We use an interface here in order to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
@@ -99,7 +99,9 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 // StartNotifications creates an Impl from the information passed in
 func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	impl := &Impl{
-		offsets: map[int64]*sync.Once{},
+		offsets:    map[int64]*sync.Once{},
+		updateChan: make(chan int64),
+		deleteChan: make(chan int64),
 	}
 
 	var cert, key []byte
@@ -240,13 +242,11 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
-
-	err = nb.Storage.AddLatestEphemeral(u)
+	_, epoch := HandleQuantization(time.Now())
+	err = nb.Storage.AddLatestEphemeral(u, epoch)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to add ephemeral ID for user")
 	}
-
-	nb.TrackOffset(ephemeral.GetOffset(u.IntermediaryId))
 
 	return nil
 }

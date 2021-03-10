@@ -12,7 +12,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"time"
 )
 
 // Obtain User from backend by primary key
@@ -104,14 +103,19 @@ func (m *MapImpl) getUsersByOffset(offset int64) ([]*User, error) {
 	return m.usersByOffset[offset], nil
 }
 
-func (m *MapImpl) DeleteOldEphemerals(offset int64) error {
-	cutoff := time.Now().Add(time.Minute * -1)
-	var newEphemerals []*Ephemeral
-	for _, e := range m.ephemeralsByOffset[offset] {
-		if e.ValidUntil.After(cutoff) {
-			newEphemerals = append(newEphemerals, e)
-		}
-	}
-	m.ephemeralsByOffset[offset] = newEphemerals
+func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
+	// TODO: update this
+	//cutoff := time.Now().Add(time.Minute * -1)
+	//	//var newEphemerals []*Ephemeral
+	//	//for _, e := range m.ephemeralsByOffset[offset] {
+	//	//	if e.ValidUntil.After(cutoff) {
+	//	//		newEphemerals = append(newEphemerals, e)
+	//	//	}
+	//	//}
+	//	//m.ephemeralsByOffset[offset] = newEphemerals
 	return nil
+}
+
+func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
+	return &Ephemeral{}, nil
 }

@@ -9,11 +9,9 @@
 package storage
 
 import (
-	"fmt"
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"time"
 )
 
 // Obtain User from backend by primary key
@@ -77,8 +75,12 @@ func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
 	return result, err
 }
 
-func (impl *DatabaseImpl) DeleteOldEphemerals(offset int64) error {
-	res := impl.db.Where(&Ephemeral{Offset: offset}).Where("valid_until < ?", time.Now()).Delete(&Ephemeral{})
-	fmt.Println(res.RowsAffected)
+func (impl *DatabaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
+	res := impl.db.Where("epoch < ?", currentEpoch).Delete(&Ephemeral{})
 	return res.Error
+}
+
+func (impl *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
+	var result *Ephemeral
+	return result, impl.db.Order("epoch desc").First(result).Error
 }

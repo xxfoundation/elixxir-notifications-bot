@@ -6,7 +6,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"time"
 )
 
 // interface declaration for storae methods
@@ -19,7 +18,8 @@ type database interface {
 
 	upsertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(transmissionRsaHash []byte) (*Ephemeral, error)
-	DeleteOldEphemerals(offset int64) error
+	GetLatestEphemeral() (*Ephemeral, error)
+	DeleteOldEphemerals(currentEpoch int32) error
 }
 
 // Struct implementing the Database Interface with an underlying DB
@@ -50,11 +50,11 @@ type User struct {
 }
 
 type Ephemeral struct {
-	ID                  uint      `gorm:"primaryKey"`
-	Offset              int64     `gorm:"not null; index"`
-	TransmissionRSAHash []byte    `gorm:"not null"`
-	EphemeralId         []byte    `gorm:"not null; index"`
-	ValidUntil          time.Time `gorm:"not null; index"`
+	ID                  uint   `gorm:"primaryKey"`
+	Offset              int64  `gorm:"not null; index"`
+	TransmissionRSAHash []byte `gorm:"not null"`
+	EphemeralId         []byte `gorm:"not null; index"`
+	Epoch               int32  `gorm:"not null; index"`
 }
 
 // Initialize the database interface with database backend
