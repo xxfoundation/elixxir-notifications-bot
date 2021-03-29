@@ -87,7 +87,7 @@ func (m *MapImpl) upsertEphemeral(ephemeral *Ephemeral) error {
 	ephemeral.ID = m.ephIDSeq
 	m.ephIDSeq++
 	m.ephemeralsByUser[string(ephemeral.TransmissionRSAHash)] = append(m.ephemeralsByUser[string(ephemeral.TransmissionRSAHash)], ephemeral)
-	m.ephemeralsByOffset[ephemeral.Offset] = append(m.ephemeralsByOffset[ephemeral.Offset], ephemeral)
+	m.allEphemerals[ephemeral.ID] = ephemeral
 	return nil
 }
 
@@ -104,18 +104,23 @@ func (m *MapImpl) getUsersByOffset(offset int64) ([]*User, error) {
 }
 
 func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
-	// TODO: update this
-	//cutoff := time.Now().Add(time.Minute * -1)
-	//	//var newEphemerals []*Ephemeral
-	//	//for _, e := range m.ephemeralsByOffset[offset] {
-	//	//	if e.ValidUntil.After(cutoff) {
-	//	//		newEphemerals = append(newEphemerals, e)
-	//	//	}
-	//	//}
-	//	//m.ephemeralsByOffset[offset] = newEphemerals
+	for k, es := range m.ephemeralsByUser {
+		for i, e := range es {
+			if e.Epoch < epoch {
+				delete(m.allEphemerals, m.ephemeralsByUser[k][i].ID)
+				m.ephemeralsByUser[k] = append(m.ephemeralsByUser[k][:i], m.ephemeralsByUser[k][i+1:]...)
+			}
+		}
+	}
 	return nil
 }
 
 func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
-	return &Ephemeral{}, nil
+	cur := m.ephIDSeq
+	var res *Ephemeral
+	var ok bool
+	for res, ok = m.allEphemerals[cur]; !ok; {
+		cur++
+	}
+	return res, nil
 }

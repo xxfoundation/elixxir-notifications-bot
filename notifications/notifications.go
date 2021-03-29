@@ -25,7 +25,6 @@ import (
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -54,7 +53,6 @@ type Impl struct {
 	fcm              *messaging.Client
 	gwId             *id.ID
 
-	offsets                map[int64]*sync.Once
 	updateChan, deleteChan chan int64
 }
 
@@ -99,7 +97,6 @@ func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, er
 // StartNotifications creates an Impl from the information passed in
 func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	impl := &Impl{
-		offsets:    map[int64]*sync.Once{},
 		updateChan: make(chan int64),
 		deleteChan: make(chan int64),
 	}

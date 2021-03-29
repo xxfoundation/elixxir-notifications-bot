@@ -2,82 +2,78 @@ package storage
 
 import (
 	"bytes"
-	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
-	"time"
 )
 
 // This file contains testing for mapImpl.go
 
-func TestDatabaseImpl(t *testing.T) {
-	s, err := NewStorage("jonahhusson", "", "nbtest", "0.0.0.0", "5432")
-	if err != nil {
-		t.Errorf("Failed to create db: %+v", err)
-		t.FailNow()
-	}
-	sig := []byte("sig")
-	uid := id.NewIdFromString("zezima", id.User, t)
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Errorf("Failed to make iid: %+v", err)
-	}
-	token1 := "i'm a token"
-	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
-	if err != nil {
-		t.Errorf("Failed to upsert user: %+v", err)
-	}
-
-	u, err := s.GetUser(iid)
-	if err != nil {
-		t.Errorf("Failed to get user: %+v", err)
-	}
-	if u.Token != token1 {
-		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
-	}
-
-	token2 := "you're a token"
-	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
-	if err != nil {
-		t.Errorf("Failed to upsert updated user: %+v", err)
-	}
-
-	u, err = s.GetUser(iid)
-	if err != nil {
-		t.Errorf("Failed to get user: %+v", err)
-	}
-	if u.Token != token2 {
-		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
-	}
-
-	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
-	if err != nil {
-		t.Errorf("Failed to upsert updated user: %+v", err)
-	}
-
-	err = s.AddLatestEphemeral(u2)
-	if err != nil {
-		t.Errorf("Failed to add latest ephemeral: %+v", err)
-	}
-	_, end, _ := ephemeral.GetOffsetBounds(u1.Offset, time.Now().UnixNano())
-	err = s.AddEphemeralsForOffset(u1.Offset, end)
-	if err != nil {
-		t.Errorf("failed to update ephemerals for offset: %+v", err)
-	}
-
-	err = s.DeleteOldEphemerals(u1.Offset)
-	if err != nil {
-		t.Errorf("Failed to delete old ephemerals: %+v", err)
-	}
-
-	us, err := s.GetAllUsers()
-	if err != nil {
-		t.Errorf("Failed to get all users: %+v", err)
-	}
-	if len(us) != 2 {
-		t.Errorf("Did not get enough users: %+v", us)
-	}
-}
+//func TestDatabaseImpl(t *testing.T) {
+//	s, err := NewStorage("jonahhusson", "", "nbtest", "0.0.0.0", "5432")
+//	if err != nil {
+//		t.Errorf("Failed to create db: %+v", err)
+//		t.FailNow()
+//	}
+//	sig := []byte("sig")
+//	uid := id.NewIdFromString("zezima", id.User, t)
+//	iid, err := ephemeral.GetIntermediaryId(uid)
+//	if err != nil {
+//		t.Errorf("Failed to make iid: %+v", err)
+//	}
+//	token1 := "i'm a token"
+//	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
+//	if err != nil {
+//		t.Errorf("Failed to upsert user: %+v", err)
+//	}
+//
+//	u, err := s.GetUser(iid)
+//	if err != nil {
+//		t.Errorf("Failed to get user: %+v", err)
+//	}
+//	if u.Token != token1 {
+//		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+//	}
+//
+//	token2 := "you're a token"
+//	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
+//	if err != nil {
+//		t.Errorf("Failed to upsert updated user: %+v", err)
+//	}
+//
+//	u, err = s.GetUser(iid)
+//	if err != nil {
+//		t.Errorf("Failed to get user: %+v", err)
+//	}
+//	if u.Token != token2 {
+//		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+//	}
+//
+//	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
+//	if err != nil {
+//		t.Errorf("Failed to upsert updated user: %+v", err)
+//	}
+//	err = s.AddLatestEphemeral(u2, 5)
+//	if err != nil {
+//		t.Errorf("Failed to add latest ephemeral: %+v", err)
+//	}
+//	_, _, _ = ephemeral.GetOffsetBounds(u1.Offset, time.Now().UnixNano())
+//	err = s.AddEphemeralsForOffset(u1.Offset, 5)
+//	if err != nil {
+//		t.Errorf("failed to update ephemerals for offset: %+v", err)
+//	}
+//
+//	err = s.DeleteOldEphemerals(6)
+//	if err != nil {
+//		t.Errorf("Failed to delete old ephemerals: %+v", err)
+//	}
+//
+//	us, err := s.GetAllUsers()
+//	if err != nil {
+//		t.Errorf("Failed to get all users: %+v", err)
+//	}
+//	if len(us) != 2 {
+//		t.Errorf("Did not get enough users: %+v", us)
+//	}
+//}
 
 // This tests getting a user that does exist in the database
 func TestMapImpl_GetUser_Happy(t *testing.T) {
@@ -256,10 +252,163 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 	}
 }
 
-func TestMapImpl_GetEphemeral(t *testing.T) {
+func TestMapImpl_UpsertEphemeral(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:         0,
+		ephemeralsByUser: map[string][]*Ephemeral{},
+		allEphemerals:    map[uint]*Ephemeral{},
+		allUsers:         nil,
+		usersByRsaHash:   map[string]*User{},
+		usersById:        map[string]*User{},
+		usersByOffset:    map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
 
+	err := m.upsertUser(&u)
+
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         []byte("eid"),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	if m.ephIDSeq != 1 {
+		t.Error("sequence did not increment")
+	}
+	if m.allEphemerals[0] == nil {
+		t.Error("Did not insert to allEphemerals")
+	}
+	if len(m.ephemeralsByUser[string(trsaHash)]) != 1 {
+		t.Error("Did not insert to ephemeralsByUser")
+	}
+}
+
+func TestMapImpl_GetEphemeral(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:         0,
+		ephemeralsByUser: map[string][]*Ephemeral{},
+		allEphemerals:    map[uint]*Ephemeral{},
+		allUsers:         nil,
+		usersByRsaHash:   map[string]*User{},
+		usersById:        map[string]*User{},
+		usersByOffset:    map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
+
+	err := m.upsertUser(&u)
+
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         []byte("eid"),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	e, err := m.GetEphemeral(trsaHash)
+	if err != nil {
+		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+	if bytes.Compare(e.TransmissionRSAHash, trsaHash) != 0 {
+		t.Errorf("Did not receive expected ephemeral: %+v", e)
+	}
 }
 
 func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:         0,
+		ephemeralsByUser: map[string][]*Ephemeral{},
+		allEphemerals:    map[uint]*Ephemeral{},
+		allUsers:         nil,
+		usersByRsaHash:   map[string]*User{},
+		usersById:        map[string]*User{},
+		usersByOffset:    map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
 
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
+
+	err := m.upsertUser(&u)
+
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         []byte("eid"),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	e, err := m.GetEphemeral(trsaHash)
+	if err != nil {
+		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+
+	err = m.DeleteOldEphemerals(18)
+	if err != nil {
+		t.Errorf("Failed to delete old ephemerals: %+v", err)
+	}
+
+	_, ok := m.allEphemerals[e.ID]
+	if ok {
+		t.Errorf("Did not delete properly")
+	}
+}
+
+func TestMapImpl_GetLatestEphemeral(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:         0,
+		ephemeralsByUser: map[string][]*Ephemeral{},
+		allEphemerals:    map[uint]*Ephemeral{},
+		allUsers:         nil,
+		usersByRsaHash:   map[string]*User{},
+		usersById:        map[string]*User{},
+		usersByOffset:    map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+
+	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
+
+	err := m.upsertUser(&u)
+
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         []byte("eid"),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	_, err = m.GetLatestEphemeral()
+	if err != nil {
+		t.Errorf("Failed to get latest ephemeral: %+v", err)
+	}
 }
