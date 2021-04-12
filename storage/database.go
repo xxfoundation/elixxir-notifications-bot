@@ -33,16 +33,16 @@ type MapImpl struct {
 	usersByRsaHash   map[string]*User
 	usersByOffset    map[int64][]*User
 	allUsers         []*User
-	allEphemerals    map[uint]*Ephemeral
+	allEphemerals    map[int]*Ephemeral
 	ephemeralsByUser map[string][]*Ephemeral
-	ephIDSeq         uint
+	ephIDSeq         int
 }
 
 // Structure representing a User in the Storage backend
 type User struct {
 	TransmissionRSAHash []byte      `gorm:"primaryKey"`
 	IntermediaryId      []byte      `gorm:"not null; index"`
-	Offset              int64       `gorm:"not null; index"`
+	OffsetNum           int64       `gorm:"not null; index"`
 	TransmissionRSA     []byte      `gorm:"not null"`
 	Signature           []byte      `gorm:"not null"`
 	Token               string      `gorm:"not null"`
@@ -97,7 +97,7 @@ func newDatabase(username, password, dbName, address,
 			usersByOffset:    map[int64][]*User{},
 			allUsers:         nil,
 			ephemeralsByUser: map[string][]*Ephemeral{},
-			allEphemerals:    map[uint]*Ephemeral{},
+			allEphemerals:    map[int]*Ephemeral{},
 			ephIDSeq:         0,
 		}
 

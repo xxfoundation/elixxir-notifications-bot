@@ -264,7 +264,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 // Unit test that tests to see that updateNDF will in fact update the ndf object inside of IMPL
 func TestImpl_UpdateNdf(t *testing.T) {
 	impl := getNewImpl()
-	testNdf, _, err := ndf.DecodeNDF(ExampleNdfJSON)
+	testNdf, err := ndf.Unmarshal([]byte(ExampleNdfJSON))
 	if err != nil {
 		t.Logf("%+v", err)
 	}

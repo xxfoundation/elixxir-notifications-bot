@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
@@ -33,7 +34,7 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) 
 		TransmissionRSAHash: h.Sum(nil),
 		TransmissionRSA:     transmissionRSA,
 		Signature:           signature,
-		Offset:              ephemeral.GetOffset(iid),
+		OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 		Token:               token,
 	}
 	return u, s.upsertUser(u)
@@ -48,7 +49,7 @@ func (s *Storage) AddLatestEphemeral(u *User, epoch int32) error {
 		TransmissionRSAHash: u.TransmissionRSAHash,
 		EphemeralId:         eid[:],
 		Epoch:               epoch,
-		Offset:              u.Offset,
+		Offset:              u.OffsetNum,
 	})
 }
 
@@ -68,6 +69,9 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32) error {
 	users, err := s.getUsersByOffset(offset)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get users for given offset")
+	}
+	if len(users) > 0 {
+		fmt.Println(fmt.Sprintf("Adding ephemerals for users: %+v", users))
 	}
 	for _, u := range users {
 		eid, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, 16, time.Now().UnixNano())

@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"gorm.io/gorm"
 )
 
 // Obtain User from backend by primary key
@@ -39,10 +40,10 @@ func (m *MapImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 			m.allUsers = append(m.allUsers[:i], m.allUsers[i+1:]...)
 		}
 	}
-	for i, u := range m.usersByOffset[user.Offset] {
+	for i, u := range m.usersByOffset[user.OffsetNum] {
 		if bytes.Compare(transmissionRsaHash, u.TransmissionRSAHash) == 0 {
-			m.usersByOffset[user.Offset] = append(m.usersByOffset[user.Offset][:i],
-				m.usersByOffset[user.Offset][i+1:]...)
+			m.usersByOffset[user.OffsetNum] = append(m.usersByOffset[user.OffsetNum][:i],
+				m.usersByOffset[user.OffsetNum][i+1:]...)
 		}
 	}
 
@@ -64,15 +65,15 @@ func (m *MapImpl) upsertUser(user *User) error {
 	m.usersByRsaHash[string(user.TransmissionRSAHash)] = user
 	m.usersById[string(user.IntermediaryId)] = user
 	var found bool
-	for i, u := range m.usersByOffset[user.Offset] {
+	for i, u := range m.usersByOffset[user.OffsetNum] {
 		if string(user.TransmissionRSAHash) == string(u.TransmissionRSAHash) {
 			found = true
-			m.usersByOffset[user.Offset][i] = user
+			m.usersByOffset[user.OffsetNum][i] = user
 			break
 		}
 	}
 	if !found {
-		m.usersByOffset[user.Offset] = append(m.usersByOffset[user.Offset], user)
+		m.usersByOffset[user.OffsetNum] = append(m.usersByOffset[user.OffsetNum], user)
 	}
 	m.allUsers = append(m.allUsers, user)
 
@@ -84,16 +85,16 @@ func (m *MapImpl) GetAllUsers() ([]*User, error) {
 }
 
 func (m *MapImpl) upsertEphemeral(ephemeral *Ephemeral) error {
-	ephemeral.ID = m.ephIDSeq
 	m.ephIDSeq++
+	ephemeral.ID = uint(m.ephIDSeq)
 	m.ephemeralsByUser[string(ephemeral.TransmissionRSAHash)] = append(m.ephemeralsByUser[string(ephemeral.TransmissionRSAHash)], ephemeral)
-	m.allEphemerals[ephemeral.ID] = ephemeral
+	m.allEphemerals[int(ephemeral.ID)] = ephemeral
 	return nil
 }
 
 func (m *MapImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, error) {
 	elist, ok := m.ephemeralsByUser[string(transmissionRSAHash)]
-	if !ok {
+	if !ok || len(elist) == 0 {
 		return nil, errors.New(fmt.Sprintf("Could not find ephemeral with transmission RSA hash %+v", transmissionRSAHash))
 	}
 	return elist[0], nil
@@ -107,7 +108,7 @@ func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
 	for k, es := range m.ephemeralsByUser {
 		for i, e := range es {
 			if e.Epoch < epoch {
-				delete(m.allEphemerals, m.ephemeralsByUser[k][i].ID)
+				delete(m.allEphemerals, int(m.ephemeralsByUser[k][i].ID))
 				m.ephemeralsByUser[k] = append(m.ephemeralsByUser[k][:i], m.ephemeralsByUser[k][i+1:]...)
 			}
 		}
@@ -116,11 +117,9 @@ func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
 }
 
 func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
-	cur := m.ephIDSeq
-	var res *Ephemeral
-	var ok bool
-	for res, ok = m.allEphemerals[cur]; !ok; {
-		cur++
+	e, ok := m.allEphemerals[m.ephIDSeq]
+	if !ok {
+		return nil, gorm.ErrRecordNotFound
 	}
-	return res, nil
+	return e, nil
 }

@@ -62,7 +62,7 @@ func TestStorage_AddLatestEphemeral(t *testing.T) {
 	}
 }
 
-func TestStorage_UpdateEphemeralsForOffset(t *testing.T) {
+func TestStorage_AddEphemeralsForOffset(t *testing.T) {
 	_, err := NewStorage("", "", "", "", "")
 	if err != nil {
 		t.Errorf("Failed to create new storage object: %+v", err)

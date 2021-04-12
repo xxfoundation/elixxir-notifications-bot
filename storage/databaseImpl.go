@@ -71,7 +71,7 @@ func (impl *DatabaseImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, 
 
 func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
 	var result []*User
-	err := impl.db.Where(&User{Offset: offset}).Find(&result).Error
+	err := impl.db.Where(&User{OffsetNum: offset}).Find(&result).Error
 	return result, err
 }
 

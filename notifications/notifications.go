@@ -22,6 +22,7 @@ import (
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/crypto/tls"
 	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"strings"
@@ -239,7 +240,7 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
-	_, epoch := HandleQuantization(time.Now())
+	_, epoch := ephemeral.HandleQuantization(time.Now())
 	err = nb.Storage.AddLatestEphemeral(u, epoch)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to add ephemeral ID for user")

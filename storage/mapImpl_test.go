@@ -55,8 +55,8 @@ import (
 //	if err != nil {
 //		t.Errorf("Failed to add latest ephemeral: %+v", err)
 //	}
-//	_, _, _ = ephemeral.GetOffsetBounds(u1.Offset, time.Now().UnixNano())
-//	err = s.AddEphemeralsForOffset(u1.Offset, 5)
+//	_, _, _ = ephemeral.GetOffsetBounds(u1.OffsetNum, time.Now().UnixNano())
+//	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5)
 //	if err != nil {
 //		t.Errorf("failed to update ephemerals for offset: %+v", err)
 //	}
@@ -256,7 +256,7 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:         0,
 		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[uint]*Ephemeral{},
+		allEphemerals:    map[int]*Ephemeral{},
 		allUsers:         nil,
 		usersByRsaHash:   map[string]*User{},
 		usersById:        map[string]*User{},
@@ -284,7 +284,7 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	if m.ephIDSeq != 1 {
 		t.Error("sequence did not increment")
 	}
-	if m.allEphemerals[0] == nil {
+	if m.allEphemerals[m.ephIDSeq] == nil {
 		t.Error("Did not insert to allEphemerals")
 	}
 	if len(m.ephemeralsByUser[string(trsaHash)]) != 1 {
@@ -296,7 +296,7 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:         0,
 		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[uint]*Ephemeral{},
+		allEphemerals:    map[int]*Ephemeral{},
 		allUsers:         nil,
 		usersByRsaHash:   map[string]*User{},
 		usersById:        map[string]*User{},
@@ -335,7 +335,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:         0,
 		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[uint]*Ephemeral{},
+		allEphemerals:    map[int]*Ephemeral{},
 		allUsers:         nil,
 		usersByRsaHash:   map[string]*User{},
 		usersById:        map[string]*User{},
@@ -371,7 +371,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 		t.Errorf("Failed to delete old ephemerals: %+v", err)
 	}
 
-	_, ok := m.allEphemerals[e.ID]
+	_, ok := m.allEphemerals[int(e.ID)]
 	if ok {
 		t.Errorf("Did not delete properly")
 	}
@@ -381,7 +381,7 @@ func TestMapImpl_GetLatestEphemeral(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:         0,
 		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[uint]*Ephemeral{},
+		allEphemerals:    map[int]*Ephemeral{},
 		allUsers:         nil,
 		usersByRsaHash:   map[string]*User{},
 		usersById:        map[string]*User{},

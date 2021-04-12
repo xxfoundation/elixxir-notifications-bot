@@ -147,7 +147,7 @@ func setupConnection(impl *notifications.Impl, permissioningCertPath, permission
 			return errors.WithMessage(err, "Failed to verify signature on received NDF")
 		}
 
-		def, _, err = ndf.DecodeNDF(string(ndfResponse.Ndf))
+		def, err = ndf.Unmarshal(ndfResponse.Ndf)
 		if err != nil {
 			return errors.WithMessage(err, "Failed to decode received NDF")
 		}
