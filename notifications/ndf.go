@@ -16,13 +16,14 @@ import (
 	"gitlab.com/elixxir/notifications-bot/io"
 	"gitlab.com/xx_network/comms/connect"
 	//"gitlab.com/elixxir/comms/notificationBot"
-	"time"
 	"bytes"
 	"gitlab.com/elixxir/crypto/hash"
+	"time"
 )
 
 // Stopper function that stops the thread on a timeout
 type Stopper func(timeout time.Duration) bool
+
 // GatewaysChanged function processes the gateways changed event when detected
 // in the NDF
 type GatewaysChanged func(ndf pb.NDF)
@@ -34,11 +35,10 @@ type InstanceObject interface {
 	GetPermHost() *connect.Host
 }
 
-
 // TrackNdf kicks off the ndf tracking thread
 func TrackNdf(i InstanceObject) Stopper {
 	// Handler function for the gateways changed event
-	gatewayEventHandler := func (ndf pb.NDF) {
+	gatewayEventHandler := func(ndf pb.NDF) {
 		jww.DEBUG.Printf("Updating Gateways with new NDF")
 		// TODO: If this returns an error, print that error if it occurs
 		i.UpdateGateways(&ndf)
@@ -48,7 +48,7 @@ func TrackNdf(i InstanceObject) Stopper {
 	quitCh := make(chan bool)
 	quitFn := func(timeout time.Duration) bool {
 		select {
-		case quitCh<-true:
+		case quitCh <- true:
 			return true
 		case <-time.After(timeout):
 			jww.ERROR.Printf("Could not stop NDF Tracking Thread")
@@ -63,7 +63,6 @@ func TrackNdf(i InstanceObject) Stopper {
 
 	return quitFn
 }
-
 
 func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
 	lastNdfHash := make([]byte, 32)

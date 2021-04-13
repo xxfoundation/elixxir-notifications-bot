@@ -8,17 +8,17 @@
 package notifications
 
 import (
-	"testing"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"sync"
+	"testing"
 	"time"
 )
-
 
 type MockPoller struct {
 	ndf *pb.NDF
 	sync.Mutex
 }
+
 func (m MockPoller) PollNdf() (*pb.NDF, error) {
 	m.Lock()
 	defer m.Unlock()
@@ -35,12 +35,12 @@ func TestTrackNdf(t *testing.T) {
 	// Stopping function for the thread
 	quitCh := make(chan bool)
 
-	poller := MockPoller {
+	poller := MockPoller{
 		ndf: nil,
 	}
 
 	gwUpdates := 0
-	gatewayEventHandler := func (ndf pb.NDF) {
+	gatewayEventHandler := func(ndf pb.NDF) {
 		t.Logf("Updating Gateways with new NDF")
 		gwUpdates += 1
 	}
@@ -50,7 +50,7 @@ func TestTrackNdf(t *testing.T) {
 	select {
 	case <-time.After(2 * time.Second):
 		t.Errorf("Could not stop NDF Tracking Thread")
-	case quitCh<-true:
+	case quitCh <- true:
 		break
 	}
 
