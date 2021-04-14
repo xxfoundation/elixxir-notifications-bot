@@ -19,7 +19,7 @@ type MockPoller struct {
 	sync.Mutex
 }
 
-func (m MockPoller) PollNdf() (*pb.NDF, error) {
+func (m MockPoller) PollNdf(ndfHash []byte) (*pb.NDF, error) {
 	m.Lock()
 	defer m.Unlock()
 	return m.ndf, nil
@@ -40,9 +40,10 @@ func TestTrackNdf(t *testing.T) {
 	}
 
 	gwUpdates := 0
-	gatewayEventHandler := func(ndf pb.NDF) {
+	gatewayEventHandler := func(ndf pb.NDF) []byte {
 		t.Logf("Updating Gateways with new NDF")
 		gwUpdates += 1
+		return nil
 	}
 
 	go trackNdf(poller, quitCh, gatewayEventHandler)

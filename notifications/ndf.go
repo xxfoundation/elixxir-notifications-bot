@@ -11,15 +11,12 @@ package notifications
 
 import (
 	//"github.com/pkg/errors"
+	"bytes"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/notifications-bot/io"
-	"gitlab.com/xx_network/comms/connect"
-	//"gitlab.com/elixxir/comms/notificationBot"
-	"bytes"
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
-	"gitlab.com/elixxir/crypto/hash"
+	"gitlab.com/elixxir/notifications-bot/io"
 	"time"
 )
 
@@ -36,7 +33,7 @@ func TrackNdf(i *network.Instance, c *notificationBot.Comms) Stopper {
 	gatewayEventHandler := func(ndf pb.NDF) []byte {
 		jww.DEBUG.Printf("Updating Gateways with new NDF")
 		// TODO: If this returns an error, print that error if it occurs
-		i.UpdateFullNdf(ndf)
+		i.UpdateFullNdf(&ndf)
 		i.UpdateGatewayConnections()
 		return i.GetFullNdf().GetHash()
 	}
@@ -54,7 +51,7 @@ func TrackNdf(i *network.Instance, c *notificationBot.Comms) Stopper {
 	}
 
 	// Polling object
-	permHost := c.GetHost(i.GetPermissioningId())
+	permHost, _ := c.GetHost(i.GetPermissioningId())
 	poller := io.NewNdfPoller(c, permHost)
 
 	go trackNdf(poller, quitCh, gatewayEventHandler)
@@ -65,8 +62,6 @@ func TrackNdf(i *network.Instance, c *notificationBot.Comms) Stopper {
 func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
 	lastNdfHash := make([]byte, 32)
 	pollDelay := 1 * time.Second
-	cMixHash, _ := hash.NewCMixHash()
-	nonce := make([]byte, 32)
 	hashCh := make(chan []byte, 1)
 	for {
 		jww.TRACE.Printf("Polling for NDF")

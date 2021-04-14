@@ -15,18 +15,15 @@
 package io
 
 import (
-	"github.com/golang/protobuf/ptypes"
-	"github.com/golang/protobuf/ptypes/any"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/xx_network/comms/connect"
-	"google.golang.org/grpc"
 )
 
 // PollingConn is an object that implements the PollNdf Function
 // and allows it to be mocked for testing.
 type PollingConn interface {
-	PollNdf() (*pb.NDF, error)
+	PollNdf(ndfHash []byte) (*pb.NDF, error)
 }
 
 // NdfPoller is a regular connection to the permissioning server, created
@@ -47,5 +44,5 @@ func NewNdfPoller(pc *notificationBot.Comms, pHost *connect.Host) NdfPoller {
 // PollNdf gets the NDF from the Permissioning server.
 func (p NdfPoller) PollNdf(ndfHash []byte) (*pb.NDF, error) {
 	permHost := p.permHost
-	return pc.PollNdf(permHost, ndfHash)
+	return p.pc.PollNdf(permHost, ndfHash)
 }
