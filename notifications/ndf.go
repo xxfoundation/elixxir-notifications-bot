@@ -17,6 +17,8 @@ import (
 	"gitlab.com/xx_network/comms/connect"
 	//"gitlab.com/elixxir/comms/notificationBot"
 	"bytes"
+	"gitlab.com/elixxir/comms/network"
+	"gitlab.com/elixxir/comms/notificationsBot"
 	"gitlab.com/elixxir/crypto/hash"
 	"time"
 )
@@ -26,22 +28,17 @@ type Stopper func(timeout time.Duration) bool
 
 // GatewaysChanged function processes the gateways changed event when detected
 // in the NDF
-type GatewaysChanged func(ndf pb.NDF)
-
-// InstanceObject is a mock of the instance object...
-type InstanceObject interface {
-	UpdateGateways(ndf *pb.NDF)
-	GetProtoComms() *connect.ProtoComms
-	GetPermHost() *connect.Host
-}
+type GatewaysChanged func(ndf pb.NDF) []byte
 
 // TrackNdf kicks off the ndf tracking thread
-func TrackNdf(i InstanceObject) Stopper {
+func TrackNdf(i *network.Instance, c *notificationsBot.Comms) Stopper {
 	// Handler function for the gateways changed event
-	gatewayEventHandler := func(ndf pb.NDF) {
+	gatewayEventHandler := func(ndf pb.NDF) []byte {
 		jww.DEBUG.Printf("Updating Gateways with new NDF")
 		// TODO: If this returns an error, print that error if it occurs
-		i.UpdateGateways(&ndf)
+		i.UpdateFullNdf(ndf)
+		i.UpdateGatewayConnections()
+		return i.GetFullNdf().GetHash()
 	}
 
 	// Stopping function for the thread
@@ -57,7 +54,8 @@ func TrackNdf(i InstanceObject) Stopper {
 	}
 
 	// Polling object
-	poller := io.NewNdfPoller(i.GetProtoComms(), i.GetPermHost())
+	permHost := c.GetHost(i.GetPermissioningId())
+	poller := io.NewNdfPoller(c, permHost)
 
 	go trackNdf(poller, quitCh, gatewayEventHandler)
 
@@ -69,19 +67,36 @@ func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
 	pollDelay := 1 * time.Second
 	cMixHash, _ := hash.NewCMixHash()
 	nonce := make([]byte, 32)
+	hashCh := make(chan []byte, 1)
 	for {
 		jww.TRACE.Printf("Polling for NDF")
-		ndf, err := poller.PollNdf()
+		ndf, err := poller.PollNdf(lastNdfHash)
 		if err != nil {
 			jww.ERROR.Printf("polling ndf: %+v", err)
 			time.Sleep(pollDelay)
+			continue
 		}
+
 		// If the cur Hash differs from the last one, trigger the update
 		// event
 		// TODO: Improve this to only trigger when gatways are updated
-		curNdfHash := ndf.Digest(nonce, cMixHash)
+		//       this isn't useful right now because gw event handlers
+		//       actually update the full ndf each time, so it's a
+		//       choice between comparing the full hash or additional
+		//       network traffic given the current state of API.
+		// FIXME: This is mildly hacky because we rely on the call back
+		// to return the ndf hash right now.
+		curNdfHash := lastNdfHash
+		select {
+		case hashUpdate := <-hashCh:
+			curNdfHash = hashUpdate
+		default:
+			break
+		}
 		if bytes.Equal(curNdfHash, lastNdfHash) {
-			go gwEvt(*ndf)
+			// FIXME: we should be able to get hash from the ndf
+			// object, but we can't.
+			go func() { hashCh <- gwEvt(*ndf) }()
 		}
 
 		lastNdfHash = curNdfHash
