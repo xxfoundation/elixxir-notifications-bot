@@ -18,7 +18,7 @@ import (
 	//"gitlab.com/elixxir/comms/notificationBot"
 	"bytes"
 	"gitlab.com/elixxir/comms/network"
-	"gitlab.com/elixxir/comms/notificationsBot"
+	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/hash"
 	"time"
 )
@@ -31,7 +31,7 @@ type Stopper func(timeout time.Duration) bool
 type GatewaysChanged func(ndf pb.NDF) []byte
 
 // TrackNdf kicks off the ndf tracking thread
-func TrackNdf(i *network.Instance, c *notificationsBot.Comms) Stopper {
+func TrackNdf(i *network.Instance, c *notificationBot.Comms) Stopper {
 	// Handler function for the gateways changed event
 	gatewayEventHandler := func(ndf pb.NDF) []byte {
 		jww.DEBUG.Printf("Updating Gateways with new NDF")

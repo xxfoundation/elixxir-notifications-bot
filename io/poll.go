@@ -18,7 +18,7 @@ import (
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
 	pb "gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/comms/notificationsBot"
+	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/xx_network/comms/connect"
 	"google.golang.org/grpc"
 )
@@ -33,11 +33,11 @@ type PollingConn interface {
 // with a protocomms object.
 type NdfPoller struct {
 	permHost *connect.Host
-	pc       *notificationsBot.Comms
+	pc       *notificationBot.Comms
 }
 
 // NewNdfPoller creates a new permconn object with a host and protocomms id.
-func NewNdfPoller(pc *notificationsBot.Comms, pHost *connect.Host) NdfPoller {
+func NewNdfPoller(pc *notificationBot.Comms, pHost *connect.Host) NdfPoller {
 	return NdfPoller{
 		pc:       pc,
 		permHost: pHost,
