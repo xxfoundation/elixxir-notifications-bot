@@ -60,42 +60,48 @@ func TrackNdf(i *network.Instance, c *notificationBot.Comms) Stopper {
 }
 
 func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
-	lastNdfHash := make([]byte, 32)
 	pollDelay := 1 * time.Second
 	hashCh := make(chan []byte, 1)
+	lastNdf := pb.NDF{Ndf: []byte{}}
+	lastNdfHash := []byte{}
 	for {
 		jww.TRACE.Printf("Polling for NDF")
+
+		// FIXME: This is mildly hacky because we rely on the call back
+		// to return the ndf hash right now.
+		select {
+		case newHash := <-hashCh:
+			lastNdfHash = newHash
+		default:
+			break
+		}
+
 		ndf, err := poller.PollNdf(lastNdfHash)
 		if err != nil {
 			jww.ERROR.Printf("polling ndf: %+v", err)
-			time.Sleep(pollDelay)
-			continue
+			ndf = nil
 		}
 
-		// If the cur Hash differs from the last one, trigger the update
+		// If the cur differs from the last one, trigger the update
 		// event
 		// TODO: Improve this to only trigger when gatways are updated
 		//       this isn't useful right now because gw event handlers
 		//       actually update the full ndf each time, so it's a
 		//       choice between comparing the full hash or additional
 		//       network traffic given the current state of API.
-		// FIXME: This is mildly hacky because we rely on the call back
-		// to return the ndf hash right now.
-		curNdfHash := lastNdfHash
-		select {
-		case hashUpdate := <-hashCh:
-			curNdfHash = hashUpdate
-		default:
-			break
-		}
-		if bytes.Equal(curNdfHash, lastNdfHash) {
+		if ndf != nil && !bytes.Equal(ndf.Ndf, lastNdf.Ndf) {
 			// FIXME: we should be able to get hash from the ndf
 			// object, but we can't.
 			go func() { hashCh <- gwEvt(*ndf) }()
+			lastNdf = *ndf
 		}
 
-		lastNdfHash = curNdfHash
-
-		time.Sleep(pollDelay)
+		select {
+		case <-quitCh:
+			jww.DEBUG.Printf("Exiting trackNDF thread...")
+			return
+		case <-time.After(pollDelay):
+			continue
+		}
 	}
 }
