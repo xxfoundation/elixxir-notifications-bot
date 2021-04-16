@@ -34,8 +34,8 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) 
 		TransmissionRSAHash: h.Sum(nil),
 		TransmissionRSA:     transmissionRSA,
 		Signature:           signature,
-		OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-		Token:               token,
+		// OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
+		Token: token,
 	}
 	return u, s.upsertUser(u)
 }
