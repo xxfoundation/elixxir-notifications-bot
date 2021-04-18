@@ -103,10 +103,11 @@ var rootCmd = &cobra.Command{
 			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
 		}
 
-		// Start notification loop
-		killChan := make(chan struct{})
+		// Start ephemeral ID tracking
 		errChan := make(chan error)
-		go impl.RunNotificationLoop(loopDelay, killChan, errChan)
+		impl.TrackNdf()
+		go impl.EphIdCreator()
+		go impl.EphIdDeleter()
 
 		// Wait forever to prevent process from ending
 		err = <-errChan

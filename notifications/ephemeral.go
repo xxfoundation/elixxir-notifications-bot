@@ -15,7 +15,7 @@ const deletionDelay = -(time.Duration(ephemeral.Period) + creationLead)
 
 // EphIdCreator runs as a thread to track ephemeral IDs for users who registered to receive push notifications
 func (nb *Impl) EphIdCreator() {
-	nb.InitCreator()
+	nb.initCreator()
 	ticker := time.NewTicker(time.Duration(offsetPhase))
 	go nb.addEphemerals(time.Now().Add(creationLead))
 	//handle all future epochs
@@ -25,7 +25,7 @@ func (nb *Impl) EphIdCreator() {
 	}
 }
 
-func (nb *Impl) InitCreator() {
+func (nb *Impl) initCreator() {
 	// Retrieve most recent ephemeral from storage
 	var lastEpochTime time.Time
 	lastEph, err := nb.Storage.GetLatestEphemeral()
@@ -55,14 +55,15 @@ func (nb *Impl) InitCreator() {
 
 func (nb *Impl) addEphemerals(start time.Time) {
 	currentOffset, epoch := ephemeral.HandleQuantization(start)
-	err := nb.Storage.AddEphemeralsForOffset(currentOffset, epoch)
+	def := nb.inst.GetFullNdf()
+	err := nb.Storage.AddEphemeralsForOffset(currentOffset, epoch, uint(def.Get().AddressSpaceSize))
 	if err != nil {
 		jww.WARN.Printf("failed to update ephemerals: %+v", err)
 	}
 }
 
 func (nb *Impl) EphIdDeleter() {
-	nb.InitDeleter()
+	nb.initDeleter()
 	ticker := time.NewTicker(time.Duration(offsetPhase))
 	//handle all future epochs
 	for true {
@@ -71,7 +72,7 @@ func (nb *Impl) EphIdDeleter() {
 	}
 }
 
-func (nb *Impl) InitDeleter() {
+func (nb *Impl) initDeleter() {
 	//handle the next epoch
 	_, epoch := ephemeral.HandleQuantization(time.Now())
 	nextTrigger := time.Unix(0, int64(epoch+1)*offsetPhase)

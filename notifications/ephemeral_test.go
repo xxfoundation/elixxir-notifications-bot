@@ -27,20 +27,20 @@ func TestImpl_InitDeleter(t *testing.T) {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now().Add(-30 * time.Hour))
-	err = s.AddLatestEphemeral(u, epoch)
+	e, err := s.AddLatestEphemeral(u, epoch, 16)
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral for user: %+v", err)
 	}
-	e, err := s.GetEphemeral(u.TransmissionRSAHash)
+	e, err = s.GetEphemeral(e.EphemeralId)
 	if err != nil {
 		t.Errorf("Failed to get latest ephemeral for user: %+v", err)
 	}
 	if e == nil {
 		t.Error("Did not receive ephemeral for user")
 	}
-	impl.InitDeleter()
+	impl.initDeleter()
 	time.Sleep(time.Second * 5)
-	e, err = s.GetEphemeral(u.TransmissionRSAHash)
+	e, err = s.GetEphemeral(e.EphemeralId)
 	if err == nil {
 		t.Errorf("Ephemeral should have been deleted, did not receive error: %+v", e)
 	}
@@ -51,9 +51,16 @@ func TestImpl_InitCreator(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to init storage: %+v", err)
 	}
-	impl := &Impl{
-		Storage: s,
+	impl, err := StartNotifications(Params{
+		Address:  "",
+		CertPath: "",
+		KeyPath:  "",
+		FBCreds:  "",
+	}, true, true)
+	if err != nil {
+		t.Errorf("Failed to create impl: %+v", err)
 	}
+	impl.Storage = s
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
@@ -64,10 +71,10 @@ func TestImpl_InitCreator(t *testing.T) {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
 	fmt.Println(u.OffsetNum)
-	impl.InitCreator()
-	e, err := s.GetEphemeral(u.TransmissionRSAHash)
+	impl.initCreator()
+	e, err := s.GetLatestEphemeral()
 	if err != nil {
-		t.Errorf("Failed to get latest ephemeral for user: %+v", err)
+		t.Errorf("Failed to get latest ephemeral: %+v", err)
 	}
 	if e == nil {
 		t.Error("Did not receive ephemeral for user")

@@ -56,7 +56,7 @@ func TestStorage_AddLatestEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}
-	err = s.AddLatestEphemeral(u, 5)
+	_, err = s.AddLatestEphemeral(u, 5, 16)
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}

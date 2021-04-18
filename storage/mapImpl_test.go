@@ -2,7 +2,10 @@ package storage
 
 import (
 	"bytes"
+	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
+	"time"
 )
 
 // This file contains testing for mapImpl.go
@@ -169,10 +172,14 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 		usersById:      map[string]*User{},
 		usersByOffset:  map[int64][]*User{},
 	}
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("rsahash")}
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: []byte("rsahash")}
 
-	err := m.upsertUser(&u)
-
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: function returned an error\n\tGot: %s", err)
 	}
@@ -203,10 +210,14 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 		usersById:      map[string]*User{},
 		usersByOffset:  map[int64][]*User{},
 	}
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("TransmissionRSAHash")}
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: []byte("rsahash")}
 
-	err := m.upsertUser(&u)
-
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
 	}
@@ -254,27 +265,35 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 
 func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:         0,
-		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[int]*Ephemeral{},
-		allUsers:         nil,
-		usersByRsaHash:   map[string]*User{},
-		usersById:        map[string]*User{},
-		usersByOffset:    map[int64][]*User{},
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	trsaHash := []byte("TransmissionRSAHash")
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
 
-	err := m.upsertUser(&u)
-
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
 	err = m.upsertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
-		EphemeralId:         []byte("eid"),
+		EphemeralId:         eid.Int64(),
 		Epoch:               17,
 	})
 	if err != nil {
@@ -287,42 +306,51 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	if m.allEphemerals[m.ephIDSeq] == nil {
 		t.Error("Did not insert to allEphemerals")
 	}
-	if len(m.ephemeralsByUser[string(trsaHash)]) != 1 {
-		t.Error("Did not insert to ephemeralsByUser")
+	_, ok := m.ephemeralsById[eid.Int64()]
+	if !ok {
+		t.Error("Did not insert to ephemeralsById")
 	}
 }
 
 func TestMapImpl_GetEphemeral(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:         0,
-		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[int]*Ephemeral{},
-		allUsers:         nil,
-		usersByRsaHash:   map[string]*User{},
-		usersById:        map[string]*User{},
-		usersByOffset:    map[int64][]*User{},
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
 
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
-
-	err := m.upsertUser(&u)
-
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
 	err = m.upsertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
-		EphemeralId:         []byte("eid"),
+		EphemeralId:         eid.Int64(),
 		Epoch:               17,
 	})
 	if err != nil {
 		t.Errorf("Failed to upsert ephemeral: %+v", err)
 	}
 
-	e, err := m.GetEphemeral(trsaHash)
+	e, err := m.GetEphemeral(eid.Int64())
 	if err != nil {
 		t.Errorf("Failed to get ephemeral: %+v", err)
 	}
@@ -333,35 +361,43 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 
 func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:         0,
-		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[int]*Ephemeral{},
-		allUsers:         nil,
-		usersByRsaHash:   map[string]*User{},
-		usersById:        map[string]*User{},
-		usersByOffset:    map[int64][]*User{},
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
 
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
-
-	err := m.upsertUser(&u)
-
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
 	err = m.upsertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
-		EphemeralId:         []byte("eid"),
+		EphemeralId:         eid.Int64(),
 		Epoch:               17,
 	})
 	if err != nil {
 		t.Errorf("Failed to upsert ephemeral: %+v", err)
 	}
 
-	e, err := m.GetEphemeral(trsaHash)
+	e, err := m.GetEphemeral(eid.Int64())
 	if err != nil {
 		t.Errorf("Failed to get ephemeral: %+v", err)
 	}
@@ -379,28 +415,36 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 
 func TestMapImpl_GetLatestEphemeral(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:         0,
-		ephemeralsByUser: map[string][]*Ephemeral{},
-		allEphemerals:    map[int]*Ephemeral{},
-		allUsers:         nil,
-		usersByRsaHash:   map[string]*User{},
-		usersById:        map[string]*User{},
-		usersByOffset:    map[int64][]*User{},
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
 	}
 	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
 
-	u := User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: trsaHash}
-
-	err := m.upsertUser(&u)
-
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
 	err = m.upsertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
-		EphemeralId:         []byte("eid"),
+		EphemeralId:         eid.Int64(),
 		Epoch:               17,
 	})
 	if err != nil {
