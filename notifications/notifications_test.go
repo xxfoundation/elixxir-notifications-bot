@@ -21,6 +21,7 @@ import (
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -179,26 +180,26 @@ func (m mockPollErrComm) RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.Ne
 	return nil, nil
 }
 
-// Unit test for PollForNotifications
-func TestPollForNotifications(t *testing.T) {
-	impl := &Impl{
-		Comms: mockPollComm{},
-		gwId:  id.NewIdFromString("test", id.Gateway, t),
-	}
-	errImpl := &Impl{
-		Comms: mockPollErrComm{},
-		gwId:  id.NewIdFromString("test", id.Gateway, t),
-	}
-	_, err := pollForNotifications(errImpl)
-	if err == nil {
-		t.Errorf("Failed to poll for notifications: %+v", err)
-	}
-
-	_, err = pollForNotifications(impl)
-	if err != nil {
-		t.Errorf("Failed to poll for notifications: %+v", err)
-	}
-}
+// // Unit test for PollForNotifications
+// func TestPollForNotifications(t *testing.T) {
+// 	impl := &Impl{
+// 		Comms: mockPollComm{},
+// 		gwId:  id.NewIdFromString("test", id.Gateway, t),
+// 	}
+// 	errImpl := &Impl{
+// 		Comms: mockPollErrComm{},
+// 		gwId:  id.NewIdFromString("test", id.Gateway, t),
+// 	}
+// 	_, err := pollForNotifications(errImpl)
+// 	if err == nil {
+// 		t.Errorf("Failed to poll for notifications: %+v", err)
+// 	}
+//
+// 	_, err = pollForNotifications(impl)
+// 	if err != nil {
+// 		t.Errorf("Failed to poll for notifications: %+v", err)
+// 	}
+// }
 
 // Unit test for RegisterForNotifications
 func TestImpl_RegisterForNotifications(t *testing.T) {
@@ -331,6 +332,46 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
+	}
+}
+
+// Happy path.
+func TestImpl_ReceiveNotificationBatch(t *testing.T) {
+	impl := getNewImpl()
+	dataChan := make(chan *pb.NotificationData)
+	impl.notifySendFunc = func(data *pb.NotificationData, comm *firebase.FirebaseComm, s *storage.Storage) error {
+		go func() { dataChan <- data }()
+		return nil
+	}
+
+	notifBatch := &pb.NotificationBatch{
+		RoundID: 42,
+		Notifications: []*pb.NotificationData{
+			{
+				EphemeralID: 5,
+				IdentityFP:  []byte("IdentityFP"),
+				MessageHash: []byte("MessageHash"),
+			},
+		},
+	}
+
+	auth := &connect.Auth{
+		IsAuthenticated: true,
+	}
+
+	err := impl.ReceiveNotificationBatch(notifBatch, auth)
+	if err != nil {
+		t.Errorf("ReceiveNotificationBatch() returned an error: %+v", err)
+	}
+
+	select {
+	case result := <-dataChan:
+		if !reflect.DeepEqual(notifBatch.Notifications[0], result) {
+			t.Errorf("Failed to receive expected NotificationData."+
+				"\nexpected: %s\nreceived: %s", notifBatch.Notifications[0], result)
+		}
+	case <-time.NewTimer(50 * time.Millisecond).C:
+		t.Error("Timed out while waiting for NotificationData.")
 	}
 }
 
