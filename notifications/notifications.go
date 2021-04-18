@@ -32,6 +32,7 @@ import (
 // Function type definitions for the main operations (poll and notify)
 type PollFunc func(*Impl) ([][]byte, error)
 type NotifyFunc func(*messaging.Client, []byte, *firebase.FirebaseComm, *storage.Storage) (string, error)
+type NotifySendFunc func(*pb.NotificationData, *firebase.FirebaseComm, *storage.Storage) error
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -51,6 +52,7 @@ type Impl struct {
 	ndf              *ndf.NetworkDefinition
 	pollFunc         PollFunc
 	notifyFunc       NotifyFunc
+	notifySendFunc   NotifySendFunc
 	fcm              *messaging.Client
 	gwId             *id.ID
 
@@ -61,7 +63,7 @@ type Impl struct {
 type NotificationComms interface {
 	GetHost(hostId *id.ID) (*connect.Host, bool)
 	AddHost(hid *id.ID, address string, cert []byte, params connect.HostParams) (host *connect.Host, err error)
-	RequestNotifications(host *connect.Host) (*pb.UserIdList, error)
+	// RequestNotifications(host *connect.Host) (*pb.UserIdList, error)
 	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
 }
 
@@ -131,7 +133,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	}
 
 	// set up stored functions
-	impl.pollFunc = pollForNotifications
+	// impl.pollFunc = pollForNotifications
 	impl.notifyFunc = notifyUser
 
 	// Start notification comms server
@@ -160,6 +162,10 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
 		return instance.UnregisterForNotifications(request, auth)
+	}
+
+	impl.Functions.ReceiveNotificationBatch = func(data *pb.NotificationBatch, auth *connect.Auth) error {
+		return instance.ReceiveNotificationBatch(data, auth)
 	}
 
 	return impl
@@ -194,21 +200,21 @@ func notifyUser(fcm *messaging.Client, uid []byte, fc *firebase.FirebaseComm, db
 	return resp, nil
 }
 
-// pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
-// It retrieves a list of user ids to be notified from the gateway
-func pollForNotifications(nb *Impl) (uids [][]byte, e error) {
-	h, ok := nb.Comms.GetHost(nb.gwId)
-	if !ok {
-		return nil, errors.New("Could not find gateway host")
-	}
-
-	users, err := nb.Comms.RequestNotifications(h)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve notifications from gateway")
-	}
-
-	return users.IDs, nil
-}
+// // pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
+// // It retrieves a list of user ids to be notified from the gateway
+// func pollForNotifications(nb *Impl) (uids [][]byte, e error) {
+// 	h, ok := nb.Comms.GetHost(nb.gwId)
+// 	if !ok {
+// 		return nil, errors.New("Could not find gateway host")
+// 	}
+//
+// 	users, err := nb.Comms.RequestNotifications(h)
+// 	if err != nil {
+// 		return nil, errors.Wrap(err, "Failed to retrieve notifications from gateway")
+// 	}
+//
+// 	return users.IDs, nil
+// }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
 func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
@@ -290,5 +296,22 @@ func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
 	}
 
 	nb.ndf = ndf
+	return nil
+}
+
+// ReceiveNotificationBatch receives the batch of notification data from gateway.
+func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth *connect.Auth) error {
+	if !auth.IsAuthenticated {
+		return errors.New("Cannot receive notification data: client is not authenticated")
+	}
+
+	fbComm := firebase.NewFirebaseComm()
+	for _, notifData := range notifBatch.GetNotifications() {
+		err := nb.notifySendFunc(notifData, fbComm, nb.Storage)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
