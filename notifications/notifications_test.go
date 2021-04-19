@@ -93,34 +93,16 @@ func TestStartNotifications(t *testing.T) {
 		Address: "0.0.0.0:42010",
 	}
 
-	params.KeyPath = wd + "/../testutil/badkey"
-	n, err := StartNotifications(params, false, true)
-	if err == nil || !strings.Contains(err.Error(), "Failed to parse notifications server key") {
-		t.Errorf("Should have thrown an error bad key")
-	}
-
 	params.KeyPath = wd + "/../testutil/cmix.rip.key"
-	n, err = StartNotifications(params, false, true)
+	_, err = StartNotifications(params, false, true)
 	if err == nil || !strings.Contains(err.Error(), "failed to read certificate at") {
 		t.Errorf("Should have thrown an error for no cert path")
 	}
 
-	params.CertPath = wd + "/../testutil/badkey"
-	n, err = StartNotifications(params, false, true)
-	if err == nil || !strings.Contains(err.Error(), "Failed to parse notifications server cert") {
-		t.Errorf("Should have thrown an error for bad certificate")
-	}
-
 	params.CertPath = wd + "/../testutil/cmix.rip.crt"
-	n, err = StartNotifications(params, false, true)
+	_, err = StartNotifications(params, false, true)
 	if err != nil {
 		t.Errorf("Failed to start notifications successfully: %+v", err)
-	}
-	if n.notificationKey == nil {
-		t.Error("Did not set key")
-	}
-	if n.notificationCert == nil {
-		t.Errorf("Did not set cert")
 	}
 }
 
@@ -250,25 +232,6 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
-	}
-}
-
-// Unit test that tests to see that updateNDF will in fact update the ndf object inside of IMPL
-func TestImpl_UpdateNdf(t *testing.T) {
-	impl := getNewImpl()
-	testNdf, err := ndf.Unmarshal([]byte(ExampleNdfJSON))
-	if err != nil {
-		t.Logf("%+v", err)
-	}
-
-	err = impl.UpdateNdf(testNdf)
-	if err != nil {
-		t.Errorf("Failed to update ndf: %+v", err)
-	}
-
-	if impl.ndf != testNdf {
-		t.Logf("Failed to change ndf")
-		t.Fail()
 	}
 }
 

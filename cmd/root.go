@@ -11,7 +11,6 @@ package cmd
 import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
@@ -19,14 +18,11 @@ import (
 	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
-	"gitlab.com/xx_network/comms/signature"
 	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"net"
 	"os"
 	"path"
-	"strings"
 )
 
 var (
@@ -97,10 +93,16 @@ var rootCmd = &cobra.Command{
 			port,
 		)
 
-		// Set up the notifications server connections
-		err = setupConnection(impl, viper.GetString("permissioningCertPath"), viper.GetString("permissioningAddress"))
+		// Read in permissioning certificate
+		cert, err := utils.ReadFile(viper.GetString("permissioningCertPath"))
 		if err != nil {
-			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
+			jww.FATAL.Panicf("Could not read permissioning cert: %+v", err)
+		}
+
+		// Add host for permissioning server
+		_, err = impl.Comms.AddHost(&id.Permissioning, viper.GetString("permissioningAddress"), cert, connect.GetDefaultHostParams())
+		if err != nil {
+			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
 		}
 
 		// Start ephemeral ID tracking
@@ -113,53 +115,6 @@ var rootCmd = &cobra.Command{
 		err = <-errChan
 		jww.FATAL.Panicf("Notifications loop error received: %+v", err)
 	},
-}
-
-// setupConnection handles connecting to permissioning and polling for the NDF once connected
-func setupConnection(impl *notifications.Impl, permissioningCertPath, permissioningAddr string) error {
-	// Read in permissioning certificate
-	cert, err := utils.ReadFile(permissioningCertPath)
-	if err != nil {
-		return errors.Wrap(err, "Could not read permissioning cert")
-	}
-
-	// Add host for permissioning server
-	h, err := impl.Comms.AddHost(&id.Permissioning, permissioningAddr, cert, connect.GetDefaultHostParams())
-	if err != nil {
-		return errors.Wrap(err, "Failed to Create permissioning host")
-	}
-
-	// Loop until an NDF is received
-	var def *ndf.NetworkDefinition
-	for def == nil {
-		// TODO: get the ndf
-		ndfResponse, err := impl.Comms.RequestNdf(h, &mixmessages.NDFHash{
-			Hash: nil,
-		})
-		// Don't stop if error is expected
-		if err != nil && !strings.Contains(err.Error(), ndf.NO_NDF) {
-			return errors.Wrap(err, "Failed to get NDF")
-		}
-		if ndfResponse == nil || ndfResponse.GetNdf() == nil {
-			continue
-		}
-		err = signature.Verify(ndfResponse, h.GetPubKey())
-		if err != nil {
-			return errors.WithMessage(err, "Failed to verify signature on received NDF")
-		}
-
-		def, err = ndf.Unmarshal(ndfResponse.Ndf)
-		if err != nil {
-			return errors.WithMessage(err, "Failed to decode received NDF")
-		}
-	}
-
-	// Update NDF & gateway host
-	err = impl.UpdateNdf(def)
-	if err != nil {
-		return errors.Wrap(err, "Failed to update impl's NDF")
-	}
-	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags

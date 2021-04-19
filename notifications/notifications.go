@@ -9,7 +9,6 @@
 package notifications
 
 import (
-	"crypto/x509"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
@@ -21,7 +20,6 @@ import (
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/signature/rsa"
-	"gitlab.com/xx_network/crypto/tls"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
@@ -31,7 +29,6 @@ import (
 )
 
 // Function type definitions for the main operations (poll and notify)
-type PollFunc func(*Impl) ([][]byte, error)
 type NotifyFunc func(*pb.NotificationData, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
 
 // Params struct holds info passed in for configuration
@@ -44,30 +41,17 @@ type Params struct {
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
-	Comms            *notificationBot.Comms
-	inst             *network.Instance
-	Storage          *storage.Storage
-	notificationCert *x509.Certificate
-	notificationKey  *rsa.PrivateKey
-	certFromFile     string
-	ndf              *ndf.NetworkDefinition
-	pollFunc         PollFunc
-	notifyFunc       NotifyFunc
-	fcm              *messaging.Client
-	gwId             *id.ID
+	Comms      *notificationBot.Comms
+	Storage    *storage.Storage
+	inst       *network.Instance
+	notifyFunc NotifyFunc
+	fcm        *messaging.Client
 
 	ndfStopper Stopper
-
-	updateChan, deleteChan chan int64
 }
 
 // StartNotifications creates an Impl from the information passed in
 func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
-	impl := &Impl{
-		updateChan: make(chan int64),
-		deleteChan: make(chan int64),
-	}
-
 	var cert, key []byte
 	var err error
 
@@ -76,10 +60,6 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		key, err = utils.ReadFile(params.KeyPath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read key at %+v", params.KeyPath)
-		}
-		impl.notificationKey, err = rsa.LoadPrivateKeyFromPem(key)
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to parse notifications server key (%+v)", impl.notificationKey)
 		}
 	} else {
 		jww.WARN.Println("Running without key...")
@@ -91,18 +71,21 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read certificate at %+v", params.CertPath)
 		}
-		// Set globals for notification server
-		impl.certFromFile = string(cert)
-		impl.notificationCert, err = tls.LoadCertificate(string(cert))
+	}
+
+	// Set up firebase messaging client
+	var app *messaging.Client
+	if !noFirebase {
+		app, err = firebase.SetupMessagingApp(params.FBCreds)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to parse notifications server cert.  "+
-				"Notifications cert is %+v", impl.notificationCert)
+			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
 		}
 	}
 
-	// set up stored functions
-	// impl.pollFunc = pollForNotifications
-	impl.notifyFunc = notifyUser
+	impl := &Impl{
+		notifyFunc: notifyUser,
+		fcm:        app,
+	}
 
 	// Start notification comms server
 	handler := NewImplementation(impl)
@@ -113,14 +96,6 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
 	impl.inst = i
-	// Set up firebase messaging client
-	if !noFirebase {
-		app, err := firebase.SetupMessagingApp(params.FBCreds)
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
-		}
-		impl.fcm = app
-	}
 
 	return impl, nil
 }
@@ -242,23 +217,6 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}
-	return nil
-}
-
-// Update stored NDF and add host for gateway to poll
-func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
-	gw := ndf.Gateways[len(ndf.Gateways)-1]
-	var err error
-	nb.gwId, err = id.Unmarshal(ndf.Nodes[len(ndf.Nodes)-1].ID)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to unmarshal ID")
-	}
-	_, err = nb.Comms.AddHost(nb.gwId, gw.Address, []byte(gw.TlsCertificate), connect.GetDefaultHostParams())
-	if err != nil {
-		return errors.Wrap(err, "Failed to add gateway host from NDF")
-	}
-
-	nb.ndf = ndf
 	return nil
 }
 
