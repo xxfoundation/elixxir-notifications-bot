@@ -8,16 +8,17 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// interface declaration for storae methods
+// interface declaration for storage methods
 type database interface {
 	upsertUser(user *User) error
 	GetUser(iid []byte) (*User, error)
+	GetUserByHash(transmissionRsaHash []byte) (*User, error)
 	getUsersByOffset(offset int64) ([]*User, error)
 	GetAllUsers() ([]*User, error)
 	DeleteUserByHash(transmissionRsaHash []byte) error
 
 	upsertEphemeral(ephemeral *Ephemeral) error
-	GetEphemeral(transmissionRsaHash []byte) (*Ephemeral, error)
+	GetEphemeral(ephemeralId int64) (*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error
 }
@@ -29,13 +30,13 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
-	usersById        map[string]*User
-	usersByRsaHash   map[string]*User
-	usersByOffset    map[int64][]*User
-	allUsers         []*User
-	allEphemerals    map[int]*Ephemeral
-	ephemeralsByUser map[string][]*Ephemeral
-	ephIDSeq         int
+	usersById      map[string]*User
+	usersByRsaHash map[string]*User
+	usersByOffset  map[int64][]*User
+	allUsers       []*User
+	allEphemerals  map[int]*Ephemeral
+	ephemeralsById map[int64]*Ephemeral
+	ephIDSeq       int
 }
 
 // Structure representing a User in the Storage backend
@@ -52,8 +53,8 @@ type User struct {
 type Ephemeral struct {
 	ID                  uint   `gorm:"primaryKey"`
 	Offset              int64  `gorm:"not null; index"`
-	TransmissionRSAHash []byte `gorm:"not null"`
-	EphemeralId         []byte `gorm:"not null; index"`
+	TransmissionRSAHash []byte `gorm:"not null;references users(transmission_rsa_hash)"`
+	EphemeralId         int64  `gorm:"not null; index"`
 	Epoch               int32  `gorm:"not null; index"`
 }
 
@@ -92,13 +93,13 @@ func newDatabase(username, password, dbName, address,
 		defer jww.INFO.Println("Map backend initialized successfully!")
 
 		mapImpl := &MapImpl{
-			usersById:        map[string]*User{},
-			usersByRsaHash:   map[string]*User{},
-			usersByOffset:    map[int64][]*User{},
-			allUsers:         nil,
-			ephemeralsByUser: map[string][]*Ephemeral{},
-			allEphemerals:    map[int]*Ephemeral{},
-			ephIDSeq:         0,
+			usersById:      map[string]*User{},
+			usersByRsaHash: map[string]*User{},
+			usersByOffset:  map[int64][]*User{},
+			allUsers:       nil,
+			ephemeralsById: map[int64]*Ephemeral{},
+			allEphemerals:  map[int]*Ephemeral{},
+			ephIDSeq:       0,
 		}
 
 		return database(mapImpl), nil

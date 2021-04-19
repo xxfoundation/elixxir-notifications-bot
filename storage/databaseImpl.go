@@ -24,13 +24,23 @@ func (impl *DatabaseImpl) GetUser(userId []byte) (*User, error) {
 	return u, nil
 }
 
+// Obtain User from backend by primary key
+func (impl *DatabaseImpl) GetUserByHash(transmissionRsaHash []byte) (*User, error) {
+	u := &User{}
+	err := impl.db.Take(u, "transmission_rsa_hash = ?", transmissionRsaHash).Error
+	if err != nil {
+		return nil, errors.Errorf("Failed to retrieve user with tRSA hash %s: %+v", transmissionRsaHash, err)
+	}
+	return u, nil
+}
+
 // Delete User from backend by primary key
 func (impl *DatabaseImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 	err := impl.db.Delete(&User{
 		TransmissionRSAHash: transmissionRsaHash,
 	}).Error
 	if err != nil {
-		return errors.Errorf("Failed to delete user with RSA hash %s: %+v", transmissionRsaHash, err)
+		return errors.Errorf("Failed to delete user with tRSA hash %s: %+v", transmissionRsaHash, err)
 	}
 	return nil
 }
@@ -64,9 +74,9 @@ func (impl *DatabaseImpl) upsertEphemeral(ephemeral *Ephemeral) error {
 	}).Create(&ephemeral).Error
 }
 
-func (impl *DatabaseImpl) GetEphemeral(transmissionRSAHash []byte) (*Ephemeral, error) {
+func (impl *DatabaseImpl) GetEphemeral(ephemeralId int64) (*Ephemeral, error) {
 	var result *Ephemeral
-	return result, impl.db.Find(result, "transmission_rsa_hash = ?", transmissionRSAHash).Error
+	return result, impl.db.Find(result, "ephemeral_id = ?", ephemeralId).Error
 }
 
 func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
