@@ -27,6 +27,17 @@ func (m *MapImpl) GetUser(userId []byte) (*User, error) {
 	return v, nil
 }
 
+func (m *MapImpl) GetUserByHash(transmissionRsaHash []byte) (*User, error) {
+	// Attempt to load from map
+	v, found := m.usersByRsaHash[string(transmissionRsaHash)]
+	// Check if it was found, Load function sets it as a bool
+	if found == false {
+		return nil, errors.New("user could not be found")
+	}
+
+	return v, nil
+}
+
 // Delete User from backend by primary key
 func (m *MapImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 	user, ok := m.usersByRsaHash[string(transmissionRsaHash)]

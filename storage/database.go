@@ -8,10 +8,11 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// interface declaration for storae methods
+// interface declaration for storage methods
 type database interface {
 	upsertUser(user *User) error
 	GetUser(iid []byte) (*User, error)
+	GetUserByHash(transmissionRsaHash []byte) (*User, error)
 	getUsersByOffset(offset int64) ([]*User, error)
 	GetAllUsers() ([]*User, error)
 	DeleteUserByHash(transmissionRsaHash []byte) error
@@ -51,9 +52,8 @@ type User struct {
 
 type Ephemeral struct {
 	ID                  uint   `gorm:"primaryKey"`
-	Token               string `gorm:"not null"`
 	Offset              int64  `gorm:"not null; index"`
-	TransmissionRSAHash []byte `gorm:"not null"`
+	TransmissionRSAHash []byte `gorm:"not null;references users(transmission_rsa_hash)"`
 	EphemeralId         int64  `gorm:"not null; index"`
 	Epoch               int32  `gorm:"not null; index"`
 }

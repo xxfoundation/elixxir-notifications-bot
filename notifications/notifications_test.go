@@ -32,7 +32,6 @@ var port = 4200
 
 // Test notificationbot's notifyuser function
 // this mocks the setup and send functions, and only tests the core logic of this function
-/*
 func TestNotifyUser(t *testing.T) {
 	badsend := func(firebase.FBSender, string) (string, error) {
 		return "", errors.New("Failed")
@@ -52,21 +51,35 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
 	}
-	_, err = s.AddUser(iid, []byte("rsacert"), []byte("sig"), "token")
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
-	err = notifyUser(nil, nil, fc_badsend, s)
+	_, e := ephemeral.HandleQuantization(time.Now())
+	eph, err := s.AddLatestEphemeral(u, e, 16)
+	if err != nil {
+		t.Errorf("Failed to add latest ephemeral: %+v", err)
+	}
+
+	err = notifyUser(&pb.NotificationData{
+		EphemeralID: eph.EphemeralId,
+		IdentityFP:  nil,
+		MessageHash: nil,
+	}, nil, fc_badsend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
 
-	err = notifyUser(nil, nil, fc, s)
+	err = notifyUser(&pb.NotificationData{
+		EphemeralID: eph.EphemeralId,
+		IdentityFP:  nil,
+		MessageHash: nil,
+	}, nil, fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
 }
-*/
+
 // Unit test for startnotifications
 // tests logic including error cases
 func TestStartNotifications(t *testing.T) {
@@ -80,13 +93,8 @@ func TestStartNotifications(t *testing.T) {
 		Address: "0.0.0.0:42010",
 	}
 
-	n, err := StartNotifications(params, false, true)
-	if err == nil || !strings.Contains(err.Error(), "failed to read key at") {
-		t.Errorf("Should have thrown an error for no key path")
-	}
-
 	params.KeyPath = wd + "/../testutil/badkey"
-	n, err = StartNotifications(params, false, true)
+	n, err := StartNotifications(params, false, true)
 	if err == nil || !strings.Contains(err.Error(), "Failed to parse notifications server key") {
 		t.Errorf("Should have thrown an error bad key")
 	}
@@ -202,7 +210,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	}
 	key, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
 	if err != nil {
-		t.Errorf("Failed to reat test key file: %+v", err)
+		t.Errorf("Failed to read test key file: %+v", err)
 	}
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
@@ -232,9 +240,9 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
 		Token:                 []byte("token"),
 		IntermediaryId:        iid,
-		TransmissionRsa:       nil,
-		TransmissionSalt:      nil,
-		TransmissionRsaSig:    nil,
+		TransmissionRsa:       []byte("trsa"),
+		TransmissionSalt:      []byte("salt"),
+		TransmissionRsaSig:    []byte("sig"),
 		IIDTransmissionRsaSig: sig,
 	}, &connect.Auth{
 		IsAuthenticated: true,

@@ -61,14 +61,6 @@ type Impl struct {
 	updateChan, deleteChan chan int64
 }
 
-// We use an interface here in order to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
-type NotificationComms interface {
-	GetHost(hostId *id.ID) (*connect.Host, bool)
-	AddHost(hid *id.ID, address string, cert []byte, params connect.HostParams) (host *connect.Host, err error)
-	// RequestNotifications(host *connect.Host) (*pb.UserIdList, error)
-	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
-}
-
 // StartNotifications creates an Impl from the information passed in
 func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	impl := &Impl{
@@ -116,7 +108,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	handler := NewImplementation(impl)
 	comms := notificationBot.StartNotificationBot(&id.NotificationBot, params.Address, handler, cert, key)
 	impl.Comms = comms
-	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{}, &ndf.NetworkDefinition{}, nil, network.None)
+	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, network.None)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
@@ -155,11 +147,16 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
 func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
-	u, err := db.GetEphemeral(data.EphemeralID)
+	e, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
 		jww.DEBUG.Printf("No registration found for ephemeral ID %+v", data.EphemeralID)
 		// This path is not an error.  if no results are returned, the user hasn't registered for notifications
 		return nil
+	}
+
+	u, err := db.GetUserByHash(e.TransmissionRSAHash)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 	}
 
 	_, err = fc.SendNotification(fcm, u.Token)

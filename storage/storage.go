@@ -41,13 +41,14 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) 
 }
 
 func (s *Storage) AddLatestEphemeral(u *User, epoch int32, size uint) (*Ephemeral, error) {
+	fmt.Println(size)
+	fmt.Println(u.IntermediaryId)
 	eid, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, size, time.Now().UnixNano())
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to get ephemeral id for user")
 	}
 	e := &Ephemeral{
 		TransmissionRSAHash: u.TransmissionRSAHash,
-		Token:               u.Token,
 		EphemeralId:         eid.Int64(),
 		Epoch:               epoch,
 		Offset:              u.OffsetNum,
@@ -82,7 +83,6 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint) e
 		}
 		err = s.upsertEphemeral(&Ephemeral{
 			TransmissionRSAHash: u.TransmissionRSAHash,
-			Token:               u.Token,
 			EphemeralId:         eid.Int64(),
 			Epoch:               epoch,
 			Offset:              offset,
