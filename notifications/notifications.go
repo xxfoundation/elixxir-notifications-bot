@@ -134,7 +134,7 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 		return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 	}
 
-	_, err = fc.SendNotification(fcm, u.Token)
+	_, err = fc.SendNotification(fcm, u.Token, data)
 	if err != nil {
 		// Catch two firebase errors that we don't want to crash on
 		// 403 and 404 indicate that the token stored is incorrect

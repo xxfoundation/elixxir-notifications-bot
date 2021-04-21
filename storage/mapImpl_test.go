@@ -50,18 +50,31 @@ import (
 //		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
 //	}
 //
+//	u, err = s.GetUserByHash(u.TransmissionRSAHash)
+//	if err != nil {
+//		t.Errorf("Failed to get user: %+v", err)
+//	}
+//	if u.Token != token2 {
+//		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+//	}
+//
 //	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
 //	if err != nil {
 //		t.Errorf("Failed to upsert updated user: %+v", err)
 //	}
-//	err = s.AddLatestEphemeral(u2, 5)
+//	_, err = s.AddLatestEphemeral(u2, 5, 16)
 //	if err != nil {
 //		t.Errorf("Failed to add latest ephemeral: %+v", err)
 //	}
 //	_, _, _ = ephemeral.GetOffsetBounds(u1.OffsetNum, time.Now().UnixNano())
-//	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5)
+//	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5, 16)
 //	if err != nil {
 //		t.Errorf("failed to update ephemerals for offset: %+v", err)
+//	}
+//
+//	_, err = s.GetLatestEphemeral()
+//	if err != nil {
+//		t.Errorf("Failed to get latest ephemeral: %+v", err)
 //	}
 //
 //	err = s.DeleteOldEphemerals(6)

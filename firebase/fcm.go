@@ -8,6 +8,7 @@ package firebase
 import (
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
+	"gitlab.com/elixxir/comms/mixmessages"
 	"testing"
 
 	"golang.org/x/net/context"
@@ -19,7 +20,7 @@ import (
 
 // function types for use in notificationsbot struct
 type SetupFunc func(string) (*messaging.Client, context.Context, error)
-type SendFunc func(FBSender, string) (string, error)
+type SendFunc func(FBSender, string, *mixmessages.NotificationData) (string, error)
 
 // FirebaseComm is a struct which holds the functions to setup the messaging app and sending notifications
 // Using a struct in this manner allows us to properly unit test the NotifyUser function
@@ -70,11 +71,11 @@ func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 // SendNotification accepts a registration token and service account file
 // It gets the proper infrastructure, then builds & sends a notification through the firebase admin API
 // returns string, error (string is of dubious use, but is returned for the time being)
-func sendNotification(app FBSender, token string) (string, error) {
+func sendNotification(app FBSender, token string, data *mixmessages.NotificationData) (string, error) {
 	ctx := context.Background()
 	message := &messaging.Message{
 		Notification: &messaging.Notification{
-			Title: "xx Messenger",
+			Title: "xx Messenger", // TODO: send idfp and hash as json in body
 			Body:  "You have a new message in the xx Messenger",
 		},
 		Token: token,

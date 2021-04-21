@@ -91,6 +91,13 @@ func (impl *DatabaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
 }
 
 func (impl *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
-	var result *Ephemeral
-	return result, impl.db.Order("epoch desc").First(result).Error
+	var result []*Ephemeral
+	err := impl.db.Order("epoch desc").Limit(1).Find(&result).Error
+	if err != nil {
+		return nil, err
+	}
+	if len(result) < 1 {
+		return nil, errors.New("No ephemerals found in database")
+	}
+	return result[0], nil
 }
