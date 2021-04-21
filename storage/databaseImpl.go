@@ -97,7 +97,7 @@ func (impl *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
 		return nil, err
 	}
 	if len(result) < 1 {
-		return nil, errors.New("No ephemerals found in database")
+		return nil, gorm.ErrRecordNotFound
 	}
 	return result[0], nil
 }
