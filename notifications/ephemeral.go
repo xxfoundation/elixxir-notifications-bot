@@ -44,7 +44,7 @@ func (nb *Impl) initCreator() {
 	// Add all missed ephemeral IDs
 	// increment by offsetPhase up to 5 minutes from now making ephemerals
 	for endTime := time.Now().Add(creationLead); lastEpochTime.Before(endTime); lastEpochTime = lastEpochTime.Add(time.Duration(offsetPhase)) {
-		go nb.addEphemerals(lastEpochTime)
+		nb.addEphemerals(lastEpochTime)
 	}
 	// handle the next epoch
 	_, epoch := ephemeral.HandleQuantization(lastEpochTime)
@@ -85,6 +85,6 @@ func (nb *Impl) deleteEphemerals(start time.Time) {
 	_, currentEpoch := ephemeral.HandleQuantization(start)
 	err := nb.Storage.DeleteOldEphemerals(currentEpoch)
 	if err != nil {
-		jww.WARN.Printf("failed to update ephemerals: %+v", err)
+		jww.WARN.Printf("failed to delete ephemerals: %+v", err)
 	}
 }
