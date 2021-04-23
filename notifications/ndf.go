@@ -31,7 +31,7 @@ func (nb *Impl) TrackNdf() {
 	gatewayEventHandler := func(ndf pb.NDF) []byte {
 		jww.DEBUG.Printf("Updating Gateways with new NDF")
 		// TODO: If this returns an error, print that error if it occurs
-		nb.inst.UpdateFullNdf(&ndf)
+		nb.inst.UpdatePartialNdf(&ndf)
 		nb.inst.UpdateGatewayConnections()
 		return nb.inst.GetFullNdf().GetHash()
 	}

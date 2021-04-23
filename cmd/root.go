@@ -100,7 +100,9 @@ var rootCmd = &cobra.Command{
 		}
 
 		// Add host for permissioning server
-		_, err = impl.Comms.AddHost(&id.Permissioning, viper.GetString("permissioningAddress"), cert, connect.GetDefaultHostParams())
+		hostParams := connect.GetDefaultHostParams()
+		hostParams.AuthEnabled = false
+		_, err = impl.Comms.AddHost(&id.Permissioning, viper.GetString("permissioningAddress"), cert, hostParams)
 		if err != nil {
 			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
 		}

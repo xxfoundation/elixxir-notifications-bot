@@ -6,6 +6,7 @@
 package firebase
 
 import (
+	"encoding/base64"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/comms/mixmessages"
@@ -74,9 +75,25 @@ func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 func sendNotification(app FBSender, token string, data *mixmessages.NotificationData) (string, error) {
 	ctx := context.Background()
 	message := &messaging.Message{
-		Notification: &messaging.Notification{
-			Title: "xx Messenger", // TODO: send idfp and hash as json in body
-			Body:  "You have a new message in the xx Messenger",
+		Data: map[string]string{
+			"MessageHash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+			"IdentityFingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+		},
+		APNS: &messaging.APNSConfig{
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					Alert: &messaging.ApsAlert{
+						Title: "You have received an xx message",
+						Body:  "encrypted",
+					},
+					MutableContent: true,
+					Category:       "SECRET",
+				},
+				CustomData: map[string]interface{}{
+					"MessageHash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+					"IdentityFingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+				},
+			},
 		},
 		Token: token,
 	}
