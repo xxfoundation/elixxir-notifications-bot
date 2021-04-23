@@ -95,6 +95,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
+	i.SetGatewayAuthentication()
 	impl.inst = i
 
 	return impl, nil
