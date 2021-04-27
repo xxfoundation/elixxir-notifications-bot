@@ -125,7 +125,6 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
 func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
-	jww.INFO.Printf("Attempting to notify user with ephemeral ID %+v", data.EphemeralID)
 	e, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -154,9 +153,11 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 				return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
 			}
 		} else {
+			jww.ERROR.Printf("Error sending notification: %+v", err)
 			return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
 		}
 	}
+	jww.INFO.Printf("Notified ephemeral ID %+v", data.EphemeralID)
 	return nil
 }
 

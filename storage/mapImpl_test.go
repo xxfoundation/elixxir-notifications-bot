@@ -10,86 +10,91 @@ import (
 
 // This file contains testing for mapImpl.go
 
-//func TestDatabaseImpl(t *testing.T) {
-//	s, err := NewStorage("jonahhusson", "", "nbtest", "0.0.0.0", "5432")
-//	if err != nil {
-//		t.Errorf("Failed to create db: %+v", err)
-//		t.FailNow()
-//	}
-//	sig := []byte("sig")
-//	uid := id.NewIdFromString("zezima", id.User, t)
-//	iid, err := ephemeral.GetIntermediaryId(uid)
-//	if err != nil {
-//		t.Errorf("Failed to make iid: %+v", err)
-//	}
-//	token1 := "i'm a token"
-//	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
-//	if err != nil {
-//		t.Errorf("Failed to upsert user: %+v", err)
-//	}
-//
-//	u, err := s.GetUser(iid)
-//	if err != nil {
-//		t.Errorf("Failed to get user: %+v", err)
-//	}
-//	if u.Token != token1 {
-//		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
-//	}
-//
-//	token2 := "you're a token"
-//	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
-//	if err != nil {
-//		t.Errorf("Failed to upsert updated user: %+v", err)
-//	}
-//
-//	u, err = s.GetUser(iid)
-//	if err != nil {
-//		t.Errorf("Failed to get user: %+v", err)
-//	}
-//	if u.Token != token2 {
-//		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
-//	}
-//
-//	u, err = s.GetUserByHash(u.TransmissionRSAHash)
-//	if err != nil {
-//		t.Errorf("Failed to get user: %+v", err)
-//	}
-//	if u.Token != token2 {
-//		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
-//	}
-//
-//	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
-//	if err != nil {
-//		t.Errorf("Failed to upsert updated user: %+v", err)
-//	}
-//	_, err = s.AddLatestEphemeral(u2, 5, 16)
-//	if err != nil {
-//		t.Errorf("Failed to add latest ephemeral: %+v", err)
-//	}
-//	_, _, _ = ephemeral.GetOffsetBounds(u1.OffsetNum, time.Now().UnixNano())
-//	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5, 16)
-//	if err != nil {
-//		t.Errorf("failed to update ephemerals for offset: %+v", err)
-//	}
-//
-//	_, err = s.GetLatestEphemeral()
-//	if err != nil {
-//		t.Errorf("Failed to get latest ephemeral: %+v", err)
-//	}
-//
-//	err = s.DeleteOldEphemerals(6)
-//	if err != nil {
-//		t.Errorf("Failed to delete old ephemerals: %+v", err)
-//	}
-//
-//	us, err := s.GetAllUsers()
-//	if err != nil {
-//		t.Errorf("Failed to get all users: %+v", err)
-//	}
-//	if len(us) != 2 {
-//		t.Errorf("Did not get enough users: %+v", us)
-//	}
-//}
+func TestDatabaseImpl(t *testing.T) {
+	s, err := NewStorage("jonahhusson", "", "nbtest", "0.0.0.0", "5432")
+	if err != nil {
+		t.Errorf("Failed to create db: %+v", err)
+		t.FailNow()
+	}
+	sig := []byte("sig")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to make iid: %+v", err)
+	}
+	token1 := "i'm a token"
+	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
+	if err != nil {
+		t.Errorf("Failed to upsert user: %+v", err)
+	}
+
+	u, err := s.GetUser(iid)
+	if err != nil {
+		t.Errorf("Failed to get user: %+v", err)
+	}
+	if u.Token != token1 {
+		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+	}
+
+	token2 := "you're a token"
+	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
+	if err != nil {
+		t.Errorf("Failed to upsert updated user: %+v", err)
+	}
+
+	u, err = s.GetUser(iid)
+	if err != nil {
+		t.Errorf("Failed to get user: %+v", err)
+	}
+	if u.Token != token2 {
+		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+	}
+
+	u, err = s.GetUserByHash(u.TransmissionRSAHash)
+	if err != nil {
+		t.Errorf("Failed to get user: %+v", err)
+	}
+	if u.Token != token2 {
+		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+	}
+
+	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
+	if err != nil {
+		t.Errorf("Failed to upsert updated user: %+v", err)
+	}
+	_, err = s.AddLatestEphemeral(u2, 5, 16)
+	if err != nil {
+		t.Errorf("Failed to add latest ephemeral: %+v", err)
+	}
+	_, _, _ = ephemeral.GetOffsetBounds(u1.OffsetNum, time.Now().UnixNano())
+	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5, 16)
+	if err != nil {
+		t.Errorf("failed to update ephemerals for offset: %+v", err)
+	}
+
+	e, err := s.GetLatestEphemeral()
+	if err != nil {
+		t.Errorf("Failed to get latest ephemeral: %+v", err)
+	}
+
+	_, err = s.GetEphemeral(e.EphemeralId)
+	if err != nil {
+		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+
+	err = s.DeleteOldEphemerals(6)
+	if err != nil {
+		t.Errorf("Failed to delete old ephemerals: %+v", err)
+	}
+
+	us, err := s.GetAllUsers()
+	if err != nil {
+		t.Errorf("Failed to get all users: %+v", err)
+	}
+	if len(us) != 2 {
+		t.Errorf("Did not get enough users: %+v", us)
+	}
+}
 
 // This tests getting a user that does exist in the database
 func TestMapImpl_GetUser_Happy(t *testing.T) {
