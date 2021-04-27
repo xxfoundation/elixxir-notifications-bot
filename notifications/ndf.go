@@ -15,6 +15,7 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/io"
+	"sync/atomic"
 	"time"
 )
 
@@ -39,7 +40,8 @@ func (nb *Impl) TrackNdf() {
 		if err != nil {
 			jww.ERROR.Printf("Failed to update gateway connections: %+v", err)
 		}
-		return nb.inst.GetFullNdf().GetHash()
+		atomic.SwapUint32(nb.receivedNdf, 1)
+		return nb.inst.GetPartialNdf().GetHash()
 	}
 
 	// Stopping function for the thread
@@ -91,7 +93,7 @@ func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
 		//       actually update the full ndf each time, so it's a
 		//       choice between comparing the full hash or additional
 		//       network traffic given the current state of API.
-		if ndf != nil && !bytes.Equal(ndf.Ndf, lastNdf.Ndf) {
+		if ndf != nil && len(ndf.Ndf) > 0 && !bytes.Equal(ndf.Ndf, lastNdf.Ndf) {
 			// FIXME: we should be able to get hash from the ndf
 			// object, but we can't.
 			go func() { hashCh <- gwEvt(*ndf) }()

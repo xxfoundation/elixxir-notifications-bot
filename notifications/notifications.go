@@ -15,7 +15,6 @@ import (
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
-	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
@@ -24,6 +23,7 @@ import (
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
+	"gorm.io/gorm"
 	"strings"
 	"time"
 )
@@ -41,11 +41,12 @@ type Params struct {
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
-	Comms      *notificationBot.Comms
-	Storage    *storage.Storage
-	inst       *network.Instance
-	notifyFunc NotifyFunc
-	fcm        *messaging.Client
+	Comms       *notificationBot.Comms
+	Storage     *storage.Storage
+	inst        *network.Instance
+	notifyFunc  NotifyFunc
+	fcm         *messaging.Client
+	receivedNdf *uint32
 
 	ndfStopper Stopper
 }
@@ -81,17 +82,18 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
 		}
 	}
-
+	receivedNdf := uint32(0)
 	impl := &Impl{
-		notifyFunc: notifyUser,
-		fcm:        app,
+		notifyFunc:  notifyUser,
+		fcm:         app,
+		receivedNdf: &receivedNdf,
 	}
 
 	// Start notification comms server
 	handler := NewImplementation(impl)
 	comms := notificationBot.StartNotificationBot(&id.NotificationBot, params.Address, handler, cert, key)
 	impl.Comms = comms
-	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, network.None)
+	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, nil, network.None)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
@@ -125,9 +127,12 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
 	e, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
-		jww.DEBUG.Printf("No registration found for ephemeral ID %+v", data.EphemeralID)
-		// This path is not an error.  if no results are returned, the user hasn't registered for notifications
-		return nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			jww.DEBUG.Printf("No registration found for ephemeral ID %+v", data.EphemeralID)
+			// This path is not an error.  if no results are returned, the user hasn't registered for notifications
+			return nil
+		}
+		return errors.WithMessagef(err, "Could not retrieve registration for ephemeral ID %+v", data.EphemeralID)
 	}
 
 	u, err := db.GetUserByHash(e.TransmissionRSAHash)
@@ -157,26 +162,26 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 // RegisterForNotifications is called by the client, and adds a user registration to our database
 func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
 	var err error
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot register for notifications: client is not authenticated")
-	}
-	if string(request.Token) == "" {
-		return errors.New("Cannot register for notifications with empty client token")
-	}
-
-	h, err := hash.NewCMixHash()
-	if err != nil {
-		return errors.Wrap(err, "Failed to create cmix hash")
-	}
-	_, err = h.Write(request.IntermediaryId)
-	if err != nil {
-		return errors.Wrap(err, "Failed to write intermediary id to hash")
-	}
-
-	err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
-	if err != nil {
-		return errors.Wrap(err, "Failed to verify signature")
-	}
+	//if !auth.IsAuthenticated {
+	//	return errors.New("Cannot register for notifications: client is not authenticated")
+	//}
+	//if string(request.Token) == "" {
+	//	return errors.New("Cannot register for notifications with empty client token")
+	//}
+	//
+	//h, err := hash.NewCMixHash()
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to create cmix hash")
+	//}
+	//_, err = h.Write(request.IntermediaryId)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to write intermediary id to hash")
+	//}
+	//
+	//err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to verify signature")
+	//}
 
 	// Add the user to storage
 	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa,
@@ -185,36 +190,37 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
-	def := nb.inst.GetFullNdf()
-	_, err = nb.Storage.AddLatestEphemeral(u, epoch, uint(def.Get().AddressSpaceSize))
+	def := nb.inst.GetPartialNdf()
+	e, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(def.Get().AddressSpaceSize))
 	if err != nil {
 		return errors.WithMessage(err, "Failed to add ephemeral ID for user")
 	}
+	jww.INFO.Printf("Added ephemeral ID %+v for user %+v", e.EphemeralId, u.IntermediaryId)
 
 	return nil
 }
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
 func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot unregister for notifications: client is not authenticated")
-	}
+	//if !auth.IsAuthenticated {
+	//	return errors.New("Cannot unregister for notifications: client is not authenticated")
+	//}
+	//
+	//h, err := hash.NewCMixHash()
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to create cmix hash")
+	//}
+	//_, err = h.Write(request.IntermediaryId)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to write intermediary id to hash")
+	//}
+	//
+	//err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to verify signature")
+	//}
 
-	h, err := hash.NewCMixHash()
-	if err != nil {
-		return errors.Wrap(err, "Failed to create cmix hash")
-	}
-	_, err = h.Write(request.IntermediaryId)
-	if err != nil {
-		return errors.Wrap(err, "Failed to write intermediary id to hash")
-	}
-
-	err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
-	if err != nil {
-		return errors.Wrap(err, "Failed to verify signature")
-	}
-
-	err = nb.Storage.DeleteUser(rsa.CreatePublicKeyPem(auth.Sender.GetPubKey()))
+	err := nb.Storage.DeleteUser(rsa.CreatePublicKeyPem(auth.Sender.GetPubKey()))
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}
@@ -236,4 +242,8 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 	}
 
 	return nil
+}
+
+func (nb *Impl) ReceivedNdf() *uint32 {
+	return nb.receivedNdf
 }

@@ -76,7 +76,7 @@ func (impl *DatabaseImpl) upsertEphemeral(ephemeral *Ephemeral) error {
 
 func (impl *DatabaseImpl) GetEphemeral(ephemeralId int64) (*Ephemeral, error) {
 	var result *Ephemeral
-	return result, impl.db.Find(result, "ephemeral_id = ?", ephemeralId).Error
+	return result, impl.db.Find(&result, "ephemeral_id = ?", ephemeralId).Error
 }
 
 func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {

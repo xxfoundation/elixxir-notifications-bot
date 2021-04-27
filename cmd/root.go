@@ -23,6 +23,8 @@ import (
 	"net"
 	"os"
 	"path"
+	"sync/atomic"
+	"time"
 )
 
 var (
@@ -110,6 +112,9 @@ var rootCmd = &cobra.Command{
 		// Start ephemeral ID tracking
 		errChan := make(chan error)
 		impl.TrackNdf()
+		for atomic.LoadUint32(impl.ReceivedNdf()) != 1 {
+			time.Sleep(time.Second)
+		}
 		go impl.EphIdCreator()
 		go impl.EphIdDeleter()
 
