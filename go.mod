@@ -31,14 +31,13 @@ require (
 	github.com/ugorji/go v1.1.4 // indirect
 	github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77 // indirect
 	github.com/zeebo/assert v1.3.0 // indirect
-	gitlab.com/elixxir/comms v0.0.4-0.20210309193245-64181ff10b68
-	gitlab.com/xx_network/comms v0.0.4-0.20210309192940-6b7fb39b4d01
-	gitlab.com/xx_network/crypto v0.0.5-0.20210309192854-cf32117afb96
-	gitlab.com/xx_network/primitives v0.0.4-0.20210309173740-eb8cd411334a
+	gitlab.com/elixxir/comms v0.0.4-0.20210427005410-7ae183abda2a
+	gitlab.com/xx_network/comms v0.0.4-0.20210426213447-82674e09e402
+	gitlab.com/xx_network/crypto v0.0.5-0.20210420170153-2a6276844076
+	gitlab.com/xx_network/primitives v0.0.4-0.20210402222416-37c1c4d3fac4
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
-	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2 // indirect
 	google.golang.org/api v0.41.0
 	google.golang.org/genproto v0.0.0-20210310155132-4ce2db91004e // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
