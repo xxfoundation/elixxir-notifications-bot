@@ -31,7 +31,7 @@ require (
 	github.com/ugorji/go v1.1.4 // indirect
 	github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77 // indirect
 	github.com/zeebo/assert v1.3.0 // indirect
-	gitlab.com/elixxir/comms v0.0.4-0.20210427005410-7ae183abda2a
+	gitlab.com/elixxir/comms v0.0.4-0.20210429182303-0edbda5e1b2c
 	gitlab.com/xx_network/comms v0.0.4-0.20210426213447-82674e09e402
 	gitlab.com/xx_network/crypto v0.0.5-0.20210420170153-2a6276844076
 	gitlab.com/xx_network/primitives v0.0.4-0.20210402222416-37c1c4d3fac4
