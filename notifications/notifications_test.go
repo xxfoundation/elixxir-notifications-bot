@@ -219,7 +219,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 		t.Errorf("Failed to create dummy host: %+v", err)
 	}
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
-		Token:                 []byte("token"),
+		Token:                 "token",
 		IntermediaryId:        iid,
 		TransmissionRsa:       []byte("trsa"),
 		TransmissionSalt:      []byte("salt"),
