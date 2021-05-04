@@ -18,7 +18,6 @@ import (
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
-	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
 	"os"
 	"reflect"
@@ -116,63 +115,6 @@ func TestNewImplementation(t *testing.T) {
 	}
 }
 
-// Dummy comms to unit test pollfornotifications
-type mockPollComm struct{}
-
-func (m mockPollComm) RequestNotifications(host *connect.Host) (*pb.UserIdList, error) {
-	return &pb.UserIdList{
-		IDs: [][]byte{[]byte("test")},
-	}, nil
-}
-func (m mockPollComm) GetHost(hostId *id.ID) (*connect.Host, bool) {
-	return &connect.Host{}, true
-}
-func (m mockPollComm) AddHost(hid *id.ID, address string, cert []byte, params connect.HostParams) (host *connect.Host, err error) {
-	return nil, nil
-}
-func (m mockPollComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
-	return nil, nil
-}
-
-type mockPollErrComm struct{}
-
-func (m mockPollErrComm) RequestNotifications(host *connect.Host) (*pb.UserIdList, error) {
-	return nil, errors.New("failed to poll")
-}
-func (m mockPollErrComm) GetHost(hostId *id.ID) (*connect.Host, bool) {
-	return nil, false
-}
-func (m mockPollErrComm) AddHost(id *id.ID, address string, cert []byte, params connect.HostParams) (host *connect.Host, err error) {
-	return nil, nil
-}
-func (m mockPollErrComm) RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error) {
-	return nil, nil
-}
-func (m mockPollErrComm) RetrieveNdf(currentDef *ndf.NetworkDefinition) (*ndf.NetworkDefinition, error) {
-	return nil, nil
-}
-
-// // Unit test for PollForNotifications
-// func TestPollForNotifications(t *testing.T) {
-// 	impl := &Impl{
-// 		Comms: mockPollComm{},
-// 		gwId:  id.NewIdFromString("test", id.Gateway, t),
-// 	}
-// 	errImpl := &Impl{
-// 		Comms: mockPollErrComm{},
-// 		gwId:  id.NewIdFromString("test", id.Gateway, t),
-// 	}
-// 	_, err := pollForNotifications(errImpl)
-// 	if err == nil {
-// 		t.Errorf("Failed to poll for notifications: %+v", err)
-// 	}
-//
-// 	_, err = pollForNotifications(impl)
-// 	if err != nil {
-// 		t.Errorf("Failed to poll for notifications: %+v", err)
-// 	}
-// }
-
 // Unit test for RegisterForNotifications
 func TestImpl_RegisterForNotifications(t *testing.T) {
 	impl := getNewImpl()
@@ -214,6 +156,20 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to sign: %+v", err)
 	}
+	_, err = impl.Comms.AddHost(&id.Permissioning, "0.0.0.0", crt, connect.GetDefaultHostParams())
+	if err != nil {
+		t.Errorf("Failed to add host: %+v", err)
+	}
+	h.Reset()
+	_, err = h.Write(crt)
+	if err != nil {
+		t.Errorf("Failed to write to hash: %+v", err)
+	}
+	psig, err := rsa.Sign(csprng.NewSystemRNG(), pk, hash.CMixHash, h.Sum(nil), nil)
+	if err != nil {
+		t.Errorf("Failed to sign trsa: %+v", err)
+	}
+
 	host, err := connect.NewHost(id.NewIdFromString("test", id.User, t), "0.0.0.0:420", crt, connect.GetDefaultHostParams())
 	if err != nil {
 		t.Errorf("Failed to create dummy host: %+v", err)
@@ -221,9 +177,9 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
 		Token:                 "token",
 		IntermediaryId:        iid,
-		TransmissionRsa:       []byte("trsa"),
+		TransmissionRsa:       crt,
 		TransmissionSalt:      []byte("salt"),
-		TransmissionRsaSig:    []byte("sig"),
+		TransmissionRsaSig:    psig,
 		IIDTransmissionRsaSig: sig,
 	}, &connect.Auth{
 		IsAuthenticated: true,
