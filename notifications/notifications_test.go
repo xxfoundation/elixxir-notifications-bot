@@ -254,7 +254,11 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to reat test key file: %+v", err)
 	}
-	iid := []byte("zezima")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to make iid: %+v", err)
+	}
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		t.Errorf("Failed to make cmix hash: %+v", err)
@@ -276,6 +280,22 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create dummy host: %+v", err)
 	}
+
+	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
+		Token:                 "token",
+		IntermediaryId:        iid,
+		TransmissionRsa:       []byte("trsa"),
+		TransmissionSalt:      []byte("salt"),
+		TransmissionRsaSig:    []byte("sig"),
+		IIDTransmissionRsaSig: sig,
+	}, &connect.Auth{
+		IsAuthenticated: true,
+		Sender:          host,
+	})
+	if err != nil {
+		t.Errorf("Failed to register for notifications: %+v", err)
+	}
+
 	err = impl.UnregisterForNotifications(&pb.NotificationUnregisterRequest{
 		IntermediaryId:        iid,
 		IIDTransmissionRsaSig: sig,

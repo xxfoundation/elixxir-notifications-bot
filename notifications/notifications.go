@@ -18,7 +18,6 @@ import (
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
-	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
@@ -222,7 +221,12 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 	//	return errors.Wrap(err, "Failed to verify signature")
 	//}
 
-	err := nb.Storage.DeleteUser(rsa.CreatePublicKeyPem(auth.Sender.GetPubKey()))
+	u, err := nb.Storage.GetUser(request.IntermediaryId)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to get user with iid: %+v", request.IntermediaryId)
+	}
+
+	err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}
