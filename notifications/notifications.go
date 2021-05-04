@@ -9,27 +9,27 @@
 package notifications
 
 import (
-	"crypto/x509"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
+	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/signature/rsa"
-	"gitlab.com/xx_network/crypto/tls"
 	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/utils"
+	"gorm.io/gorm"
 	"strings"
 	"time"
 )
 
 // Function type definitions for the main operations (poll and notify)
-type PollFunc func(*Impl) ([][]byte, error)
-type NotifyFunc func(*messaging.Client, string, *firebase.FirebaseComm, storage.Storage) (string, error)
+type NotifyFunc func(*pb.NotificationData, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -41,71 +41,29 @@ type Params struct {
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
-	Comms            NotificationComms
-	Storage          storage.Storage
-	notificationCert *x509.Certificate
-	notificationKey  *rsa.PrivateKey
-	certFromFile     string
-	ndf              *ndf.NetworkDefinition
-	pollFunc         PollFunc
-	notifyFunc       NotifyFunc
-	fcm              *messaging.Client
-	gwId             *id.ID
-}
+	Comms       *notificationBot.Comms
+	Storage     *storage.Storage
+	inst        *network.Instance
+	notifyFunc  NotifyFunc
+	fcm         *messaging.Client
+	receivedNdf *uint32
 
-// We use an interface here in order to allow us to mock the getHost and RequestNDF in the notifcationsBot.Comms for testing
-type NotificationComms interface {
-	GetHost(hostId *id.ID) (*connect.Host, bool)
-	AddHost(hid *id.ID, address string, cert []byte, params connect.HostParams) (host *connect.Host, err error)
-	RequestNotifications(host *connect.Host) (*pb.UserIdList, error)
-	RequestNdf(host *connect.Host, message *pb.NDFHash) (*pb.NDF, error)
-}
-
-// Main function for this repo accepts credentials and an impl
-// loops continuously, polling for notifications and notifying the relevant users
-func (nb *Impl) RunNotificationLoop(loopDuration int, killChan chan struct{}, errChan chan error) {
-	fc := firebase.NewFirebaseComm()
-	for {
-		// Stop execution if killed by channel
-		select {
-		case <-killChan:
-			return
-		case <-time.After(time.Millisecond * time.Duration(loopDuration)):
-		}
-
-		// Poll for UIDs to notify
-		UIDs, err := nb.pollFunc(nb)
-		if err != nil {
-			errChan <- errors.Wrap(err, "Failed to poll gateway for users to notify")
-			return
-		}
-
-		for _, id := range UIDs {
-			// Attempt to notify a given user (will not error if UID not registered)
-			_, err := nb.notifyFunc(nb.fcm, string(id), fc, nb.Storage)
-			if err != nil {
-				errChan <- errors.Wrapf(err, "Failed to notify user with ID %+v", id)
-				return
-			}
-		}
-	}
+	ndfStopper Stopper
 }
 
 // StartNotifications creates an Impl from the information passed in
 func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
-	impl := &Impl{}
-
 	var cert, key []byte
 	var err error
 
 	// Read in private key
-	key, err = utils.ReadFile(params.KeyPath)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read key at %+v", params.KeyPath)
-	}
-	impl.notificationKey, err = rsa.LoadPrivateKeyFromPem(key)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse notifications server key (%+v)", impl.notificationKey)
+	if params.KeyPath != "" {
+		key, err = utils.ReadFile(params.KeyPath)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to read key at %+v", params.KeyPath)
+		}
+	} else {
+		jww.WARN.Println("Running without key...")
 	}
 
 	if !noTLS {
@@ -114,31 +72,33 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to read certificate at %+v", params.CertPath)
 		}
-		// Set globals for notification server
-		impl.certFromFile = string(cert)
-		impl.notificationCert, err = tls.LoadCertificate(string(cert))
-		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to parse notifications server cert.  "+
-				"Notifications cert is %+v", impl.notificationCert)
-		}
 	}
 
-	// set up stored functions
-	impl.pollFunc = pollForNotifications
-	impl.notifyFunc = notifyUser
+	// Set up firebase messaging client
+	var app *messaging.Client
+	if !noFirebase {
+		app, err = firebase.SetupMessagingApp(params.FBCreds)
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
+		}
+	}
+	receivedNdf := uint32(0)
+	impl := &Impl{
+		notifyFunc:  notifyUser,
+		fcm:         app,
+		receivedNdf: &receivedNdf,
+	}
 
 	// Start notification comms server
 	handler := NewImplementation(impl)
 	comms := notificationBot.StartNotificationBot(&id.NotificationBot, params.Address, handler, cert, key)
 	impl.Comms = comms
-	// Set up firebase messaging client
-	if !noFirebase {
-		app, err := firebase.SetupMessagingApp(params.FBCreds)
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
-		}
-		impl.fcm = app
+	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, nil, network.None)
+	if err != nil {
+		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
+	i.SetGatewayAuthentication()
+	impl.inst = i
 
 	return impl, nil
 }
@@ -147,12 +107,16 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	impl := notificationBot.NewImplementation()
 
-	impl.Functions.RegisterForNotifications = func(clientToken []byte, auth *connect.Auth) error {
-		return instance.RegisterForNotifications(clientToken, auth)
+	impl.Functions.RegisterForNotifications = func(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
+		return instance.RegisterForNotifications(request, auth)
 	}
 
-	impl.Functions.UnregisterForNotifications = func(auth *connect.Auth) error {
-		return instance.UnregisterForNotifications(auth)
+	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
+		return instance.UnregisterForNotifications(request, auth)
+	}
+
+	impl.Functions.ReceiveNotificationBatch = func(data *pb.NotificationBatch, auth *connect.Auth) error {
+		return instance.ReceiveNotificationBatch(data, auth)
 	}
 
 	return impl
@@ -160,94 +124,128 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(fcm *messaging.Client, uid string, fc *firebase.FirebaseComm, db storage.Storage) (string, error) {
-	u, err := db.GetUser(uid)
+func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
+	e, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
-		jww.DEBUG.Printf("No registration found for user with ID %+v", uid)
-		// This path is not an error.  if no results are returned, the user hasn't registered for notifications
-		return "", nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			jww.DEBUG.Printf("No registration found for ephemeral ID %+v", data.EphemeralID)
+			// This path is not an error.  if no results are returned, the user hasn't registered for notifications
+			return nil
+		}
+		return errors.WithMessagef(err, "Could not retrieve registration for ephemeral ID %+v", data.EphemeralID)
 	}
 
-	resp, err := fc.SendNotification(fcm, u.Token)
+	u, err := db.GetUserByHash(e.TransmissionRSAHash)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
+	}
+
+	_, err = fc.SendNotification(fcm, u.Token, data)
 	if err != nil {
 		// Catch two firebase errors that we don't want to crash on
 		// 403 and 404 indicate that the token stored is incorrect
 		// this means rather than crashing we should log and unregister the user
 		// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
 		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
-			jww.ERROR.Printf("User with ID %+v has invalid token, unregistering...", uid)
-			err := db.DeleteUser(uid)
+			jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
+			err := db.DeleteUserByHash(u.TransmissionRSAHash)
 			if err != nil {
-				return "", errors.Wrapf(err, "Failed to remove user registration for uid: %+v", uid)
+				return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
 			}
 		} else {
-			return "", errors.Wrapf(err, "Failed to send notification to user with ID %+v", uid)
+			jww.ERROR.Printf("Error sending notification: %+v", err)
+			return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
 		}
 	}
-	return resp, nil
-}
-
-// pollForNotifications accepts a gateway host and a RequestInterface (a comms object)
-// It retrieves a list of user ids to be notified from the gateway
-func pollForNotifications(nb *Impl) (uids [][]byte, e error) {
-	h, ok := nb.Comms.GetHost(nb.gwId)
-	if !ok {
-		return nil, errors.New("Could not find gateway host")
-	}
-
-	users, err := nb.Comms.RequestNotifications(h)
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to retrieve notifications from gateway")
-	}
-
-	return users.IDs, nil
+	jww.INFO.Printf("Notified ephemeral ID %+v", data.EphemeralID)
+	return nil
 }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
-func (nb *Impl) RegisterForNotifications(clientToken []byte, auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot register for notifications: client is not authenticated")
-	}
-	if string(clientToken) == "" {
-		return errors.New("Cannot register for notifications with empty client token")
-	}
-	// Implement this
-	u := &storage.User{
-		Id:    auth.Sender.GetId().String(),
-		Token: string(clientToken),
-	}
-	err := nb.Storage.UpsertUser(u)
+func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
+	var err error
+	//if !auth.IsAuthenticated {
+	//	return errors.New("Cannot register for notifications: client is not authenticated")
+	//}
+	//if string(request.Token) == "" {
+	//	return errors.New("Cannot register for notifications with empty client token")
+	//}
+	//
+	//h, err := hash.NewCMixHash()
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to create cmix hash")
+	//}
+	//_, err = h.Write(request.IntermediaryId)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to write intermediary id to hash")
+	//}
+	//
+	//err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to verify signature")
+	//}
+
+	// Add the user to storage
+	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa,
+		request.IIDTransmissionRsaSig, request.Token)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
+	_, epoch := ephemeral.HandleQuantization(time.Now())
+	def := nb.inst.GetPartialNdf()
+	e, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(def.Get().AddressSpaceSize))
+	if err != nil {
+		return errors.WithMessage(err, "Failed to add ephemeral ID for user")
+	}
+	jww.INFO.Printf("Added ephemeral ID %+v for user %+v", e.EphemeralId, u.IntermediaryId)
+
 	return nil
 }
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
-func (nb *Impl) UnregisterForNotifications(auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot unregister for notifications: client is not authenticated")
-	}
-	err := nb.Storage.DeleteUser(auth.Sender.GetId().String())
+func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
+	//if !auth.IsAuthenticated {
+	//	return errors.New("Cannot unregister for notifications: client is not authenticated")
+	//}
+	//
+	//h, err := hash.NewCMixHash()
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to create cmix hash")
+	//}
+	//_, err = h.Write(request.IntermediaryId)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to write intermediary id to hash")
+	//}
+	//
+	//err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	//if err != nil {
+	//	return errors.Wrap(err, "Failed to verify signature")
+	//}
+
+	err := nb.Storage.DeleteUser(rsa.CreatePublicKeyPem(auth.Sender.GetPubKey()))
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}
 	return nil
 }
 
-// Update stored NDF and add host for gateway to poll
-func (nb *Impl) UpdateNdf(ndf *ndf.NetworkDefinition) error {
-	gw := ndf.Gateways[len(ndf.Gateways)-1]
-	var err error
-	nb.gwId, err = id.Unmarshal(ndf.Nodes[len(ndf.Nodes)-1].ID)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to unmarshal ID")
-	}
-	_, err = nb.Comms.AddHost(nb.gwId, gw.Address, []byte(gw.TlsCertificate), connect.GetDefaultHostParams())
-	if err != nil {
-		return errors.Wrap(err, "Failed to add gateway host from NDF")
+// ReceiveNotificationBatch receives the batch of notification data from gateway.
+func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth *connect.Auth) error {
+	if !auth.IsAuthenticated {
+		return errors.New("Cannot receive notification data: client is not authenticated")
 	}
 
-	nb.ndf = ndf
+	fbComm := firebase.NewFirebaseComm()
+	for _, notifData := range notifBatch.GetNotifications() {
+		err := nb.notifyFunc(notifData, nb.fcm, fbComm, nb.Storage)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (nb *Impl) ReceivedNdf() *uint32 {
+	return nb.receivedNdf
 }
