@@ -108,12 +108,12 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	impl := notificationBot.NewImplementation()
 
-	impl.Functions.RegisterForNotifications = func(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
-		return instance.RegisterForNotifications(request, auth)
+	impl.Functions.RegisterForNotifications = func(request *pb.NotificationRegisterRequest) error {
+		return instance.RegisterForNotifications(request)
 	}
 
-	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
-		return instance.UnregisterForNotifications(request, auth)
+	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest) error {
+		return instance.UnregisterForNotifications(request)
 	}
 
 	impl.Functions.ReceiveNotificationBatch = func(data *pb.NotificationBatch, auth *connect.Auth) error {
@@ -163,12 +163,9 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
-func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
+func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest) error {
 	var err error
 	// Check auth & inputs
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot register for notifications: client is not authenticated")
-	}
 	if string(request.Token) == "" {
 		return errors.New("Cannot register for notifications with empty client token")
 	}
@@ -185,7 +182,7 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	h.Write(request.TransmissionRsa)
 	err = rsa.Verify(permHost.GetPubKey(), hash.CMixHash, h.Sum(nil), request.TransmissionRsaSig, nil)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to verify client's transmission rsa signature")
+		return errors.WithMessage(err, "Failed to verify permissioning signature of client transmission rsa cert")
 	}
 
 	// Verify IID transmission RSA signature
@@ -194,7 +191,11 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	if err != nil {
 		return errors.Wrap(err, "Failed to write intermediary id to hash")
 	}
-	err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	pub, err := rsa.LoadPublicKeyFromPem(request.TransmissionRsa)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to load public key from bytes")
+	}
+	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
 	if err != nil {
 		return errors.Wrap(err, "Failed to verify signature")
 	}
@@ -217,26 +218,30 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 }
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
-func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot unregister for notifications: client is not authenticated")
-	}
-
+func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest) error {
 	h, err := hash.NewCMixHash()
 	if err != nil {
-		return errors.Wrap(err, "Failed to create cmix hash")
+		return errors.WithMessage(err, "Failed to create cmix hash")
 	}
 	_, err = h.Write(request.IntermediaryId)
 	if err != nil {
-		return errors.Wrap(err, "Failed to write intermediary id to hash")
+		return errors.WithMessage(err, "Failed to write intermediary id to hash")
 	}
 
-	err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	u, err := nb.Storage.GetUser(request.IntermediaryId)
 	if err != nil {
-		return errors.Wrap(err, "Failed to verify signature")
+		return errors.WithMessagef(err, "Failed to find user with intermediary ID %+v", request.IntermediaryId)
 	}
 
-	err = nb.Storage.DeleteUser(rsa.CreatePublicKeyPem(auth.Sender.GetPubKey()))
+	pub, err := rsa.LoadPublicKeyFromPem(u.TransmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to load public key from database")
+	}
+	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	if err != nil {
+		return errors.Wrap(err, "Failed to verify IID signature")
+	}
+	err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}

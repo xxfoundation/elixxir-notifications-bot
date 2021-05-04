@@ -127,14 +127,21 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get working dir: %+v", err)
 	}
-	crt, err := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
+	permCert, err := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
 	if err != nil {
 		t.Errorf("Failed to read test cert file: %+v", err)
 	}
-	key, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
+	permKey, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
 	if err != nil {
 		t.Errorf("Failed to read test key file: %+v", err)
 	}
+	private, err := rsa.GenerateKey(csprng.NewSystemRNG(), 4096)
+	if err != nil {
+		t.Errorf("Failed to create private key: %+v", err)
+	}
+	public := private.GetPublic()
+	key := rsa.CreatePrivateKeyPem(private)
+	crt := rsa.CreatePublicKeyPem(public)
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
@@ -156,7 +163,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to sign: %+v", err)
 	}
-	_, err = impl.Comms.AddHost(&id.Permissioning, "0.0.0.0", crt, connect.GetDefaultHostParams())
+	_, err = impl.Comms.AddHost(&id.Permissioning, "0.0.0.0", permCert, connect.GetDefaultHostParams())
 	if err != nil {
 		t.Errorf("Failed to add host: %+v", err)
 	}
@@ -165,15 +172,15 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to write to hash: %+v", err)
 	}
-	psig, err := rsa.Sign(csprng.NewSystemRNG(), pk, hash.CMixHash, h.Sum(nil), nil)
+	loadedPermKey, err := rsa.LoadPrivateKeyFromPem(permKey)
+	if err != nil {
+		t.Errorf("Failed to load perm key from bytes: %+v", err)
+	}
+	psig, err := rsa.Sign(csprng.NewSystemRNG(), loadedPermKey, hash.CMixHash, h.Sum(nil), nil)
 	if err != nil {
 		t.Errorf("Failed to sign trsa: %+v", err)
 	}
 
-	host, err := connect.NewHost(id.NewIdFromString("test", id.User, t), "0.0.0.0:420", crt, connect.GetDefaultHostParams())
-	if err != nil {
-		t.Errorf("Failed to create dummy host: %+v", err)
-	}
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
 		Token:                 "token",
 		IntermediaryId:        iid,
@@ -181,9 +188,6 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 		TransmissionSalt:      []byte("salt"),
 		TransmissionRsaSig:    psig,
 		IIDTransmissionRsaSig: sig,
-	}, &connect.Auth{
-		IsAuthenticated: true,
-		Sender:          host,
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
@@ -202,15 +206,26 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get working dir: %+v", err)
 	}
-	crt, err := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
+	permCert, err := utils.ReadFile(wd + "/../testutil/cmix.rip.crt")
 	if err != nil {
 		t.Errorf("Failed to read test cert file: %+v", err)
 	}
-	key, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
+	permKey, err := utils.ReadFile(wd + "/../testutil/cmix.rip.key")
 	if err != nil {
-		t.Errorf("Failed to reat test key file: %+v", err)
+		t.Errorf("Failed to read test key file: %+v", err)
 	}
-	iid := []byte("zezima")
+	private, err := rsa.GenerateKey(csprng.NewSystemRNG(), 4096)
+	if err != nil {
+		t.Errorf("Failed to create private key: %+v", err)
+	}
+	public := private.GetPublic()
+	key := rsa.CreatePrivateKeyPem(private)
+	crt := rsa.CreatePublicKeyPem(public)
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to get intermediary ID: %+v", err)
+	}
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		t.Errorf("Failed to make cmix hash: %+v", err)
@@ -227,20 +242,41 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to sign: %+v", err)
 	}
-
-	host, err := connect.NewHost(id.NewIdFromString("test", id.User, t), "0.0.0.0:420", crt, connect.GetDefaultHostParams())
+	_, err = impl.Comms.AddHost(&id.Permissioning, "0.0.0.0", permCert, connect.GetDefaultHostParams())
 	if err != nil {
-		t.Errorf("Failed to create dummy host: %+v", err)
+		t.Errorf("Failed to add host: %+v", err)
+	}
+	h.Reset()
+	_, err = h.Write(crt)
+	if err != nil {
+		t.Errorf("Failed to write to hash: %+v", err)
+	}
+	loadedPermKey, err := rsa.LoadPrivateKeyFromPem(permKey)
+	if err != nil {
+		t.Errorf("Failed to load perm key from bytes: %+v", err)
+	}
+	psig, err := rsa.Sign(csprng.NewSystemRNG(), loadedPermKey, hash.CMixHash, h.Sum(nil), nil)
+	if err != nil {
+		t.Errorf("Failed to sign trsa: %+v", err)
+	}
+
+	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
+		Token:                 "token",
+		IntermediaryId:        iid,
+		TransmissionRsa:       crt,
+		TransmissionSalt:      []byte("salt"),
+		TransmissionRsaSig:    psig,
+		IIDTransmissionRsaSig: sig,
+	})
+	if err != nil {
+		t.Errorf("Failed to register for notifications: %+v", err)
 	}
 	err = impl.UnregisterForNotifications(&pb.NotificationUnregisterRequest{
 		IntermediaryId:        iid,
 		IIDTransmissionRsaSig: sig,
-	}, &connect.Auth{
-		IsAuthenticated: true,
-		Sender:          host,
 	})
 	if err != nil {
-		t.Errorf("Failed to register for notifications: %+v", err)
+		t.Errorf("Failed to unregister for notifications: %+v", err)
 	}
 }
 
