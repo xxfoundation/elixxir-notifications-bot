@@ -104,7 +104,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	return impl, nil
 }
 
-// NewImplementation
+// NewImplementation initializes impl object
 func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	impl := notificationBot.NewImplementation()
 
@@ -197,7 +197,7 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	}
 	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
 	if err != nil {
-		return errors.Wrap(err, "Failed to verify signature")
+		return errors.Wrap(err, "Failed to verify IID signature from client")
 	}
 
 	// Add the user to storage
@@ -239,7 +239,7 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 	}
 	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
 	if err != nil {
-		return errors.Wrap(err, "Failed to verify IID signature")
+		return errors.Wrap(err, "Failed to verify IID signature from client")
 	}
 	err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
 	if err != nil {
