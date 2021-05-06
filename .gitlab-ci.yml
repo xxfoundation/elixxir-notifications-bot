@@ -3,7 +3,7 @@
 variables:
   REPO_DIR: gitlab.com/elixxir
   REPO_NAME: notifications-bot
-  DOCKER_IMAGE: elixxirlabs/cuda-go:latest
+  DOCKER_IMAGE: elixxirlabs/cuda-go:go1.16-cuda11.1
   MIN_CODE_COVERAGE: "0.0"
 
 before_script:
