@@ -235,9 +235,11 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 
 // ReceiveNotificationBatch receives the batch of notification data from gateway.
 func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot receive notification data: client is not authenticated")
-	}
+	//if !auth.IsAuthenticated {
+	//	return errors.New("Cannot receive notification data: client is not authenticated")
+	//}
+
+	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
 
 	fbComm := firebase.NewFirebaseComm()
 	for _, notifData := range notifBatch.GetNotifications() {
