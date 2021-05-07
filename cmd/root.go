@@ -235,7 +235,9 @@ func initLog() {
 		}
 		// Create log file, overwrites if existing
 		logPath := viper.GetString("logPath")
-		logFile, err := os.Create(logPath)
+		logFile, err := os.OpenFile(logPath,
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+			0644)
 		if err != nil {
 			jww.WARN.Println("Invalid or missing log path, default path used.")
 		} else {
