@@ -6,6 +6,7 @@
 package firebase
 
 import (
+	"encoding/base64"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/comms/mixmessages"
@@ -73,33 +74,22 @@ func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 // returns string, error (string is of dubious use, but is returned for the time being)
 func sendNotification(app FBSender, token string, data *mixmessages.NotificationData) (string, error) {
 	ctx := context.Background()
-	//message := &messaging.Message{
-	//	Data: map[string]string{
-	//		"MessageHash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-	//		"IdentityFingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
-	//	},
-	//	APNS: &messaging.APNSConfig{
-	//		Payload: &messaging.APNSPayload{
-	//			Aps: &messaging.Aps{
-	//				Alert: &messaging.ApsAlert{
-	//					Title: "You have received an xx message",
-	//					Body:  "encrypted",
-	//				},
-	//				MutableContent: true,
-	//				Category:       "SECRET",
-	//			},
-	//			CustomData: map[string]interface{}{
-	//				"MessageHash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-	//				"IdentityFingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
-	//			},
-	//		},
-	//	},
-	//	Token: token,
-	//}
 	message := &messaging.Message{
-		Notification: &messaging.Notification{
-			Title: "Test Notification",
-			Body:  "I'm a notification from the notification bot",
+		Notification: nil, // This must remain nil for the data to go to android apps in background
+		Data: map[string]string{
+			"MessageHash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+			"IdentityFingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+		},
+		APNS: &messaging.APNSConfig{ // APNS is apple's native notification service, this is ios specific config
+			Payload: &messaging.APNSPayload{
+				Aps: &messaging.Aps{
+					ContentAvailable: true,
+				},
+				CustomData: map[string]interface{}{
+					"MessageHash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+					"IdentityFingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+				},
+			},
 		},
 		Token: token,
 	}
