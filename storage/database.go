@@ -50,7 +50,7 @@ type User struct {
 	Token               string      `gorm:"not null"`
 	Ephemerals          []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash;constraint:OnDelete:CASCADE;"`
 	// Time in which user has registered with the network (ie permissioning)
-	RegistrationTimestamp time.Time
+	RegistrationTimestamp time.Time `gorm:"not null"`
 }
 
 type Ephemeral struct {
