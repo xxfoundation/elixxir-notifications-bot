@@ -50,7 +50,12 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "token")
+	testTime, err := time.Parse(time.RFC3339,
+		"2012-12-21T22:08:41+00:00")
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
+	}
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"),testTime, "token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}

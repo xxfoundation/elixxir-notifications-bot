@@ -20,7 +20,7 @@ func NewStorage(username, password, dbName, address, port string) (*Storage, err
 	return storage, err
 }
 
-func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) (*User, error) {
+func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, regTimestamp time.Time, token string) (*User, error) {
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to create cmix hash")
@@ -34,6 +34,7 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) 
 		TransmissionRSAHash: h.Sum(nil),
 		TransmissionRSA:     transmissionRSA,
 		Signature:           signature,
+		RegistrationTimestamp: regTimestamp,
 		OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 		Token:               token,
 	}

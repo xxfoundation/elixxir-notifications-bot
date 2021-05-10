@@ -6,6 +6,7 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"time"
 )
 
 // interface declaration for storage methods
@@ -48,6 +49,8 @@ type User struct {
 	Signature           []byte      `gorm:"not null"`
 	Token               string      `gorm:"not null"`
 	Ephemerals          []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash;constraint:OnDelete:CASCADE;"`
+	// Time in which user has registered with the network (ie permissioning)
+	RegistrationTimestamp time.Time
 }
 
 type Ephemeral struct {
