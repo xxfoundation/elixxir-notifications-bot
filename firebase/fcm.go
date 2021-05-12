@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/comms/mixmessages"
 	"testing"
+	"time"
 
 	"golang.org/x/net/context"
 
@@ -74,10 +75,15 @@ func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 // returns string, error (string is of dubious use, but is returned for the time being)
 func sendNotification(app FBSender, token string, data *mixmessages.NotificationData) (string, error) {
 	ctx := context.Background()
+	ttl := 6 * time.Hour
 	message := &messaging.Message{
-		Data: map[string]string{
-			"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-			"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+		Android: &messaging.AndroidConfig{
+			Priority: "high",
+			TTL:      &ttl,
+			Data: map[string]string{
+				"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+				"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+			},
 		},
 		APNS: &messaging.APNSConfig{ // APNS is apple's native notification service, this is ios specific config
 			Payload: &messaging.APNSPayload{
