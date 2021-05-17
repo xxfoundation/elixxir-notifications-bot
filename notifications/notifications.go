@@ -95,26 +95,33 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		}
 	}
 	receivedNdf := uint32(0)
-	apnsKey, err := utils.ReadFile(params.KeyPath)
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to read APNS key")
-	}
-	if params.APNS.KeyID == "" || params.APNS.Issuer == "" || params.APNS.BundleID == "" {
-		return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
-	}
-	apnsClient, err := apns.NewClient(
-		apns.WithJWT(apnsKey, params.APNS.KeyID, params.APNS.Issuer),
-		apns.WithBundleID(params.APNS.BundleID),
-		apns.WithMaxIdleConnections(100),
-		apns.WithTimeout(5*time.Second))
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to setup apns client")
-	}
+
 	impl := &Impl{
-		apnsClient:  apnsClient,
 		notifyFunc:  notifyUser,
 		fcm:         app,
 		receivedNdf: &receivedNdf,
+	}
+
+	if params.APNS.KeyPath == "" {
+		jww.WARN.Println("WARNING: RUNNING WITHOUT APNS")
+	} else {
+		if params.APNS.KeyID == "" || params.APNS.Issuer == "" || params.APNS.BundleID == "" {
+			return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
+		}
+		apnsKey, err := utils.ReadFile(params.APNS.KeyPath)
+		if err != nil {
+			return nil, errors.WithMessage(err, "Failed to read APNS key")
+		}
+
+		apnsClient, err := apns.NewClient(
+			apns.WithJWT(apnsKey, params.APNS.KeyID, params.APNS.Issuer),
+			apns.WithBundleID(params.APNS.BundleID),
+			apns.WithMaxIdleConnections(100),
+			apns.WithTimeout(5*time.Second))
+		if err != nil {
+			return nil, errors.WithMessage(err, "Failed to setup apns client")
+		}
+		impl.apnsClient = apnsClient
 	}
 
 	// Start notification comms server

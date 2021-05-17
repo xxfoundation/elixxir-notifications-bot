@@ -50,6 +50,7 @@ func TestImpl_InitCreator(t *testing.T) {
 	s, err := storage.NewStorage("", "", "", "", "")
 	if err != nil {
 		t.Errorf("Failed to init storage: %+v", err)
+		t.FailNow()
 	}
 	impl, err := StartNotifications(Params{
 		Address:  "",
@@ -59,6 +60,7 @@ func TestImpl_InitCreator(t *testing.T) {
 	}, true, true)
 	if err != nil {
 		t.Errorf("Failed to create impl: %+v", err)
+		t.FailNow()
 	}
 	impl.Storage = s
 	uid := id.NewIdFromString("zezima", id.User, t)
