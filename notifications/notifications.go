@@ -141,7 +141,7 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 		return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 	}
 
-	_, err = fc.SendNotification(fcm, u.Token, data)
+	resp, err := fc.SendNotification(fcm, u.Token, data)
 	if err != nil {
 		// Catch two firebase errors that we don't want to crash on
 		// 403 and 404 indicate that the token stored is incorrect
@@ -158,7 +158,7 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 			return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
 		}
 	}
-	jww.INFO.Printf("Notified ephemeral ID %+v", data.EphemeralID)
+	jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 	return nil
 }
 
@@ -250,9 +250,11 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 
 // ReceiveNotificationBatch receives the batch of notification data from gateway.
 func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth *connect.Auth) error {
-	if !auth.IsAuthenticated {
-		return errors.New("Cannot receive notification data: client is not authenticated")
-	}
+	//if !auth.IsAuthenticated {
+	//	return errors.New("Cannot receive notification data: client is not authenticated")
+	//}
+
+	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
 
 	fbComm := firebase.NewFirebaseComm()
 	for _, notifData := range notifBatch.GetNotifications() {

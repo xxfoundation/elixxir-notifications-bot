@@ -41,19 +41,41 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) 
 }
 
 func (s *Storage) AddLatestEphemeral(u *User, epoch int32, size uint) (*Ephemeral, error) {
-	fmt.Println(size)
-	fmt.Println(u.IntermediaryId)
-	eid, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, size, time.Now().UnixNano())
+	now := time.Now()
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, size, now.UnixNano())
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to get ephemeral id for user")
 	}
+
 	e := &Ephemeral{
 		TransmissionRSAHash: u.TransmissionRSAHash,
 		EphemeralId:         eid.Int64(),
 		Epoch:               epoch,
 		Offset:              u.OffsetNum,
 	}
-	return e, s.upsertEphemeral(e)
+	err = s.upsertEphemeral(e)
+	if err != nil {
+		return nil, err
+	}
+
+	eid2, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, size, now.Add(5*time.Minute).UnixNano())
+	if err != nil {
+		return nil, errors.WithMessage(err, "Failed to get ephemeral id for user")
+	}
+	if eid2.Int64() != eid.Int64() {
+		e := &Ephemeral{
+			TransmissionRSAHash: u.TransmissionRSAHash,
+			EphemeralId:         eid2.Int64(),
+			Epoch:               epoch + 1,
+			Offset:              u.OffsetNum,
+		}
+		err = s.upsertEphemeral(e)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return e, err
 }
 
 func (s *Storage) DeleteUser(transmissionRSA []byte) error {
@@ -68,7 +90,7 @@ func (s *Storage) DeleteUser(transmissionRSA []byte) error {
 	return s.DeleteUserByHash(h.Sum(nil))
 }
 
-func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint) error {
+func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t time.Time) error {
 	users, err := s.getUsersByOffset(offset)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to get users for given offset")
@@ -77,7 +99,7 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint) e
 		fmt.Println(fmt.Sprintf("Adding ephemerals for users: %+v", users))
 	}
 	for _, u := range users {
-		eid, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, size, time.Now().UnixNano())
+		eid, _, _, err := ephemeral.GetIdFromIntermediary(u.IntermediaryId, size, t.UnixNano())
 		if err != nil {
 			return errors.WithMessage(err, "Failed to get eid for user")
 		}

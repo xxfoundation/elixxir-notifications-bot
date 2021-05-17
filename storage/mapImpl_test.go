@@ -67,7 +67,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}
 	_, _, _ = ephemeral.GetOffsetBounds(u1.OffsetNum, time.Now().UnixNano())
-	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5, 16)
+	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5, 16, time.Now())
 	if err != nil {
 		t.Errorf("failed to update ephemerals for offset: %+v", err)
 	}
@@ -305,7 +305,7 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	}
 	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
 	if err != nil {
-		t.Errorf("FAiled to create ephemeral ID: %+v", err)
+		t.Errorf("Failed to create ephemeral ID: %+v", err)
 	}
 
 	err = m.upsertEphemeral(&Ephemeral{
