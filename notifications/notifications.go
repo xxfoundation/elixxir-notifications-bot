@@ -11,7 +11,7 @@ package notifications
 import (
 	"encoding/base64"
 	"firebase.google.com/go/messaging"
-	"github.com/edganiukov/apns"
+	"github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
@@ -186,7 +186,8 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				},
 			}, apns.WithExpiration(604800), // 1 week
 				apns.WithPriority(10),
-				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)))
+				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
+				apns.WithPushType("alert"))
 			if err != nil {
 				jww.ERROR.Printf("Failed to send notification via APNS: %+v", err)
 				err := db.DeleteUserByHash(u.TransmissionRSAHash)

@@ -8,7 +8,7 @@ package notifications
 import (
 	"firebase.google.com/go/messaging"
 	"fmt"
-	"github.com/edganiukov/apns"
+	"github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
