@@ -139,7 +139,7 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 		return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 	}
 
-	_, err = fc.SendNotification(fcm, u.Token, data)
+	resp, err := fc.SendNotification(fcm, u.Token, data)
 	if err != nil {
 		// Catch two firebase errors that we don't want to crash on
 		// 403 and 404 indicate that the token stored is incorrect
@@ -156,7 +156,7 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 			return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
 		}
 	}
-	jww.INFO.Printf("Notified ephemeral ID %+v", data.EphemeralID)
+	jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 	return nil
 }
 
