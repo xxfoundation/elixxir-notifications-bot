@@ -92,7 +92,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	handler := NewImplementation(impl)
 	comms := notificationBot.StartNotificationBot(&id.NotificationBot, params.Address, handler, cert, key)
 	impl.Comms = comms
-	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, nil, network.None)
+	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, nil, network.None, false)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
