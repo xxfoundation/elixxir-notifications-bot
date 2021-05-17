@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"time"
@@ -37,6 +38,7 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) 
 		OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 		Token:               token,
 	}
+	jww.INFO.Printf("Adding user %+v with token %s", u.TransmissionRSAHash, token)
 	return u, s.upsertUser(u)
 }
 

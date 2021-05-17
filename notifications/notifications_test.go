@@ -8,6 +8,7 @@ package notifications
 import (
 	"firebase.google.com/go/messaging"
 	"fmt"
+	"github.com/edganiukov/apns"
 	"github.com/pkg/errors"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
@@ -28,6 +29,12 @@ import (
 )
 
 var port = 4200
+
+type MockApns struct{}
+
+func (m *MockApns) Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error) {
+	return nil, nil
+}
 
 // Test notificationbot's notifyuser function
 // this mocks the setup and send functions, and only tests the core logic of this function
@@ -50,7 +57,7 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "token")
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), ":token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
@@ -59,12 +66,11 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}
-
 	err = notifyUser(&pb.NotificationData{
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, nil, fcBadSend, s)
+	}, &MockApns{}, nil, fcBadSend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
@@ -73,7 +79,7 @@ func TestNotifyUser(t *testing.T) {
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, nil, fc, s)
+	}, &MockApns{}, nil, fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -312,7 +318,7 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 	impl := getNewImpl()
 	dataChan := make(chan *pb.NotificationData)
-	impl.notifyFunc = func(data *pb.NotificationData, f *messaging.Client, fc *firebase.FirebaseComm, s *storage.Storage) error {
+	impl.notifyFunc = func(data *pb.NotificationData, apns ApnsSender, f *messaging.Client, fc *firebase.FirebaseComm, s *storage.Storage) error {
 		go func() { dataChan <- data }()
 		return nil
 	}

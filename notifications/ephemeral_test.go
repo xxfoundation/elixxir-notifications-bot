@@ -31,16 +31,16 @@ func TestImpl_InitDeleter(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral for user: %+v", err)
 	}
-	e, err = s.GetEphemeral(e.EphemeralId)
+	elist, err := s.GetEphemeral(e.EphemeralId)
 	if err != nil {
 		t.Errorf("Failed to get latest ephemeral for user: %+v", err)
 	}
-	if e == nil {
+	if elist == nil {
 		t.Error("Did not receive ephemeral for user")
 	}
 	impl.initDeleter()
 	time.Sleep(time.Second * 5)
-	e, err = s.GetEphemeral(e.EphemeralId)
+	elist, err = s.GetEphemeral(e.EphemeralId)
 	if err == nil {
 		t.Errorf("Ephemeral should have been deleted, did not receive error: %+v", e)
 	}

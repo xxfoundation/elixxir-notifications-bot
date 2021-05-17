@@ -9,7 +9,9 @@
 package notifications
 
 import (
+	"encoding/base64"
 	"firebase.google.com/go/messaging"
+	"github.com/edganiukov/apns"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
@@ -28,7 +30,10 @@ import (
 )
 
 // Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(*pb.NotificationData, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
+type NotifyFunc func(*pb.NotificationData, ApnsSender, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
+type ApnsSender interface {
+	Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
+}
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -36,6 +41,13 @@ type Params struct {
 	CertPath string
 	KeyPath  string
 	FBCreds  string
+	APNS     APNSParams
+}
+type APNSParams struct {
+	KeyPath  string
+	KeyID    string
+	Issuer   string
+	BundleID string
 }
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
@@ -45,6 +57,7 @@ type Impl struct {
 	inst        *network.Instance
 	notifyFunc  NotifyFunc
 	fcm         *messaging.Client
+	apnsClient  *apns.Client
 	receivedNdf *uint32
 
 	ndfStopper Stopper
@@ -82,7 +95,23 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		}
 	}
 	receivedNdf := uint32(0)
+	apnsKey, err := utils.ReadFile(params.KeyPath)
+	if err != nil {
+		return nil, errors.WithMessage(err, "Failed to read APNS key")
+	}
+	if params.APNS.KeyID == "" || params.APNS.Issuer == "" || params.APNS.BundleID == "" {
+		return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
+	}
+	apnsClient, err := apns.NewClient(
+		apns.WithJWT(apnsKey, params.APNS.KeyID, params.APNS.Issuer),
+		apns.WithBundleID(params.APNS.BundleID),
+		apns.WithMaxIdleConnections(100),
+		apns.WithTimeout(5*time.Second))
+	if err != nil {
+		return nil, errors.WithMessage(err, "Failed to setup apns client")
+	}
 	impl := &Impl{
+		apnsClient:  apnsClient,
 		notifyFunc:  notifyUser,
 		fcm:         app,
 		receivedNdf: &receivedNdf,
@@ -123,8 +152,8 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
-	e, err := db.GetEphemeral(data.EphemeralID)
+func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
+	elist, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			jww.DEBUG.Printf("No registration found for ephemeral ID %+v", data.EphemeralID)
@@ -133,30 +162,61 @@ func notifyUser(data *pb.NotificationData, fcm *messaging.Client, fc *firebase.F
 		}
 		return errors.WithMessagef(err, "Could not retrieve registration for ephemeral ID %+v", data.EphemeralID)
 	}
+	for _, e := range elist {
+		u, err := db.GetUserByHash(e.TransmissionRSAHash)
+		if err != nil {
+			return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
+		}
 
-	u, err := db.GetUserByHash(e.TransmissionRSAHash)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
-	}
-
-	resp, err := fc.SendNotification(fcm, u.Token, data)
-	if err != nil {
-		// Catch two firebase errors that we don't want to crash on
-		// 403 and 404 indicate that the token stored is incorrect
-		// this means rather than crashing we should log and unregister the user
-		// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
-		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
-			jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
-			err := db.DeleteUserByHash(u.TransmissionRSAHash)
+		isAPNS := !strings.Contains(u.Token, ":")
+		mutableContent := 1
+		if isAPNS {
+			jww.INFO.Printf("Notifying ephemeral ID %+v via APNS to token %+v", data.EphemeralID, u.Token)
+			resp, err := apnsClient.Send(u.Token, apns.Payload{
+				APS: apns.APS{
+					Alert: apns.Alert{
+						Title: "Privacy: protected!",
+						Body:  "Some notifications are not for you to ensure privacy; we hope to remove this notification soon",
+					},
+					MutableContent: &mutableContent,
+				},
+				CustomValues: map[string]interface{}{
+					"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+					"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+				},
+			}, apns.WithExpiration(604800), // 1 week
+				apns.WithPriority(10),
+				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)))
 			if err != nil {
-				return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
+				jww.ERROR.Printf("Failed to send notification via APNS: %+v", err)
+				err := db.DeleteUserByHash(u.TransmissionRSAHash)
+				if err != nil {
+					return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
+				}
+			} else {
+				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 			}
 		} else {
-			jww.ERROR.Printf("Error sending notification: %+v", err)
-			return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
+			resp, err := fc.SendNotification(fcm, u.Token, data)
+			if err != nil {
+				// Catch two firebase errors that we don't want to crash on
+				// 403 and 404 indicate that the token stored is incorrect
+				// this means rather than crashing we should log and unregister the user
+				// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
+				if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
+					jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
+					err := db.DeleteUserByHash(u.TransmissionRSAHash)
+					if err != nil {
+						return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
+					}
+				} else {
+					jww.ERROR.Printf("Error sending notification: %+v", err)
+					return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
+				}
+			}
+			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 		}
 	}
-	jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 	return nil
 }
 
@@ -243,7 +303,7 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 	fbComm := firebase.NewFirebaseComm()
 	for _, notifData := range notifBatch.GetNotifications() {
-		err := nb.notifyFunc(notifData, nb.fcm, fbComm, nb.Storage)
+		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, fbComm, nb.Storage)
 		if err != nil {
 			return err
 		}
