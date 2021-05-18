@@ -1,25 +1,123 @@
 package storage
 
-import "testing"
+import (
+	"bytes"
+	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"testing"
+	"time"
+)
 
 // This file contains testing for mapImpl.go
 
+func TestDatabaseImpl(t *testing.T) {
+	s, err := NewStorage("jonahhusson", "", "nbtest", "0.0.0.0", "5432")
+	if err != nil {
+		t.Errorf("Failed to create db: %+v", err)
+		t.FailNow()
+	}
+	sig := []byte("sig")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to make iid: %+v", err)
+	}
+	token1 := "i'm a token"
+	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
+	if err != nil {
+		t.Errorf("Failed to upsert user: %+v", err)
+	}
+
+	u, err := s.GetUser(iid)
+	if err != nil {
+		t.Errorf("Failed to get user: %+v", err)
+	}
+	if u.Token != token1 {
+		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+	}
+
+	token2 := "you're a token"
+	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
+	if err != nil {
+		t.Errorf("Failed to upsert updated user: %+v", err)
+	}
+
+	u, err = s.GetUser(iid)
+	if err != nil {
+		t.Errorf("Failed to get user: %+v", err)
+	}
+	if u.Token != token2 {
+		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+	}
+
+	u, err = s.GetUserByHash(u.TransmissionRSAHash)
+	if err != nil {
+		t.Errorf("Failed to get user: %+v", err)
+	}
+	if u.Token != token2 {
+		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
+	}
+
+	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
+	if err != nil {
+		t.Errorf("Failed to upsert updated user: %+v", err)
+	}
+	_, err = s.AddLatestEphemeral(u2, 5, 16)
+	if err != nil {
+		t.Errorf("Failed to add latest ephemeral: %+v", err)
+	}
+	_, _, _ = ephemeral.GetOffsetBounds(u1.OffsetNum, time.Now().UnixNano())
+	err = s.AddEphemeralsForOffset(u1.OffsetNum, 5, 16, time.Now())
+	if err != nil {
+		t.Errorf("failed to update ephemerals for offset: %+v", err)
+	}
+
+	e, err := s.GetLatestEphemeral()
+	if err != nil {
+		t.Errorf("Failed to get latest ephemeral: %+v", err)
+	}
+
+	_, err = s.GetEphemeral(e.EphemeralId)
+	if err != nil {
+		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+
+	err = s.DeleteOldEphemerals(6)
+	if err != nil {
+		t.Errorf("Failed to delete old ephemerals: %+v", err)
+	}
+
+	us, err := s.GetAllUsers()
+	if err != nil {
+		t.Errorf("Failed to get all users: %+v", err)
+	}
+	if len(us) != 2 {
+		t.Errorf("Did not get enough users: %+v", us)
+	}
+}
+
 // This tests getting a user that does exist in the database
 func TestMapImpl_GetUser_Happy(t *testing.T) {
-	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
-	m.users.Store(u.Id, &u)
+	m := &MapImpl{
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
+	m.usersById[string(u.IntermediaryId)] = u
+	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
+	m.allUsers = append(m.allUsers, u)
 
-	user, err := m.GetUser(u.Id)
+	user, err := m.GetUser(u.IntermediaryId)
 
 	// Check that we got a user back
 	if user == nil {
 		t.Errorf("TestMapImpl_GetUser_Happy: function did not return a user")
 	} else {
 		// Perform additional tests on the user var if we're sure it's populated
-		if user.Id != u.Id {
+		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.Id, u.Id)
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
 		if user.Token != u.Token {
@@ -35,13 +133,17 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 
 // This tests getting a user that does *not* exist in the database
 func TestMapImpl_GetUser_NoUser(t *testing.T) {
-	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
+	m := &MapImpl{
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 
-	user, err := m.GetUser(u.Id)
+	user, err := m.GetUser(u.IntermediaryId)
 
 	if user != nil {
-		t.Errorf("TestMapImpl_GetUser_NoUser: function returned a user\n\tGot: %s", user.Id)
+		t.Errorf("TestMapImpl_GetUser_NoUser: function returned a user\n\tGot: %s", user.IntermediaryId)
 	}
 
 	if err == nil {
@@ -51,101 +153,324 @@ func TestMapImpl_GetUser_NoUser(t *testing.T) {
 
 // This tests deleting a user that does exist in the database
 func TestMapImpl_DeleteUser_Happy(t *testing.T) {
-	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
-	m.users.Store(u.Id, &u)
+	m := &MapImpl{
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
+	m.usersById[string(u.IntermediaryId)] = u
+	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
+	m.allUsers = append(m.allUsers, u)
 
-	err := m.DeleteUser(u.Id)
+	err := m.DeleteUserByHash(u.TransmissionRSAHash)
 
 	if err != nil {
 		t.Errorf("TestMapImpl_DeleteUser_Happy: function returned error\n\tGot: %s", err)
 	}
 
-	// Try to oad user from map manually
-	_, ok := m.users.Load(u.Id)
+	// Try to load user from map manually
+	_, ok := m.usersById[string(u.IntermediaryId)]
 	if ok == true {
 		t.Errorf("TestMapImpl_DeleteUser_Happy: user existed in database after deletion called")
+	}
+	_, ok = m.usersByRsaHash[string(u.TransmissionRSAHash)]
+	if ok == true {
+		t.Errorf("TestMapImpl_DeleteUser_Happy: user existed in database after deletion called")
+	}
+	if len(m.allUsers) != 0 {
+		t.Errorf("Should have deleted from allUsers")
 	}
 }
 
 // This tests inserting a user once and verifying we can read it back right
 func TestMapImpl_UpsertUser_Happy(t *testing.T) {
-	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
+	m := &MapImpl{
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: []byte("rsahash")}
 
-	err := m.UpsertUser(&u)
-
+	err = m.upsertUser(&u)
 	if err != nil {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: function returned an error\n\tGot: %s", err)
 	}
 
 	// Load user from map manually
-	user, ok := m.users.Load(u.Id)
+	user, ok := m.usersByRsaHash[string(u.TransmissionRSAHash)]
 	// Check that a user was found
 	if ok != true {
 		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
-		if user.(*User).Id != u.Id {
+		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.(*User).Id, u.Id)
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
-		if user.(*User).Token != u.Token {
+		if user.Token != u.Token {
 			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different token\n\tGot: %s\n\tExpected: %s", user.(*User).Token, u.Token)
+				"user with different token\n\tGot: %s\n\tExpected: %s", user.Token, u.Token)
 		}
 	}
 }
 
 // This tests inserting a user *twice* and verifying we can read it back right each time
 func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
-	m := &MapImpl{}
-	u := User{Id: "test", Token: "token"}
-
-	err := m.UpsertUser(&u)
-
+	m := &MapImpl{
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
-		t.Errorf("TestMapImpl_UpsertUser_Happy: function returned an error\n\tGot: %s", err)
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: []byte("rsahash")}
+
+	err = m.upsertUser(&u)
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
 	}
 
 	// Load user from map manually
-	user, ok := m.users.Load(u.Id)
+	user, ok := m.usersByRsaHash[string(u.TransmissionRSAHash)]
 	// Check that a user was found
 	if ok != true {
-		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
-		if user.(*User).Id != u.Id {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.(*User).Id, u.Id)
+		if bytes.Compare(user.IntermediaryId, u.IntermediaryId) != 0 {
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
-		if user.(*User).Token != u.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different token\n\tGot: %s\n\tExpected: %s", user.(*User).Token, u.Token)
+		if user.Token != u.Token {
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
+				"user with different token\n\tGot: %s\n\tExpected: %s", user.Token, u.Token)
 		}
 	}
 
 	// Create user with the same ID but change the token
-	u2 := User{Id: "test", Token: "othertoken"}
-	err = m.UpsertUser(&u2)
+	u2 := User{IntermediaryId: []byte("testtwo"), Token: "othertoken", TransmissionRSAHash: []byte("TransmissionRSAHash")}
+	err = m.upsertUser(&u2)
 
 	// Load user from map manually
-	user, ok = m.users.Load(u2.Id)
+	user, ok = m.usersByRsaHash[string(u2.TransmissionRSAHash)]
 	// Check that a user was found
 	if ok != true {
-		t.Errorf("TestMapImpl_UpsertUser_Happy: loading user from map manually did not return user")
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: loading user from map manually did not return user")
 	} else {
 		// If a user is found, make sure it's our test user
-		if user.(*User).Id != u2.Id {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different ID\n\tGot: %s\n\tExpected: %s", user.(*User).Id, u.Id)
+		if bytes.Compare(user.IntermediaryId, u2.IntermediaryId) != 0 {
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
+				"user with different ID\n\tGot: %s\n\tExpected: %s", user.IntermediaryId, u.IntermediaryId)
 		}
 
-		if user.(*User).Token != u2.Token {
-			t.Errorf("TestMapImpl_GetUser_Happy: function returned "+
-				"user with different token\n\tGot: %s\n\tExpected: %s", user.(*User).Token, u2.Token)
+		if user.Token != u2.Token {
+			t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned "+
+				"user with different token\n\tGot: %s\n\tExpected: %s", user.Token, u2.Token)
 		}
+	}
+}
+
+func TestMapImpl_UpsertEphemeral(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+
+	err = m.upsertUser(&u)
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("Failed to create ephemeral ID: %+v", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         eid.Int64(),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	if m.ephIDSeq != 1 {
+		t.Error("sequence did not increment")
+	}
+	if m.allEphemerals[m.ephIDSeq] == nil {
+		t.Error("Did not insert to allEphemerals")
+	}
+	_, ok := m.ephemeralsById[eid.Int64()]
+	if !ok {
+		t.Error("Did not insert to ephemeralsById")
+	}
+}
+
+func TestMapImpl_GetEphemeral(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+	err = m.upsertUser(&u)
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         eid.Int64(),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	e, err := m.GetEphemeral(eid.Int64())
+	if err != nil {
+		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+	if bytes.Compare(e.TransmissionRSAHash, trsaHash) != 0 {
+		t.Errorf("Did not receive expected ephemeral: %+v", e)
+	}
+}
+
+func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+	err = m.upsertUser(&u)
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         eid.Int64(),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	e, err := m.GetEphemeral(eid.Int64())
+	if err != nil {
+		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+
+	err = m.DeleteOldEphemerals(18)
+	if err != nil {
+		t.Errorf("Failed to delete old ephemerals: %+v", err)
+	}
+
+	_, ok := m.allEphemerals[int(e.ID)]
+	if ok {
+		t.Errorf("Did not delete properly")
+	}
+}
+
+func TestMapImpl_GetLatestEphemeral(t *testing.T) {
+	m := &MapImpl{
+		ephIDSeq:       0,
+		ephemeralsById: map[int64]*Ephemeral{},
+		allEphemerals:  map[int]*Ephemeral{},
+		allUsers:       nil,
+		usersByRsaHash: map[string]*User{},
+		usersById:      map[string]*User{},
+		usersByOffset:  map[int64][]*User{},
+	}
+	trsaHash := []byte("TransmissionRSAHash")
+	uid := id.NewIdFromString("zezima", id.User, t)
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Errorf("Failed to create intermediary ID: %+v", err)
+	}
+
+	u := User{IntermediaryId: iid, Token: "token", TransmissionRSAHash: trsaHash}
+	err = m.upsertUser(&u)
+	if err != nil {
+		t.Errorf("TestMapImpl_UpsertUser_HappyTwice: function returned an error\n\tGot: %s", err)
+	}
+
+	eid, _, _, err := ephemeral.GetIdFromIntermediary(iid, 16, time.Now().UnixNano())
+	if err != nil {
+		t.Errorf("FAiled to create ephemeral ID: %+v", err)
+	}
+
+	err = m.upsertEphemeral(&Ephemeral{
+		Offset:              0,
+		TransmissionRSAHash: trsaHash,
+		EphemeralId:         eid.Int64(),
+		Epoch:               17,
+	})
+	if err != nil {
+		t.Errorf("Failed to upsert ephemeral: %+v", err)
+	}
+
+	_, err = m.GetLatestEphemeral()
+	if err != nil {
+		t.Errorf("Failed to get latest ephemeral: %+v", err)
 	}
 }

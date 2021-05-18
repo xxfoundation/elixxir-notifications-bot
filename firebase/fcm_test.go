@@ -8,6 +8,7 @@ package firebase
 import (
 	"context"
 	"firebase.google.com/go/messaging"
+	"gitlab.com/elixxir/comms/mixmessages"
 	"testing"
 )
 
@@ -24,7 +25,11 @@ func (MockSender) Send(ctx context.Context, app *messaging.Message) (string, err
 func TestSendNotification(t *testing.T) {
 	app := MockSender{}
 
-	_, err := sendNotification(app, token)
+	_, err := sendNotification(app, token, &mixmessages.NotificationData{
+		EphemeralID: 12345,
+		IdentityFP:  []byte("testfp"),
+		MessageHash: []byte("testmsghash"),
+	})
 	if err != nil {
 		t.Error(err.Error())
 	}

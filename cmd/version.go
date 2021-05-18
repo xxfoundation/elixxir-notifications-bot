@@ -11,11 +11,11 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
-	"gitlab.com/elixxir/primitives/utils"
+	"gitlab.com/xx_network/primitives/utils"
 )
 
 // Change this value to set the version for this build
-const currentVersion = "1.0.0"
+const currentVersion = "2.0.0"
 
 func printVersion() {
 	fmt.Printf("Elixxir Notifications Server v%s -- %s\n\n", SEMVER, GITVERSION)

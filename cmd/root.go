@@ -11,19 +11,20 @@ package cmd
 import (
 	"fmt"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
 	"gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/notifications"
 	"gitlab.com/elixxir/notifications-bot/storage"
-	"gitlab.com/elixxir/primitives/id"
-	"gitlab.com/elixxir/primitives/ndf"
-	"gitlab.com/elixxir/primitives/utils"
+	"gitlab.com/xx_network/comms/connect"
+	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/utils"
+	"net"
 	"os"
 	"path"
-	"strings"
+	"sync/atomic"
+	"time"
 )
 
 var (
@@ -77,62 +78,50 @@ var rootCmd = &cobra.Command{
 			jww.FATAL.Panicf("Failed to start notifications server: %+v", err)
 		}
 
+		rawAddr := viper.GetString("dbAddress")
+		var addr, port string
+		if rawAddr != "" {
+			addr, port, err = net.SplitHostPort(rawAddr)
+			if err != nil {
+				jww.FATAL.Panicf("Unable to get database port from %s: %+v", rawAddr, err)
+			}
+		}
 		// Initialize the storage backend
-		impl.Storage = storage.NewDatabase(
+		impl.Storage, err = storage.NewStorage(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
 			viper.GetString("dbName"),
-			viper.GetString("dbAddress"),
+			addr,
+			port,
 		)
 
-		// Set up the notifications server connections
-		err = setupConnection(impl, viper.GetString("permissioningCertPath"), viper.GetString("permissioningAddress"))
+		// Read in permissioning certificate
+		cert, err := utils.ReadFile(viper.GetString("permissioningCertPath"))
 		if err != nil {
-			jww.FATAL.Panicf("Failed to set up connections: %+v", err)
+			jww.FATAL.Panicf("Could not read permissioning cert: %+v", err)
 		}
 
-		// Start notification loop
-		killChan := make(chan struct{})
+		// Add host for permissioning server
+		hostParams := connect.GetDefaultHostParams()
+		hostParams.AuthEnabled = false
+		_, err = impl.Comms.AddHost(&id.Permissioning, viper.GetString("permissioningAddress"), cert, hostParams)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to Create permissioning host: %+v", err)
+		}
+
+		// Start ephemeral ID tracking
 		errChan := make(chan error)
-		go impl.RunNotificationLoop(loopDelay, killChan, errChan)
+		impl.TrackNdf()
+		for atomic.LoadUint32(impl.ReceivedNdf()) != 1 {
+			time.Sleep(time.Second)
+		}
+		go impl.EphIdCreator()
+		go impl.EphIdDeleter()
 
 		// Wait forever to prevent process from ending
 		err = <-errChan
 		jww.FATAL.Panicf("Notifications loop error received: %+v", err)
 	},
-}
-
-// setupConnection handles connecting to permissioning and polling for the NDF once connected
-func setupConnection(impl *notifications.Impl, permissioningCertPath, permissioningAddr string) error {
-	// Read in permissioning certificate
-	cert, err := utils.ReadFile(permissioningCertPath)
-	if err != nil {
-		return errors.Wrap(err, "Could not read permissioning cert")
-	}
-
-	// Add host for permissioning server
-	_, err = impl.Comms.AddHost(id.PERMISSIONING, permissioningAddr, cert, true, false)
-	if err != nil {
-		return errors.Wrap(err, "Failed to Create permissioning host")
-	}
-
-	// Loop until an NDF is received
-	var def *ndf.NetworkDefinition
-	emptyNdf := &ndf.NetworkDefinition{}
-	for def == nil {
-		def, err = impl.Comms.RetrieveNdf(emptyNdf)
-		// Don't stop if error is expected
-		if err != nil && !strings.Contains(err.Error(), ndf.NO_NDF) {
-			return errors.Wrap(err, "Failed to get NDF")
-		}
-	}
-
-	// Update NDF & gateway host
-	err = impl.UpdateNdf(def)
-	if err != nil {
-		return errors.Wrap(err, "Failed to update impl's NDF")
-	}
-	return nil
 }
 
 // Execute adds all child commands to the root command and sets flags
@@ -246,7 +235,9 @@ func initLog() {
 		}
 		// Create log file, overwrites if existing
 		logPath := viper.GetString("logPath")
-		logFile, err := os.Create(logPath)
+		logFile, err := os.OpenFile(logPath,
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+			0644)
 		if err != nil {
 			jww.WARN.Println("Invalid or missing log path, default path used.")
 		} else {
