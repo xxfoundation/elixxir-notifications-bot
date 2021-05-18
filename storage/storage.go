@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"time"
@@ -30,14 +31,15 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, regTimestamp t
 		return nil, errors.WithMessage(err, "Failed to hash transmission RSA")
 	}
 	u := &User{
-		IntermediaryId:      iid,
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     transmissionRSA,
-		Signature:           signature,
+		IntermediaryId:        iid,
+		TransmissionRSAHash:   h.Sum(nil),
+		TransmissionRSA:       transmissionRSA,
+		Signature:             signature,
 		RegistrationTimestamp: regTimestamp,
-		OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-		Token:               token,
+		OffsetNum:             ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
+		Token:                 token,
 	}
+	jww.INFO.Printf("Adding user %+v with token %s", u.TransmissionRSAHash, token)
 	return u, s.upsertUser(u)
 }
 

@@ -35,5 +35,11 @@ firebaseCredentialsPath: "{fb_creds_path}"
 permissioningCertPath: "${permissioning_cert_path}"
 # Address:port of the permissioning server
 permissioningAddress: "${permissioning_address}:${port}"
+
+# APNS parameters
+apnsKeyPath: ""
+apnsKeyID: ""
+apnsIssuer: ""
+apnsBundleID: ""
 # === END YAML
 ```

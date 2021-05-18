@@ -19,7 +19,7 @@ type database interface {
 	DeleteUserByHash(transmissionRsaHash []byte) error
 
 	upsertEphemeral(ephemeral *Ephemeral) error
-	GetEphemeral(ephemeralId int64) (*Ephemeral, error)
+	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error
 }
@@ -36,7 +36,7 @@ type MapImpl struct {
 	usersByOffset  map[int64][]*User
 	allUsers       []*User
 	allEphemerals  map[int]*Ephemeral
-	ephemeralsById map[int64]*Ephemeral
+	ephemeralsById map[int64][]*Ephemeral
 	ephIDSeq       int
 }
 
@@ -56,7 +56,7 @@ type User struct {
 type Ephemeral struct {
 	ID                  uint   `gorm:"primaryKey"`
 	Offset              int64  `gorm:"not null; index"`
-	TransmissionRSAHash []byte `gorm:"not null;references users(transmission_rsa_hash)"`
+	TransmissionRSAHash []byte `gorm:"not null; unique; references users(transmission_rsa_hash)"`
 	EphemeralId         int64  `gorm:"not null; index"`
 	Epoch               int32  `gorm:"not null; index"`
 }
@@ -100,7 +100,7 @@ func newDatabase(username, password, dbName, address,
 			usersByRsaHash: map[string]*User{},
 			usersByOffset:  map[int64][]*User{},
 			allUsers:       nil,
-			ephemeralsById: map[int64]*Ephemeral{},
+			ephemeralsById: map[int64][]*Ephemeral{},
 			allEphemerals:  map[int]*Ephemeral{},
 			ephIDSeq:       0,
 		}
