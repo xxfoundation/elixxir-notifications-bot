@@ -22,8 +22,13 @@ func TestDatabaseImpl(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make iid: %+v", err)
 	}
+	testTime, err := time.Parse(time.RFC3339,
+		"2012-12-21T22:08:41+00:00")
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
+	}
 	token1 := "i'm a token"
-	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
+	_, err = s.AddUser(iid, []byte("rsa"), sig, testTime, token1)
 	if err != nil {
 		t.Errorf("Failed to upsert user: %+v", err)
 	}
@@ -37,7 +42,7 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 
 	token2 := "you're a token"
-	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
+	u1, err := s.AddUser(iid, []byte("rsa"), sig, testTime, token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
@@ -58,7 +63,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
 	}
 
-	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
+	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, testTime, token2)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
