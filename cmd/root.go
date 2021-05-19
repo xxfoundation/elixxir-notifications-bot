@@ -63,12 +63,23 @@ var rootCmd = &cobra.Command{
 			jww.FATAL.Panicf("Unable to expand credentials path: %+v", err)
 		}
 
+		apnsKeyPath, err := utils.ExpandPath(viper.GetString("apnsKeyPath"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand apns key path: %+v", err)
+		}
+
 		// Populate params
 		NotificationParams = notifications.Params{
 			Address:  localAddress,
 			CertPath: certPath,
 			KeyPath:  keyPath,
 			FBCreds:  fbCreds,
+			APNS: notifications.APNSParams{
+				KeyPath:  apnsKeyPath,
+				KeyID:    viper.GetString("apnsKeyID"),
+				Issuer:   viper.GetString("apnsIssuer"),
+				BundleID: viper.GetString("apnsBundleID"),
+			},
 		}
 
 		// Start notifications server

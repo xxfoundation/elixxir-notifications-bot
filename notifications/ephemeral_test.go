@@ -22,7 +22,12 @@ func TestImpl_InitDeleter(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get intermediary ephemeral id: %+v", err)
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token")
+	testTime, err := time.Parse(time.RFC3339,
+		"2012-12-21T22:08:41+00:00")
+	if err != nil {
+		t.Fatalf("Could not parse precanned time: %v", err.Error())
+	}
+	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), testTime, "token")
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
@@ -31,16 +36,16 @@ func TestImpl_InitDeleter(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral for user: %+v", err)
 	}
-	e, err = s.GetEphemeral(e.EphemeralId)
+	elist, err := s.GetEphemeral(e.EphemeralId)
 	if err != nil {
 		t.Errorf("Failed to get latest ephemeral for user: %+v", err)
 	}
-	if e == nil {
+	if elist == nil {
 		t.Error("Did not receive ephemeral for user")
 	}
 	impl.initDeleter()
 	time.Sleep(time.Second * 5)
-	e, err = s.GetEphemeral(e.EphemeralId)
+	elist, err = s.GetEphemeral(e.EphemeralId)
 	if err == nil {
 		t.Errorf("Ephemeral should have been deleted, did not receive error: %+v", e)
 	}
@@ -50,6 +55,7 @@ func TestImpl_InitCreator(t *testing.T) {
 	s, err := storage.NewStorage("", "", "", "", "")
 	if err != nil {
 		t.Errorf("Failed to init storage: %+v", err)
+		t.FailNow()
 	}
 	impl, err := StartNotifications(Params{
 		Address:  "",
@@ -59,6 +65,7 @@ func TestImpl_InitCreator(t *testing.T) {
 	}, true, true)
 	if err != nil {
 		t.Errorf("Failed to create impl: %+v", err)
+		t.FailNow()
 	}
 	impl.Storage = s
 	uid := id.NewIdFromString("zezima", id.User, t)
@@ -66,7 +73,12 @@ func TestImpl_InitCreator(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get intermediary ephemeral id: %+v", err)
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token")
+	testTime, err := time.Parse(time.RFC3339,
+		"2012-12-21T22:08:41+00:00")
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
+	}
+	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), testTime, "token")
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
