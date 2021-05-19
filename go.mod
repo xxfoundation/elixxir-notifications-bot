@@ -14,8 +14,8 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20210519192308-402d188eaa65
-	gitlab.com/elixxir/crypto v0.0.7-0.20210519184524-7dc31e2a88de
+	gitlab.com/elixxir/comms v0.0.4-0.20210519202444-7a4f7dc4d8db
+	gitlab.com/elixxir/crypto v0.0.7-0.20210519202235-70feb27d6fbe
 	gitlab.com/xx_network/comms v0.0.4-0.20210517205649-06ddfa8d2a75
 	gitlab.com/xx_network/crypto v0.0.5-0.20210517205543-4ae99cbb9063
 	gitlab.com/xx_network/primitives v0.0.4-0.20210517202253-c7b4bd0087ea
