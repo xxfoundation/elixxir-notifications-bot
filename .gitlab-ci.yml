@@ -3,7 +3,7 @@
 variables:
   REPO_DIR: gitlab.com/elixxir
   REPO_NAME: notifications-bot
-  DOCKER_IMAGE: elixxirlabs/cuda-go:latest
+  DOCKER_IMAGE: elixxirlabs/cuda-go:go1.16-cuda11.1
   MIN_CODE_COVERAGE: "0.0"
 
 before_script:
@@ -54,7 +54,6 @@ build:
     - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' ./...
     - GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.linux64 main.go
     - GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.win64 main.go
-    - GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.win32 main.go
     - GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.darwin64 main.go
   artifacts:
     paths:
