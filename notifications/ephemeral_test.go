@@ -22,12 +22,10 @@ func TestImpl_InitDeleter(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get intermediary ephemeral id: %+v", err)
 	}
-	testTime, err := time.Parse(time.RFC3339,
-		"2012-12-21T22:08:41+00:00")
 	if err != nil {
 		t.Fatalf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), testTime, "token")
+	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token")
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
@@ -73,12 +71,10 @@ func TestImpl_InitCreator(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get intermediary ephemeral id: %+v", err)
 	}
-	testTime, err := time.Parse(time.RFC3339,
-		"2012-12-21T22:08:41+00:00")
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), testTime, "token")
+	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token")
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}

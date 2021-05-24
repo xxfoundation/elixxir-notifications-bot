@@ -18,6 +18,7 @@ import (
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/hash"
+	"gitlab.com/elixxir/crypto/registration"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
@@ -243,18 +244,17 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	if !ok {
 		return errors.New("Could not find permissioning host to verify client signature")
 	}
+	err = registration.VerifyWithTimestamp(permHost.GetPubKey(), request.RegistrationTimestamp,
+		string(request.TransmissionRsa), request.IIDTransmissionRsaSig)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to verify perm sig with timestamp")
+	}
+
+	// Verify IID transmission RSA signature
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		return errors.WithMessage(err, "Failed to create cmix hash")
 	}
-	h.Write(request.TransmissionRsa)
-	err = rsa.Verify(permHost.GetPubKey(), hash.CMixHash, h.Sum(nil), request.TransmissionRsaSig, nil)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to verify permissioning signature of client transmission rsa cert")
-	}
-
-	// Verify IID transmission RSA signature
-	h.Reset()
 	_, err = h.Write(request.IntermediaryId)
 	if err != nil {
 		return errors.Wrap(err, "Failed to write intermediary id to hash")
@@ -269,8 +269,7 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	}
 
 	// Add the user to storage
-	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig,
-		time.Unix(0, request.RegistrationTimestamp), request.Token)
+	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}

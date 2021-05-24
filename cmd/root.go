@@ -82,13 +82,6 @@ var rootCmd = &cobra.Command{
 			},
 		}
 
-		// Start notifications server
-		jww.INFO.Println("Starting Notifications...")
-		impl, err := notifications.StartNotifications(NotificationParams, noTLS, false)
-		if err != nil {
-			jww.FATAL.Panicf("Failed to start notifications server: %+v", err)
-		}
-
 		rawAddr := viper.GetString("dbAddress")
 		var addr, port string
 		if rawAddr != "" {
@@ -98,13 +91,25 @@ var rootCmd = &cobra.Command{
 			}
 		}
 		// Initialize the storage backend
-		impl.Storage, err = storage.NewStorage(
+		s, err := storage.NewStorage(
 			viper.GetString("dbUsername"),
 			viper.GetString("dbPassword"),
 			viper.GetString("dbName"),
 			addr,
 			port,
 		)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to initialize storage: %+v", err)
+		}
+
+		// Start notifications server
+		jww.INFO.Println("Starting Notifications...")
+		impl, err := notifications.StartNotifications(NotificationParams, noTLS, false)
+		if err != nil {
+			jww.FATAL.Panicf("Failed to start notifications server: %+v", err)
+		}
+
+		impl.Storage = s
 
 		// Read in permissioning certificate
 		cert, err := utils.ReadFile(viper.GetString("permissioningCertPath"))

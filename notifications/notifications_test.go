@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
+	"gitlab.com/elixxir/crypto/registration"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
@@ -55,12 +56,10 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
 	}
-	testTime, err := time.Parse(time.RFC3339,
-		"2012-12-21T22:08:41+00:00")
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), testTime, ":token")
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), ":token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
@@ -183,19 +182,12 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add host: %+v", err)
 	}
-	h.Reset()
-	_, err = h.Write(crt)
-	if err != nil {
-		t.Errorf("Failed to write to hash: %+v", err)
-	}
 	loadedPermKey, err := rsa.LoadPrivateKeyFromPem(permKey)
 	if err != nil {
 		t.Errorf("Failed to load perm key from bytes: %+v", err)
 	}
-	psig, err := rsa.Sign(csprng.NewSystemRNG(), loadedPermKey, hash.CMixHash, h.Sum(nil), nil)
-	if err != nil {
-		t.Errorf("Failed to sign trsa: %+v", err)
-	}
+	ts := time.Now().UnixNano()
+	psig, err := registration.SignWithTimestamp(csprng.NewSystemRNG(), loadedPermKey, ts, string(crt))
 
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
 		Token:                 "token",
@@ -204,6 +196,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 		TransmissionSalt:      []byte("salt"),
 		TransmissionRsaSig:    psig,
 		IIDTransmissionRsaSig: sig,
+		RegistrationTimestamp: ts,
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
