@@ -245,7 +245,7 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 		return errors.New("Could not find permissioning host to verify client signature")
 	}
 	err = registration.VerifyWithTimestamp(permHost.GetPubKey(), request.RegistrationTimestamp,
-		string(request.TransmissionRsa), request.IIDTransmissionRsaSig)
+		string(request.TransmissionRsa), request.TransmissionRsaSig)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to verify perm sig with timestamp")
 	}

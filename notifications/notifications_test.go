@@ -264,10 +264,8 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to load perm key from bytes: %+v", err)
 	}
-	psig, err := rsa.Sign(csprng.NewSystemRNG(), loadedPermKey, hash.CMixHash, h.Sum(nil), nil)
-	if err != nil {
-		t.Errorf("Failed to sign trsa: %+v", err)
-	}
+	ts := time.Now().UnixNano()
+	psig, err := registration.SignWithTimestamp(csprng.NewSystemRNG(), loadedPermKey, ts, string(crt))
 
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
 		Token:                 "token",
@@ -276,6 +274,7 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 		TransmissionSalt:      []byte("salt"),
 		TransmissionRsaSig:    psig,
 		IIDTransmissionRsaSig: sig,
+		RegistrationTimestamp: ts,
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
