@@ -20,6 +20,7 @@ require (
 	gitlab.com/xx_network/crypto v0.0.5-0.20210526002149-9c08ccb202be
 	gitlab.com/xx_network/primitives v0.0.4-0.20210525232109-3f99a04adcfd
 	gitlab.com/xx_network/ring v0.0.3-0.20210527191221-ce3f170aabd5 // indirect
+	go.opencensus.io v0.22.3 // indirect
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
 	google.golang.org/api v0.20.0
