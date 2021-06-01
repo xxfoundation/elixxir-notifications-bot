@@ -23,6 +23,7 @@ import (
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
+	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
 	"gorm.io/gorm"
 	"strings"
@@ -128,7 +129,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	handler := NewImplementation(impl)
 	comms := notificationBot.StartNotificationBot(&id.NotificationBot, params.Address, handler, cert, key)
 	impl.Comms = comms
-	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpaceSize: 16}, nil, nil, network.None, false)
+	i, err := network.NewInstance(impl.Comms.ProtoComms, &ndf.NetworkDefinition{AddressSpace: []ndf.AddressSpace{{Size: 16, Timestamp: netTime.Now()}}}, nil, nil, network.None, false)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to start instance")
 	}
@@ -259,7 +260,8 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
 	def := nb.inst.GetPartialNdf()
-	e, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(def.Get().AddressSpaceSize))
+	// FIXME: Does the address space need more logic here?
+	e, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(def.Get().AddressSpace[0].Size))
 	if err != nil {
 		return errors.WithMessage(err, "Failed to add ephemeral ID for user")
 	}

@@ -7,26 +7,23 @@ require (
 	cloud.google.com/go/firestore v1.1.1 // indirect
 	cloud.google.com/go/pubsub v1.3.1 // indirect
 	firebase.google.com/go v3.12.0+incompatible
-	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/jonahh-yeti/apns v0.0.1
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20210527192434-4f4f53730861
-	gitlab.com/elixxir/crypto v0.0.7-0.20210526002540-1fb51df5b4b2
-	gitlab.com/elixxir/primitives v0.0.3-0.20210526002350-b9c947fec050 // indirect
-	gitlab.com/xx_network/comms v0.0.4-0.20210526002311-2b5a66af0eac
-	gitlab.com/xx_network/crypto v0.0.5-0.20210526002149-9c08ccb202be
-	gitlab.com/xx_network/primitives v0.0.4-0.20210525232109-3f99a04adcfd
-	gitlab.com/xx_network/ring v0.0.3-0.20210527191221-ce3f170aabd5 // indirect
-	golang.org/x/net v0.0.0-20210510120150-4163338589ed
+	gitlab.com/elixxir/comms v0.0.4-0.20210601193829-9a626b0c8a56
+	gitlab.com/elixxir/crypto v0.0.7-0.20210601193549-039f62f2d81a
+	gitlab.com/xx_network/comms v0.0.4-0.20210601193357-717527f3a1ff
+	gitlab.com/xx_network/crypto v0.0.5-0.20210601193257-27ba5d088733
+	gitlab.com/xx_network/primitives v0.0.4-0.20210601193218-658388fcaa81
+	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
 	google.golang.org/api v0.20.0
 	google.golang.org/genproto v0.0.0-20201030142918-24207fddd1c3 // indirect
-	google.golang.org/grpc v1.33.1 // indirect
 	gopkg.in/ini.v1 v1.56.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gorm.io/driver/postgres v1.0.8
 	gorm.io/gorm v1.20.12
 )
