@@ -17,9 +17,12 @@ import (
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
+	"gitlab.com/elixxir/crypto/hash"
+	"gitlab.com/elixxir/crypto/registration"
 	"gitlab.com/elixxir/notifications-bot/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
+	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
@@ -139,16 +142,16 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	return impl, nil
 }
 
-// NewImplementation
+// NewImplementation initializes impl object
 func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	impl := notificationBot.NewImplementation()
 
-	impl.Functions.RegisterForNotifications = func(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
-		return instance.RegisterForNotifications(request, auth)
+	impl.Functions.RegisterForNotifications = func(request *pb.NotificationRegisterRequest) error {
+		return instance.RegisterForNotifications(request)
 	}
 
-	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
-		return instance.UnregisterForNotifications(request, auth)
+	impl.Functions.UnregisterForNotifications = func(request *pb.NotificationUnregisterRequest) error {
+		return instance.UnregisterForNotifications(request)
 	}
 
 	impl.Functions.ReceiveNotificationBatch = func(data *pb.NotificationBatch, auth *connect.Auth) error {
@@ -230,28 +233,41 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
-func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest, auth *connect.Auth) error {
+func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest) error {
 	var err error
-	//if !auth.IsAuthenticated {
-	//	return errors.New("Cannot register for notifications: client is not authenticated")
-	//}
-	//if string(request.Token) == "" {
-	//	return errors.New("Cannot register for notifications with empty client token")
-	//}
-	//
-	//h, err := hash.NewCMixHash()
-	//if err != nil {
-	//	return errors.Wrap(err, "Failed to create cmix hash")
-	//}
-	//_, err = h.Write(request.IntermediaryId)
-	//if err != nil {
-	//	return errors.Wrap(err, "Failed to write intermediary id to hash")
-	//}
-	//
-	//err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
-	//if err != nil {
-	//	return errors.Wrap(err, "Failed to verify signature")
-	//}
+	// Check auth & inputs
+	if string(request.Token) == "" {
+		return errors.New("Cannot register for notifications with empty client token")
+	}
+
+	// Verify permissioning RSA signature
+	permHost, ok := nb.Comms.GetHost(&id.Permissioning)
+	if !ok {
+		return errors.New("Could not find permissioning host to verify client signature")
+	}
+	err = registration.VerifyWithTimestamp(permHost.GetPubKey(), request.RegistrationTimestamp,
+		string(request.TransmissionRsa), request.TransmissionRsaSig)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to verify perm sig with timestamp")
+	}
+
+	// Verify IID transmission RSA signature
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		return errors.WithMessage(err, "Failed to create cmix hash")
+	}
+	_, err = h.Write(request.IntermediaryId)
+	if err != nil {
+		return errors.Wrap(err, "Failed to write intermediary id to hash")
+	}
+	pub, err := rsa.LoadPublicKeyFromPem(request.TransmissionRsa)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to load public key from bytes")
+	}
+	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	if err != nil {
+		return errors.Wrap(err, "Failed to verify IID signature from client")
+	}
 
 	// Add the user to storage
 	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token)
@@ -271,30 +287,29 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 }
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
-func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest, auth *connect.Auth) error {
-	//if !auth.IsAuthenticated {
-	//	return errors.New("Cannot unregister for notifications: client is not authenticated")
-	//}
-	//
-	//h, err := hash.NewCMixHash()
-	//if err != nil {
-	//	return errors.Wrap(err, "Failed to create cmix hash")
-	//}
-	//_, err = h.Write(request.IntermediaryId)
-	//if err != nil {
-	//	return errors.Wrap(err, "Failed to write intermediary id to hash")
-	//}
-	//
-	//err = rsa.Verify(auth.Sender.GetPubKey(), hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
-	//if err != nil {
-	//	return errors.Wrap(err, "Failed to verify signature")
-	//}
+func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest) error {
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		return errors.WithMessage(err, "Failed to create cmix hash")
+	}
+	_, err = h.Write(request.IntermediaryId)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to write intermediary id to hash")
+	}
 
 	u, err := nb.Storage.GetUser(request.IntermediaryId)
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to get user with iid: %+v", request.IntermediaryId)
+		return errors.WithMessagef(err, "Failed to find user with intermediary ID %+v", request.IntermediaryId)
 	}
 
+	pub, err := rsa.LoadPublicKeyFromPem(u.TransmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to load public key from database")
+	}
+	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
+	if err != nil {
+		return errors.Wrap(err, "Failed to verify IID signature from client")
+	}
 	err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")

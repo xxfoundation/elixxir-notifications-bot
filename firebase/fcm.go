@@ -30,19 +30,19 @@ type FirebaseComm struct {
 	SendNotification SendFunc
 }
 
-// This interface matches the send function in the messaging app, allowing us to unit test sendNotification
+// FBSender is an interface which matches the send function in the messaging app, allowing us to unit test sendNotification
 type FBSender interface {
 	Send(context.Context, *messaging.Message) (string, error)
 }
 
-// Set up a notificationbot object with the proper setup and send functions
+// NewFirebaseComm create a *FirebaseComm object with the proper setup and send functions
 func NewFirebaseComm() *FirebaseComm {
 	return &FirebaseComm{
 		SendNotification: sendNotification,
 	}
 }
 
-// FOR TESTING USE ONLY: setup a notificationbot object with mocked setup and send funcs
+// NewMockFirebaseComm FOR TESTING USE ONLY: create a *FirebaseComm object with mocked setup and send funcs
 func NewMockFirebaseComm(t *testing.T, sendFunc SendFunc) *FirebaseComm {
 	if t == nil {
 		panic("This method should only be used in tests")
@@ -52,7 +52,7 @@ func NewMockFirebaseComm(t *testing.T, sendFunc SendFunc) *FirebaseComm {
 	}
 }
 
-// setupApp is a helper function which sets up a connection with firebase
+// SetupMessagingApp initializes communication with firebase
 // It returns a messaging client, a context object and an error
 func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 	ctx := context.Background()
@@ -70,7 +70,7 @@ func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 	return client, nil
 }
 
-// SendNotification accepts a registration token and service account file
+// sendNotification accepts a registration token and service account file
 // It gets the proper infrastructure, then builds & sends a notification through the firebase admin API
 // returns string, error (string is of dubious use, but is returned for the time being)
 func sendNotification(app FBSender, token string, data *mixmessages.NotificationData) (string, error) {
