@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"git.xx.network/xx_network/primitives/id/ephemeral"
 	"gorm.io/gorm"
 	"time"
 )

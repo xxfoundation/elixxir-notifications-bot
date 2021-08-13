@@ -9,7 +9,7 @@ import (
 	"encoding/base64"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
-	"gitlab.com/elixxir/comms/mixmessages"
+	"git.xx.network/elixxir/comms/mixmessages"
 	"testing"
 	"time"
 

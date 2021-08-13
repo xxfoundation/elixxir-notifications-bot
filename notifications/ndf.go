@@ -13,8 +13,8 @@ import (
 	//"github.com/pkg/errors"
 	"bytes"
 	jww "github.com/spf13/jwalterweatherman"
-	pb "gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/notifications-bot/io"
+	pb "git.xx.network/elixxir/comms/mixmessages"
+	"git.xx.network/elixxir/notifications-bot/io"
 	"sync/atomic"
 	"time"
 )

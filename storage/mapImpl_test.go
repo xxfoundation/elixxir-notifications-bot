@@ -2,8 +2,8 @@ package storage
 
 import (
 	"bytes"
-	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"git.xx.network/xx_network/primitives/id"
+	"git.xx.network/xx_network/primitives/id/ephemeral"
 	"testing"
 	"time"
 )

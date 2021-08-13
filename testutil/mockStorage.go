@@ -1,6 +1,6 @@
 package testutil
 
-import "gitlab.com/elixxir/notifications-bot/storage"
+import "git.xx.network/elixxir/notifications-bot/storage"
 
 type MockStorage struct{}
 

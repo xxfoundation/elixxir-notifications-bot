@@ -2,9 +2,9 @@ package notifications
 
 import (
 	"fmt"
-	"gitlab.com/elixxir/notifications-bot/storage"
-	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"git.xx.network/elixxir/notifications-bot/storage"
+	"git.xx.network/xx_network/primitives/id"
+	"git.xx.network/xx_network/primitives/id/ephemeral"
 	"testing"
 	"time"
 )

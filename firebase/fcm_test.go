@@ -8,7 +8,7 @@ package firebase
 import (
 	"context"
 	"firebase.google.com/go/messaging"
-	"gitlab.com/elixxir/comms/mixmessages"
+	"git.xx.network/elixxir/comms/mixmessages"
 	"testing"
 )
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/crypto/hash"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"git.xx.network/elixxir/crypto/hash"
+	"git.xx.network/xx_network/primitives/id/ephemeral"
 	"time"
 )
 

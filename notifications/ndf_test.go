@@ -9,8 +9,8 @@ package notifications
 
 import (
 	"bytes"
-	pb "gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/comms/testutils"
+	pb "git.xx.network/elixxir/comms/mixmessages"
+	"git.xx.network/elixxir/comms/testutils"
 	"sync"
 	"testing"
 	"time"
