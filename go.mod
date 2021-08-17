@@ -13,11 +13,11 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20210813172950-d9be85bbd52d
-	gitlab.com/elixxir/crypto v0.0.7-0.20210803232056-ba3ff44cc618
-	gitlab.com/xx_network/comms v0.0.4-0.20210813170223-ab758f0bbec5
-	gitlab.com/xx_network/crypto v0.0.5-0.20210803231814-b18476a2257c
-	gitlab.com/xx_network/primitives v0.0.4-0.20210803222745-e898d5e546e9
+	gitlab.com/elixxir/comms v0.0.4-0.20210817213543-e9d5bab2d7cf
+	gitlab.com/elixxir/crypto v0.0.7-0.20210817213204-d43b2f43e38c
+	gitlab.com/xx_network/comms v0.0.4-0.20210817212950-958b239ff84d
+	gitlab.com/xx_network/crypto v0.0.5-0.20210817212828-992cbe93391c
+	gitlab.com/xx_network/primitives v0.0.4-0.20210817212601-5edf47162057
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
 	google.golang.org/api v0.20.0
