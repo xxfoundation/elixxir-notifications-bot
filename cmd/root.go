@@ -10,7 +10,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	jww "github.com/spf13/jwalterweatherman"
 	"github.com/spf13/viper"
@@ -22,15 +21,15 @@ import (
 	"gitlab.com/xx_network/primitives/utils"
 	"net"
 	"os"
-	"path"
 	"sync/atomic"
 	"time"
 )
 
 var (
-	cfgFile            string
+	cfgFile, logPath   string
 	verbose            bool
 	noTLS              bool
+	validConfig        bool
 	NotificationParams notifications.Params
 	loopDelay          int
 )
@@ -42,6 +41,9 @@ var rootCmd = &cobra.Command{
 	Long:  `This server provides registration functions on cMix`,
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		initConfig()
+		initLog()
+
 		if verbose {
 			err := os.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", "info")
 			if err != nil {
@@ -157,7 +159,6 @@ func init() {
 	// There is one init in each sub command. Do not put variable declarations
 	// here, and ensure all the Flags are of the *P variety, unless there's a
 	// very good reason not to have them as local params to sub command."
-	cobra.OnInitialize(initConfig, initLog)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
@@ -189,75 +190,71 @@ func handleBindingError(err error, flag string) {
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
 	//Use default config location if none is passed
+	var err error
+	validConfig = true
 	if cfgFile == "" {
-		// Find home directory.
-		home, err := homedir.Dir()
+		cfgFile, err = utils.SearchDefaultLocations("notifications.yaml", "xxnetwork")
 		if err != nil {
-			jww.ERROR.Println(err)
-			os.Exit(1)
-		}
-
-		cfgFile = home + "/.elixxir/notifications.yaml"
-
-	}
-
-	validConfig := true
-	f, err := os.Open(cfgFile)
-	if err != nil {
-		jww.ERROR.Printf("Unable to open config file (%s): %+v", cfgFile, err)
-		validConfig = false
-	}
-	_, err = f.Stat()
-	if err != nil {
-		jww.ERROR.Printf("Invalid config file (%s): %+v", cfgFile, err)
-		validConfig = false
-	}
-	err = f.Close()
-	if err != nil {
-		jww.ERROR.Printf("Unable to close config file (%s): %+v", cfgFile, err)
-		validConfig = false
-	}
-
-	// Set the config file if it is valid
-	if validConfig {
-		// Set the config path to the directory containing the config file
-		// This may increase the reliability of the config watching, somewhat
-		cfgDir, _ := path.Split(cfgFile)
-		viper.AddConfigPath(cfgDir)
-
-		viper.SetConfigFile(cfgFile)
-		viper.AutomaticEnv() // read in environment variables that match
-
-		// If a config file is found, read it in.
-		if err := viper.ReadInConfig(); err != nil {
-			jww.ERROR.Printf("Unable to parse config file (%s): %+v", cfgFile, err)
 			validConfig = false
+			jww.FATAL.Panicf("Failed to find config file: %+v", err)
 		}
-		viper.WatchConfig()
+	} else {
+		cfgFile, err = utils.ExpandPath(cfgFile)
+		if err != nil {
+			validConfig = false
+			jww.FATAL.Panicf("Failed to expand config file path: %+v", err)
+		}
+	}
+
+	viper.SetConfigFile(cfgFile)
+	viper.AutomaticEnv() // read in environment variables that match
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Printf("Unable to read config file (%s): %+v", cfgFile, err.Error())
+		validConfig = false
 	}
 }
 
 // initLog initializes logging thresholds and the log path.
 func initLog() {
-	if viper.Get("logPath") != nil {
-		// If verbose flag set then log more info for debugging
-		if verbose || viper.GetBool("verbose") {
-			jww.SetLogThreshold(jww.LevelDebug)
-			jww.SetStdoutThreshold(jww.LevelDebug)
-			mixmessages.DebugMode()
-		} else {
-			jww.SetLogThreshold(jww.LevelInfo)
-			jww.SetStdoutThreshold(jww.LevelInfo)
-		}
-		// Create log file, overwrites if existing
-		logPath := viper.GetString("logPath")
-		logFile, err := os.OpenFile(logPath,
-			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
-			0644)
+	vipLogLevel := viper.GetUint("logLevel")
+
+	// Check the level of logs to display
+	if vipLogLevel > 1 {
+		// Set the GRPC log level
+		err := os.Setenv("GRPC_GO_LOG_SEVERITY_LEVEL", "info")
 		if err != nil {
-			jww.WARN.Println("Invalid or missing log path, default path used.")
-		} else {
-			jww.SetLogOutput(logFile)
+			jww.ERROR.Printf("Could not set GRPC_GO_LOG_SEVERITY_LEVEL: %+v", err)
 		}
+
+		err = os.Setenv("GRPC_GO_LOG_VERBOSITY_LEVEL", "99")
+		if err != nil {
+			jww.ERROR.Printf("Could not set GRPC_GO_LOG_VERBOSITY_LEVEL: %+v", err)
+		}
+		// Turn on trace logs
+		jww.SetLogThreshold(jww.LevelTrace)
+		jww.SetStdoutThreshold(jww.LevelTrace)
+		mixmessages.TraceMode()
+	} else if vipLogLevel == 1 {
+		// Turn on debugging logs
+		jww.SetLogThreshold(jww.LevelDebug)
+		jww.SetStdoutThreshold(jww.LevelDebug)
+		mixmessages.DebugMode()
+	} else {
+		// Turn on info logs
+		jww.SetLogThreshold(jww.LevelInfo)
+		jww.SetStdoutThreshold(jww.LevelInfo)
+	}
+
+	logPath = viper.GetString("log")
+
+	logFile, err := os.OpenFile(logPath,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0644)
+	if err != nil {
+		fmt.Printf("Could not open log file %s!\n", logPath)
+	} else {
+		jww.SetLogOutput(logFile)
 	}
 }

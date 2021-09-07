@@ -11,9 +11,9 @@ Notifications bot is used to send push notifications to users' devices via fireb
 
 # START YAML ===
 # Verbose logging
-verbose: "${verbose}"
+logLevel: "${verbose}"
 # Path to log file
-logPath: "${log_path}"
+log: "${log_path}"
 
 # Database connection information
 dbUsername: "${db_username}"
