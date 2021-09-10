@@ -81,6 +81,7 @@ var rootCmd = &cobra.Command{
 				KeyID:    viper.GetString("apnsKeyID"),
 				Issuer:   viper.GetString("apnsIssuer"),
 				BundleID: viper.GetString("apnsBundleID"),
+				Dev:      viper.GetBool("apnsDev"),
 			},
 		}
 

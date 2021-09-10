@@ -41,5 +41,6 @@ apnsKeyPath: ""
 apnsKeyID: ""
 apnsIssuer: ""
 apnsBundleID: ""
+apnsDev: true
 # === END YAML
 ```

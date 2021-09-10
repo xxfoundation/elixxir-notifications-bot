@@ -52,6 +52,7 @@ type APNSParams struct {
 	KeyID    string
 	Issuer   string
 	BundleID string
+	Dev      bool
 }
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
@@ -116,12 +117,19 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if err != nil {
 			return nil, errors.WithMessage(err, "Failed to read APNS key")
 		}
-
+		var endpoint apns.ClientOption
+		if params.APNS.Dev {
+			jww.INFO.Println("")
+			endpoint = apns.WithEndpoint(apns.DevelopmentGateway)
+		} else {
+			endpoint = apns.WithEndpoint(apns.ProductionGateway)
+		}
 		apnsClient, err := apns.NewClient(
 			apns.WithJWT(apnsKey, params.APNS.KeyID, params.APNS.Issuer),
 			apns.WithBundleID(params.APNS.BundleID),
 			apns.WithMaxIdleConnections(100),
-			apns.WithTimeout(5*time.Second))
+			apns.WithTimeout(5*time.Second),
+			endpoint)
 		if err != nil {
 			return nil, errors.WithMessage(err, "Failed to setup apns client")
 		}
