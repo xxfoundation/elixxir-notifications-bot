@@ -220,10 +220,11 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 			resp, err := fc.SendNotification(fcm, u.Token, data)
 			if err != nil {
 				// Catch two firebase errors that we don't want to crash on
-				// 403 and 404 indicate that the token stored is incorrect
+				// 400 and 404 indicate that the token stored is incorrect
 				// this means rather than crashing we should log and unregister the user
 				// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
-				if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
+				// Stale token documentation: https://firebase.google.com/docs/cloud-messaging/manage-tokens
+				if strings.Contains(err.Error(), "400") || strings.Contains(err.Error(), "404") {
 					jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
 					err := db.DeleteUserByHash(u.TransmissionRSAHash)
 					if err != nil {
