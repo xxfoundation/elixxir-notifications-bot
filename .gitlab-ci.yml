@@ -68,8 +68,8 @@ tag:
         - master
     image: $DOCKER_IMAGE
     script:
-        - git remote add origin_tags git@gitlab.com:elixxir/notifications-bot.git || true
-        - git remote set-url origin_tags git@gitlab.com:elixxir/notifications-bot.git || true
+        - git remote add origin_tags git@git.xx.network:elixxir/notifications-bot.git || true
+        - git remote set-url origin_tags git@git.xx.network:elixxir/notifications-bot.git || true
         - git tag $(./release/notifications.linux64 version | grep "Elixxir Notifications Server v"| cut -d ' ' -f4) -f
         - git push origin_tags -f --tags
 
@@ -77,8 +77,8 @@ trigger_integration:
   stage: trigger_integration
   script:
     # Server
-    - "curl -X POST -F token=2a4419808282d0a47c55eee8b9904e -F ref=master https://gitlab.com/api/v4/projects/5014439/trigger/pipeline"
+    - "curl -X POST -F token=2a4419808282d0a47c55eee8b9904e -F ref=master https://gitlab.com/api/v4/projects/28/trigger/pipeline"
     # Client
-    - "curl -X POST -F token=602ad7669e7d6daa61b210a0c4312b -F ref=master https://gitlab.com/api/v4/projects/5454785/trigger/pipeline"
+    - "curl -X POST -F token=602ad7669e7d6daa61b210a0c4312b -F ref=master https://gitlab.com/api/v4/projects/28/trigger/pipeline"
   only:
     - master
