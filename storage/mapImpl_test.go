@@ -22,6 +22,9 @@ func TestDatabaseImpl(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to make iid: %+v", err)
 	}
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
+	}
 	token1 := "i'm a token"
 	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
 	if err != nil {
@@ -284,7 +287,7 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:       0,
-		ephemeralsById: map[int64]*Ephemeral{},
+		ephemeralsById: map[int64][]*Ephemeral{},
 		allEphemerals:  map[int]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
@@ -333,7 +336,7 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 func TestMapImpl_GetEphemeral(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:       0,
-		ephemeralsById: map[int64]*Ephemeral{},
+		ephemeralsById: map[int64][]*Ephemeral{},
 		allEphemerals:  map[int]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
@@ -372,7 +375,7 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get ephemeral: %+v", err)
 	}
-	if bytes.Compare(e.TransmissionRSAHash, trsaHash) != 0 {
+	if bytes.Compare(e[0].TransmissionRSAHash, trsaHash) != 0 {
 		t.Errorf("Did not receive expected ephemeral: %+v", e)
 	}
 }
@@ -380,7 +383,7 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:       0,
-		ephemeralsById: map[int64]*Ephemeral{},
+		ephemeralsById: map[int64][]*Ephemeral{},
 		allEphemerals:  map[int]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
@@ -425,7 +428,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 		t.Errorf("Failed to delete old ephemerals: %+v", err)
 	}
 
-	_, ok := m.allEphemerals[int(e.ID)]
+	_, ok := m.allEphemerals[int(e[0].ID)]
 	if ok {
 		t.Errorf("Did not delete properly")
 	}
@@ -434,7 +437,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 func TestMapImpl_GetLatestEphemeral(t *testing.T) {
 	m := &MapImpl{
 		ephIDSeq:       0,
-		ephemeralsById: map[int64]*Ephemeral{},
+		ephemeralsById: map[int64][]*Ephemeral{},
 		allEphemerals:  map[int]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},

@@ -16,6 +16,9 @@ func TestStorage_AddUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
 	}
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
+	}
 	_, err = s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
@@ -31,6 +34,9 @@ func TestStorage_DeleteUser(t *testing.T) {
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
+	}
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
 	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
 	if err != nil {
@@ -51,6 +57,9 @@ func TestStorage_AddLatestEphemeral(t *testing.T) {
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
 		t.Errorf("Failed to create iid: %+v", err)
+	}
+	if err != nil {
+		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
 	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
 	if err != nil {

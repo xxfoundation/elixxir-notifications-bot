@@ -98,14 +98,14 @@ func (m *MapImpl) GetAllUsers() ([]*User, error) {
 func (m *MapImpl) upsertEphemeral(ephemeral *Ephemeral) error {
 	m.ephIDSeq++
 	ephemeral.ID = uint(m.ephIDSeq)
-	m.ephemeralsById[ephemeral.EphemeralId] = ephemeral
+	m.ephemeralsById[ephemeral.EphemeralId] = append(m.ephemeralsById[ephemeral.EphemeralId], ephemeral)
 	m.allEphemerals[int(ephemeral.ID)] = ephemeral
 	return nil
 }
 
-func (m *MapImpl) GetEphemeral(ephemeralId int64) (*Ephemeral, error) {
+func (m *MapImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
 	e, ok := m.ephemeralsById[ephemeralId]
-	if !ok {
+	if !ok || len(e) < 1 {
 		return nil, errors.New(fmt.Sprintf("Could not find ephemeral with transmission RSA hash %+v", ephemeralId))
 	}
 	return e, nil
@@ -116,11 +116,17 @@ func (m *MapImpl) getUsersByOffset(offset int64) ([]*User, error) {
 }
 
 func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
-	for i, e := range m.ephemeralsById {
-		if e.Epoch < epoch {
-			delete(m.allEphemerals, int(m.ephemeralsById[i].ID))
-			delete(m.ephemeralsById, i)
+	for i, elist := range m.ephemeralsById {
+		if elist != nil {
+			for j, e := range elist {
+				if e.Epoch < epoch {
+					delete(m.allEphemerals, int(m.ephemeralsById[i][j].ID))
+					m.ephemeralsById[i] = append(m.ephemeralsById[i][:j],
+						m.ephemeralsById[i][j+1:]...)
+				}
+			}
 		}
+
 	}
 	return nil
 }

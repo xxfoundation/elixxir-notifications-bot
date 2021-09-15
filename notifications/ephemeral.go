@@ -56,7 +56,8 @@ func (nb *Impl) initCreator() {
 func (nb *Impl) addEphemerals(start time.Time) {
 	currentOffset, epoch := ephemeral.HandleQuantization(start)
 	def := nb.inst.GetPartialNdf()
-	err := nb.Storage.AddEphemeralsForOffset(currentOffset, epoch, uint(def.Get().AddressSpaceSize), start)
+	// FIXME: Does the address space need more logic here?
+	err := nb.Storage.AddEphemeralsForOffset(currentOffset, epoch, uint(def.Get().AddressSpace[0].Size), start)
 	if err != nil {
 		jww.WARN.Printf("failed to update ephemerals: %+v", err)
 	}

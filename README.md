@@ -11,9 +11,9 @@ Notifications bot is used to send push notifications to users' devices via fireb
 
 # START YAML ===
 # Verbose logging
-verbose: "${verbose}"
+logLevel: "${verbose}"
 # Path to log file
-logPath: "${log_path}"
+log: "${log_path}"
 
 # Database connection information
 dbUsername: "${db_username}"
@@ -35,5 +35,12 @@ firebaseCredentialsPath: "{fb_creds_path}"
 permissioningCertPath: "${permissioning_cert_path}"
 # Address:port of the permissioning server
 permissioningAddress: "${permissioning_address}:${port}"
+
+# APNS parameters
+apnsKeyPath: ""
+apnsKeyID: ""
+apnsIssuer: ""
+apnsBundleID: ""
+apnsDev: true
 # === END YAML
 ```
