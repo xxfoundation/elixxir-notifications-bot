@@ -208,11 +208,12 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
 				apns.WithPushType("alert"))
 			if err != nil {
-				jww.ERROR.Printf("Failed to send notification via APNS: %+v", err)
-				err := db.DeleteUserByHash(u.TransmissionRSAHash)
-				if err != nil {
-					return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
-				}
+				jww.ERROR.Printf("Failed to send notification via APNS: %+v: %+v", resp, err)
+				// TODO : Should be re-enabled for specific error cases? deep dive on apns docs may be helpful
+				//err := db.DeleteUserByHash(u.TransmissionRSAHash)
+				//if err != nil {
+				//	return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
+				//}
 			} else {
 				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 			}
