@@ -208,11 +208,12 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
 				apns.WithPushType("alert"))
 			if err != nil {
-				jww.ERROR.Printf("Failed to send notification via APNS: %+v", err)
-				err := db.DeleteUserByHash(u.TransmissionRSAHash)
-				if err != nil {
-					return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
-				}
+				jww.ERROR.Printf("Failed to send notification via APNS: %+v: %+v", resp, err)
+				// TODO : Should be re-enabled for specific error cases? deep dive on apns docs may be helpful
+				//err := db.DeleteUserByHash(u.TransmissionRSAHash)
+				//if err != nil {
+				//	return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
+				//}
 			} else {
 				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 			}
@@ -220,10 +221,11 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 			resp, err := fc.SendNotification(fcm, u.Token, data)
 			if err != nil {
 				// Catch two firebase errors that we don't want to crash on
-				// 403 and 404 indicate that the token stored is incorrect
+				// 400 and 404 indicate that the token stored is incorrect
 				// this means rather than crashing we should log and unregister the user
 				// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
-				if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
+				// Stale token documentation: https://firebase.google.com/docs/cloud-messaging/manage-tokens
+				if strings.Contains(err.Error(), "400") || strings.Contains(err.Error(), "404") {
 					jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
 					err := db.DeleteUserByHash(u.TransmissionRSAHash)
 					if err != nil {
