@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
+	"github.com/sideshow/apns2"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
@@ -32,6 +33,10 @@ var port = 4200
 type MockApns struct{}
 
 func (m *MockApns) Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error) {
+	return nil, nil
+}
+
+func (m *MockApns) Push(n *apns2.Notification) (*apns2.Response, error) {
 	return nil, nil
 }
 

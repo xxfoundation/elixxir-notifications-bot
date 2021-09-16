@@ -11,8 +11,11 @@ package notifications
 import (
 	"encoding/base64"
 	"firebase.google.com/go/messaging"
-	"github.com/jonahh-yeti/apns"
+	// "github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
+	"github.com/sideshow/apns2"
+	"github.com/sideshow/apns2/payload"
+	apnstoken "github.com/sideshow/apns2/token"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/network"
@@ -29,6 +32,7 @@ import (
 	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
 	"gorm.io/gorm"
+	"log"
 	"strings"
 	"time"
 )
@@ -36,7 +40,8 @@ import (
 // Function type definitions for the main operations (poll and notify)
 type NotifyFunc func(*pb.NotificationData, ApnsSender, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
 type ApnsSender interface {
-	Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
+	//Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
+	Push(n *apns2.Notification) (*apns2.Response, error)
 }
 
 // Params struct holds info passed in for configuration
@@ -62,7 +67,7 @@ type Impl struct {
 	inst        *network.Instance
 	notifyFunc  NotifyFunc
 	fcm         *messaging.Client
-	apnsClient  *apns.Client
+	apnsClient  *apns2.Client
 	receivedNdf *uint32
 
 	ndfStopper Stopper
@@ -113,26 +118,20 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if params.APNS.KeyID == "" || params.APNS.Issuer == "" || params.APNS.BundleID == "" {
 			return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
 		}
-		apnsKey, err := utils.ReadFile(params.APNS.KeyPath)
+
+		authKey, err := apnstoken.AuthKeyFromFile("params.APNS.KeyPath")
 		if err != nil {
-			return nil, errors.WithMessage(err, "Failed to read APNS key")
+			log.Fatal("token error:", err)
 		}
-		var endpoint apns.ClientOption
-		if params.APNS.Dev {
-			jww.INFO.Println("")
-			endpoint = apns.WithEndpoint(apns.DevelopmentGateway)
-		} else {
-			endpoint = apns.WithEndpoint(apns.ProductionGateway)
+		token := &apnstoken.Token{
+			AuthKey: authKey,
+			// KeyID from developer account (Certificates, Identifiers & Profiles -> Keys)
+			KeyID: params.APNS.KeyID,
+			// TeamID from developer account (View Account -> Membership)
+			TeamID: params.APNS.Issuer,
 		}
-		apnsClient, err := apns.NewClient(
-			apns.WithJWT(apnsKey, params.APNS.KeyID, params.APNS.Issuer),
-			apns.WithBundleID(params.APNS.BundleID),
-			apns.WithMaxIdleConnections(100),
-			apns.WithTimeout(5*time.Second),
-			endpoint)
-		if err != nil {
-			return nil, errors.WithMessage(err, "Failed to setup apns client")
-		}
+		apnsClient := apns2.NewTokenClient(token)
+
 		impl.apnsClient = apnsClient
 	}
 
@@ -188,25 +187,38 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 		}
 
 		isAPNS := !strings.Contains(u.Token, ":")
-		mutableContent := 1
+		// mutableContent := 1
 		if isAPNS {
 			jww.INFO.Printf("Notifying ephemeral ID %+v via APNS to token %+v", data.EphemeralID, u.Token)
-			resp, err := apnsClient.Send(u.Token, apns.Payload{
-				APS: apns.APS{
-					Alert: apns.Alert{
-						Title: "Privacy: protected!",
-						Body:  "Some notifications are not for you to ensure privacy; we hope to remove this notification soon",
-					},
-					MutableContent: &mutableContent,
-				},
-				CustomValues: map[string]interface{}{
-					"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-					"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
-				},
-			}, apns.WithExpiration(604800), // 1 week
-				apns.WithPriority(10),
-				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
-				apns.WithPushType("alert"))
+			notifPayload := payload.NewPayload().AlertTitle("Privacy: protected!").AlertBody(
+				"Some notifications are not for you to ensure privacy; we hope to remove this notification soon").MutableContent().Custom(
+				"messagehash", base64.StdEncoding.EncodeToString(data.MessageHash)).Custom(
+				"identityfingerprint", base64.StdEncoding.EncodeToString(data.IdentityFP))
+			notif := &apns2.Notification{
+				CollapseID:  base64.StdEncoding.EncodeToString(u.TransmissionRSAHash),
+				DeviceToken: u.Token,
+				Expiration:  time.Now().Add(time.Hour * 24 * 7),
+				Priority:    apns2.PriorityHigh,
+				Payload:     notifPayload,
+				PushType:    apns2.PushTypeAlert,
+			}
+			resp, err := apnsClient.Push(notif)
+			//resp, err := apnsClient.Send(u.Token, apns.Payload{
+			//	APS: apns.APS{
+			//		Alert: apns.Alert{
+			//			Title: "Privacy: protected!",
+			//			Body:  "Some notifications are not for you to ensure privacy; we hope to remove this notification soon",
+			//		},
+			//		MutableContent: &mutableContent,
+			//	},
+			//	CustomValues: map[string]interface{}{
+			//		"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
+			//		"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+			//	},
+			//}, apns.WithExpiration(604800), // 1 week
+			//	apns.WithPriority(10),
+			//	apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
+			//	apns.WithPushType("alert"))
 			if err != nil {
 				jww.ERROR.Printf("Failed to send notification via APNS: %+v: %+v", resp, err)
 				// TODO : Should be re-enabled for specific error cases? deep dive on apns docs may be helpful
