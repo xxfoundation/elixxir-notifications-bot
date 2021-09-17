@@ -40,10 +40,6 @@ import (
 
 // Function type definitions for the main operations (poll and notify)
 type NotifyFunc func(*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
-type ApnsSender interface {
-	//Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
-	Push(n *apns2.Notification) (*apns2.Response, error)
-}
 
 // Params struct holds info passed in for configuration
 type Params struct {
