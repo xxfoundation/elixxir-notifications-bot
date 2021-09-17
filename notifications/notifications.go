@@ -38,7 +38,7 @@ import (
 )
 
 // Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(*pb.NotificationData, ApnsSender, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
+type NotifyFunc func(*pb.NotificationData, ApnsSender, *messaging.Client, *firebase.FirebaseComm, *storage.Storage, string) error
 type ApnsSender interface {
 	//Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
 	Push(n *apns2.Notification) (*apns2.Response, error)
@@ -69,6 +69,7 @@ type Impl struct {
 	fcm         *messaging.Client
 	apnsClient  *apns2.Client
 	receivedNdf *uint32
+	params      *Params
 
 	ndfStopper Stopper
 }
@@ -110,6 +111,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		notifyFunc:  notifyUser,
 		fcm:         app,
 		receivedNdf: &receivedNdf,
+		params:      &params,
 	}
 
 	if params.APNS.KeyPath == "" {
@@ -119,7 +121,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 			return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
 		}
 
-		authKey, err := apnstoken.AuthKeyFromFile("params.APNS.KeyPath")
+		authKey, err := apnstoken.AuthKeyFromFile(params.APNS.KeyPath)
 		if err != nil {
 			log.Fatal("token error:", err)
 		}
@@ -131,6 +133,12 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 			TeamID: params.APNS.Issuer,
 		}
 		apnsClient := apns2.NewTokenClient(token)
+		if params.APNS.Dev {
+			jww.INFO.Printf("Running with dev apns gateway")
+			apnsClient.Development()
+		} else {
+			apnsClient.Production()
+		}
 
 		impl.apnsClient = apnsClient
 	}
@@ -170,7 +178,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
+func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage, topic string) error {
 	elist, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -201,6 +209,7 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				Priority:    apns2.PriorityHigh,
 				Payload:     notifPayload,
 				PushType:    apns2.PushTypeAlert,
+				Topic:       topic,
 			}
 			resp, err := apnsClient.Push(notif)
 			//resp, err := apnsClient.Send(u.Token, apns.Payload{
@@ -349,7 +358,7 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 	fbComm := firebase.NewFirebaseComm()
 	for _, notifData := range notifBatch.GetNotifications() {
-		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, fbComm, nb.Storage)
+		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, fbComm, nb.Storage, nb.params.APNS.BundleID)
 		if err != nil {
 			return err
 		}

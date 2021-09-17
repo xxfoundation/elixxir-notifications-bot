@@ -77,7 +77,7 @@ func TestNotifyUser(t *testing.T) {
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, &MockApns{}, nil, fcBadSend, s)
+	}, &MockApns{}, nil, fcBadSend, s, "")
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
@@ -86,7 +86,7 @@ func TestNotifyUser(t *testing.T) {
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, &MockApns{}, nil, fc, s)
+	}, &MockApns{}, nil, fc, s, "")
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -297,7 +297,7 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 	impl := getNewImpl()
 	dataChan := make(chan *pb.NotificationData)
-	impl.notifyFunc = func(data *pb.NotificationData, apns ApnsSender, f *messaging.Client, fc *firebase.FirebaseComm, s *storage.Storage) error {
+	impl.notifyFunc = func(data *pb.NotificationData, apns ApnsSender, f *messaging.Client, fc *firebase.FirebaseComm, s *storage.Storage, topic string) error {
 		go func() { dataChan <- data }()
 		return nil
 	}
