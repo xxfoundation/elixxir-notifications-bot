@@ -37,7 +37,7 @@ func TestSendNotification(t *testing.T) {
 
 // Unit test the NewFirebaseComm method
 func TestNewFirebaseComm(t *testing.T) {
-	comm := NewFirebaseComm()
+	comm := NewFirebaseComm(nil)
 	if comm.SendNotification == nil {
 		t.Error("Failed to set functions in comm")
 	}

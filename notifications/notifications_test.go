@@ -6,15 +6,14 @@
 package notifications
 
 import (
-	"firebase.google.com/go/messaging"
 	"fmt"
-	"github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
 	"github.com/sideshow/apns2"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/firebase"
+	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/csprng"
@@ -29,16 +28,6 @@ import (
 )
 
 var port = 4200
-
-type MockApns struct{}
-
-func (m *MockApns) Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error) {
-	return nil, nil
-}
-
-func (m *MockApns) Push(n *apns2.Notification) (*apns2.Response, error) {
-	return nil, nil
-}
 
 // Test notificationbot's notifyuser function
 // this mocks the setup and send functions, and only tests the core logic of this function
@@ -73,11 +62,13 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}
+
+	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
 	err = notifyUser(&pb.NotificationData{
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, &MockApns{}, nil, fcBadSend, s, "")
+	}, ac, fcBadSend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
@@ -86,7 +77,7 @@ func TestNotifyUser(t *testing.T) {
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, &MockApns{}, nil, fc, s, "")
+	}, ac, fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -297,7 +288,7 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 	impl := getNewImpl()
 	dataChan := make(chan *pb.NotificationData)
-	impl.notifyFunc = func(data *pb.NotificationData, apns ApnsSender, f *messaging.Client, fc *firebase.FirebaseComm, s *storage.Storage, topic string) error {
+	impl.notifyFunc = func(data *pb.NotificationData, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage) error {
 		go func() { dataChan <- data }()
 		return nil
 	}

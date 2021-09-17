@@ -10,7 +10,8 @@ package notifications
 
 import (
 	"encoding/base64"
-	"firebase.google.com/go/messaging"
+	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+
 	// "github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
 	"github.com/sideshow/apns2"
@@ -22,7 +23,7 @@ import (
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/firebase"
+	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/signature/rsa"
@@ -38,7 +39,7 @@ import (
 )
 
 // Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(*pb.NotificationData, ApnsSender, *messaging.Client, *firebase.FirebaseComm, *storage.Storage, string) error
+type NotifyFunc func(*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
 type ApnsSender interface {
 	//Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
 	Push(n *apns2.Notification) (*apns2.Response, error)
@@ -66,10 +67,9 @@ type Impl struct {
 	Storage     *storage.Storage
 	inst        *network.Instance
 	notifyFunc  NotifyFunc
-	fcm         *messaging.Client
-	apnsClient  *apns2.Client
+	fcm         *firebase.FirebaseComm
+	apnsClient  *apns.ApnsComm
 	receivedNdf *uint32
-	params      *Params
 
 	ndfStopper Stopper
 }
@@ -98,20 +98,20 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	}
 
 	// Set up firebase messaging client
-	var app *messaging.Client
+	var fbComm *firebase.FirebaseComm
 	if !noFirebase {
-		app, err = firebase.SetupMessagingApp(params.FBCreds)
+		app, err := firebase.SetupMessagingApp(params.FBCreds)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
 		}
+		fbComm = firebase.NewFirebaseComm(app)
 	}
 	receivedNdf := uint32(0)
 
 	impl := &Impl{
 		notifyFunc:  notifyUser,
-		fcm:         app,
+		fcm:         fbComm,
 		receivedNdf: &receivedNdf,
-		params:      &params,
 	}
 
 	if params.APNS.KeyPath == "" {
@@ -140,7 +140,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 			apnsClient.Production()
 		}
 
-		impl.apnsClient = apnsClient
+		impl.apnsClient = apns.NewApnsComm(apnsClient, params.APNS.BundleID)
 	}
 
 	// Start notification comms server
@@ -178,7 +178,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage, topic string) error {
+func notifyUser(data *pb.NotificationData, apnsClient *apns.ApnsComm, fc *firebase.FirebaseComm, db *storage.Storage) error {
 	elist, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -209,7 +209,7 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				Priority:    apns2.PriorityHigh,
 				Payload:     notifPayload,
 				PushType:    apns2.PushTypeAlert,
-				Topic:       topic,
+				Topic:       apnsClient.GetTopic(),
 			}
 			resp, err := apnsClient.Push(notif)
 			//resp, err := apnsClient.Send(u.Token, apns.Payload{
@@ -239,7 +239,7 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 			}
 		} else {
-			resp, err := fc.SendNotification(fcm, u.Token, data)
+			resp, err := fc.SendNotification(fc.Client, u.Token, data)
 			if err != nil {
 				// Catch two firebase errors that we don't want to crash on
 				// 400 and 404 indicate that the token stored is incorrect
@@ -356,9 +356,8 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
 
-	fbComm := firebase.NewFirebaseComm()
 	for _, notifData := range notifBatch.GetNotifications() {
-		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, fbComm, nb.Storage, nb.params.APNS.BundleID)
+		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, nb.Storage)
 		if err != nil {
 			return err
 		}
