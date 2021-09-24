@@ -7,12 +7,12 @@ require (
 	cloud.google.com/go/firestore v1.1.1 // indirect
 	cloud.google.com/go/pubsub v1.3.1 // indirect
 	firebase.google.com/go v3.12.0+incompatible
-	github.com/jonahh-yeti/apns v0.0.1
 	github.com/pkg/errors v0.9.1
 	github.com/sideshow/apns2 v0.20.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
+	github.com/stretchr/testify v1.7.0 // indirect
 	gitlab.com/elixxir/comms v0.0.4-0.20210923193811-eff1796c4f06
 	gitlab.com/elixxir/crypto v0.0.7-0.20210920180151-6c9b84bae372
 	gitlab.com/xx_network/comms v0.0.4-0.20210921011654-3b73a40ed3d6
