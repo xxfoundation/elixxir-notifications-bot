@@ -10,16 +10,20 @@ package notifications
 
 import (
 	"encoding/base64"
-	"firebase.google.com/go/messaging"
-	"github.com/jonahh-yeti/apns"
+	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+
+	// "github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
+	"github.com/sideshow/apns2"
+	"github.com/sideshow/apns2/payload"
+	apnstoken "github.com/sideshow/apns2/token"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/firebase"
+	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/signature/rsa"
@@ -34,10 +38,7 @@ import (
 )
 
 // Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(*pb.NotificationData, ApnsSender, *messaging.Client, *firebase.FirebaseComm, *storage.Storage) error
-type ApnsSender interface {
-	Send(token string, p apns.Payload, opts ...apns.SendOption) (*apns.Response, error)
-}
+type NotifyFunc func(*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -61,8 +62,8 @@ type Impl struct {
 	Storage     *storage.Storage
 	inst        *network.Instance
 	notifyFunc  NotifyFunc
-	fcm         *messaging.Client
-	apnsClient  *apns.Client
+	fcm         *firebase.FirebaseComm
+	apnsClient  *apns.ApnsComm
 	receivedNdf *uint32
 
 	ndfStopper Stopper
@@ -92,18 +93,19 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	}
 
 	// Set up firebase messaging client
-	var app *messaging.Client
+	var fbComm *firebase.FirebaseComm
 	if !noFirebase {
-		app, err = firebase.SetupMessagingApp(params.FBCreds)
+		app, err := firebase.SetupMessagingApp(params.FBCreds)
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
 		}
+		fbComm = firebase.NewFirebaseComm(app)
 	}
 	receivedNdf := uint32(0)
 
 	impl := &Impl{
 		notifyFunc:  notifyUser,
-		fcm:         app,
+		fcm:         fbComm,
 		receivedNdf: &receivedNdf,
 	}
 
@@ -113,27 +115,27 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if params.APNS.KeyID == "" || params.APNS.Issuer == "" || params.APNS.BundleID == "" {
 			return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
 		}
-		apnsKey, err := utils.ReadFile(params.APNS.KeyPath)
+
+		authKey, err := apnstoken.AuthKeyFromFile(params.APNS.KeyPath)
 		if err != nil {
-			return nil, errors.WithMessage(err, "Failed to read APNS key")
+			return nil, errors.WithMessage(err, "Failed to load auth key from file")
 		}
-		var endpoint apns.ClientOption
+		token := &apnstoken.Token{
+			AuthKey: authKey,
+			// KeyID from developer account (Certificates, Identifiers & Profiles -> Keys)
+			KeyID: params.APNS.KeyID,
+			// TeamID from developer account (View Account -> Membership)
+			TeamID: params.APNS.Issuer,
+		}
+		apnsClient := apns2.NewTokenClient(token)
 		if params.APNS.Dev {
-			jww.INFO.Println("")
-			endpoint = apns.WithEndpoint(apns.DevelopmentGateway)
+			jww.INFO.Printf("Running with dev apns gateway")
+			apnsClient.Development()
 		} else {
-			endpoint = apns.WithEndpoint(apns.ProductionGateway)
+			apnsClient.Production()
 		}
-		apnsClient, err := apns.NewClient(
-			apns.WithJWT(apnsKey, params.APNS.KeyID, params.APNS.Issuer),
-			apns.WithBundleID(params.APNS.BundleID),
-			apns.WithMaxIdleConnections(100),
-			apns.WithTimeout(5*time.Second),
-			endpoint)
-		if err != nil {
-			return nil, errors.WithMessage(err, "Failed to setup apns client")
-		}
-		impl.apnsClient = apnsClient
+
+		impl.apnsClient = apns.NewApnsComm(apnsClient, params.APNS.BundleID)
 	}
 
 	// Start notification comms server
@@ -171,7 +173,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging.Client, fc *firebase.FirebaseComm, db *storage.Storage) error {
+func notifyUser(data *pb.NotificationData, apnsClient *apns.ApnsComm, fc *firebase.FirebaseComm, db *storage.Storage) error {
 	elist, err := db.GetEphemeral(data.EphemeralID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -188,25 +190,23 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 		}
 
 		isAPNS := !strings.Contains(u.Token, ":")
-		mutableContent := 1
+		// mutableContent := 1
 		if isAPNS {
 			jww.INFO.Printf("Notifying ephemeral ID %+v via APNS to token %+v", data.EphemeralID, u.Token)
-			resp, err := apnsClient.Send(u.Token, apns.Payload{
-				APS: apns.APS{
-					Alert: apns.Alert{
-						Title: "Privacy: protected!",
-						Body:  "Some notifications are not for you to ensure privacy; we hope to remove this notification soon",
-					},
-					MutableContent: &mutableContent,
-				},
-				CustomValues: map[string]interface{}{
-					"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-					"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
-				},
-			}, apns.WithExpiration(604800), // 1 week
-				apns.WithPriority(10),
-				apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
-				apns.WithPushType("alert"))
+			notifPayload := payload.NewPayload().AlertTitle("Privacy: protected!").AlertBody(
+				"Some notifications are not for you to ensure privacy; we hope to remove this notification soon").MutableContent().Custom(
+				"messagehash", base64.StdEncoding.EncodeToString(data.MessageHash)).Custom(
+				"identityfingerprint", base64.StdEncoding.EncodeToString(data.IdentityFP))
+			notif := &apns2.Notification{
+				CollapseID:  base64.StdEncoding.EncodeToString(u.TransmissionRSAHash),
+				DeviceToken: u.Token,
+				Expiration:  time.Now().Add(time.Hour * 24 * 7),
+				Priority:    apns2.PriorityHigh,
+				Payload:     notifPayload,
+				PushType:    apns2.PushTypeAlert,
+				Topic:       apnsClient.GetTopic(),
+			}
+			resp, err := apnsClient.Push(notif)
 			if err != nil {
 				jww.ERROR.Printf("Failed to send notification via APNS: %+v: %+v", resp, err)
 				// TODO : Should be re-enabled for specific error cases? deep dive on apns docs may be helpful
@@ -218,7 +218,7 @@ func notifyUser(data *pb.NotificationData, apnsClient ApnsSender, fcm *messaging
 				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 			}
 		} else {
-			resp, err := fc.SendNotification(fcm, u.Token, data)
+			resp, err := fc.SendNotification(fc.Client, u.Token, data)
 			if err != nil {
 				// Catch two firebase errors that we don't want to crash on
 				// 400 and 404 indicate that the token stored is incorrect
@@ -335,9 +335,8 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
 
-	fbComm := firebase.NewFirebaseComm()
 	for _, notifData := range notifBatch.GetNotifications() {
-		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, fbComm, nb.Storage)
+		err := nb.notifyFunc(notifData, nb.apnsClient, nb.fcm, nb.Storage)
 		if err != nil {
 			return err
 		}
