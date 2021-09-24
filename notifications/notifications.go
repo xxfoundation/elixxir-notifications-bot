@@ -33,7 +33,6 @@ import (
 	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
 	"gorm.io/gorm"
-	"log"
 	"strings"
 	"time"
 )
@@ -119,7 +118,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 
 		authKey, err := apnstoken.AuthKeyFromFile(params.APNS.KeyPath)
 		if err != nil {
-			log.Fatal("token error:", err)
+			return nil, errors.WithMessage(err, "Failed to load auth key from file")
 		}
 		token := &apnstoken.Token{
 			AuthKey: authKey,
@@ -208,22 +207,6 @@ func notifyUser(data *pb.NotificationData, apnsClient *apns.ApnsComm, fc *fireba
 				Topic:       apnsClient.GetTopic(),
 			}
 			resp, err := apnsClient.Push(notif)
-			//resp, err := apnsClient.Send(u.Token, apns.Payload{
-			//	APS: apns.APS{
-			//		Alert: apns.Alert{
-			//			Title: "Privacy: protected!",
-			//			Body:  "Some notifications are not for you to ensure privacy; we hope to remove this notification soon",
-			//		},
-			//		MutableContent: &mutableContent,
-			//	},
-			//	CustomValues: map[string]interface{}{
-			//		"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-			//		"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
-			//	},
-			//}, apns.WithExpiration(604800), // 1 week
-			//	apns.WithPriority(10),
-			//	apns.WithCollapseID(base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)),
-			//	apns.WithPushType("alert"))
 			if err != nil {
 				jww.ERROR.Printf("Failed to send notification via APNS: %+v: %+v", resp, err)
 				// TODO : Should be re-enabled for specific error cases? deep dive on apns docs may be helpful
