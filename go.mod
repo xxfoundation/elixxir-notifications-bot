@@ -13,10 +13,10 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.0 // indirect
-	gitlab.com/elixxir/comms v0.0.4-0.20211004181649-32197e4cc5a3
-	gitlab.com/elixxir/crypto v0.0.7-0.20210920180151-6c9b84bae372
-	gitlab.com/xx_network/comms v0.0.4-0.20210921011654-3b73a40ed3d6
-	gitlab.com/xx_network/crypto v0.0.5-0.20210920180047-4dd4aed4a942
+	gitlab.com/elixxir/comms v0.0.4-0.20211006231929-cc2735ca43a6
+	gitlab.com/elixxir/crypto v0.0.7-0.20211006231624-44434504fff4
+	gitlab.com/xx_network/comms v0.0.4-0.20211006231434-99dd38f025a7
+	gitlab.com/xx_network/crypto v0.0.5-0.20211006222352-8e0ac37b86b0
 	gitlab.com/xx_network/primitives v0.0.4-0.20210915220237-70cb4551d6f3
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
