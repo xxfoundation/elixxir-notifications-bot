@@ -11,6 +11,7 @@ package notifications
 import (
 	"encoding/base64"
 	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+	"sync"
 
 	// "github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
@@ -65,6 +66,7 @@ type Impl struct {
 	fcm         *firebase.FirebaseComm
 	apnsClient  *apns.ApnsComm
 	receivedNdf *uint32
+	roundStore  sync.Map
 
 	ndfStopper Stopper
 }
@@ -332,6 +334,13 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 	//if !auth.IsAuthenticated {
 	//	return errors.New("Cannot receive notification data: client is not authenticated")
 	//}
+
+	rid := notifBatch.RoundID
+
+	_, loaded := nb.roundStore.LoadOrStore(rid, true)
+	if loaded {
+		return nil
+	}
 
 	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
 
