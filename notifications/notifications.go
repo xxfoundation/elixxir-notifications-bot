@@ -151,6 +151,8 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	i.SetGatewayAuthentication()
 	impl.inst = i
 
+	go impl.Cleaner()
+
 	return impl, nil
 }
 
