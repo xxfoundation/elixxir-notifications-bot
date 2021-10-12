@@ -337,7 +337,7 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 	rid := notifBatch.RoundID
 
-	_, loaded := nb.roundStore.LoadOrStore(rid, true)
+	_, loaded := nb.roundStore.LoadOrStore(rid, time.Now())
 	if loaded {
 		return nil
 	}
@@ -356,4 +356,18 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 func (nb *Impl) ReceivedNdf() *uint32 {
 	return nb.receivedNdf
+}
+
+func (nb *Impl) Cleaner() {
+	for {
+		f := func(key, val interface{}) bool {
+			t := val.(time.Time)
+			if time.Since(t) > (5 * time.Minute) {
+				nb.roundStore.Delete(key)
+			}
+			return true
+		}
+		nb.roundStore.Range(f)
+		time.Sleep(time.Minute * 10)
+	}
 }
