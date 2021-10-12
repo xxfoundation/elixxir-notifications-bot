@@ -341,6 +341,7 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 
 	_, loaded := nb.roundStore.LoadOrStore(rid, time.Now())
 	if loaded {
+		jww.DEBUG.Printf("Dropping duplicate notification batch for round %+v", notifBatch.RoundID)
 		return nil
 	}
 
