@@ -7,16 +7,17 @@ require (
 	cloud.google.com/go/firestore v1.1.1 // indirect
 	cloud.google.com/go/pubsub v1.3.1 // indirect
 	firebase.google.com/go v3.12.0+incompatible
-	github.com/jonahh-yeti/apns v0.0.1
 	github.com/pkg/errors v0.9.1
+	github.com/sideshow/apns2 v0.20.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20210914232530-b0e625b49552
-	gitlab.com/elixxir/crypto v0.0.7-0.20210914232212-42464d16fff3
-	gitlab.com/xx_network/comms v0.0.4-0.20210914232007-b82fc7baa23c
-	gitlab.com/xx_network/crypto v0.0.5-0.20210914231859-c309efac46c4
-	gitlab.com/xx_network/primitives v0.0.4-0.20210913211733-42dc24dd47df
+	github.com/stretchr/testify v1.7.0 // indirect
+	gitlab.com/elixxir/comms v0.0.4-0.20211014164523-495493efb970
+	gitlab.com/elixxir/crypto v0.0.7-0.20211014164205-95915de2ac0d
+	gitlab.com/xx_network/comms v0.0.4-0.20211014163953-e774276b83ae
+	gitlab.com/xx_network/crypto v0.0.5-0.20211014163843-57b345890686
+	gitlab.com/xx_network/primitives v0.0.4-0.20211014163031-53405cf191fb
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
 	google.golang.org/api v0.20.0

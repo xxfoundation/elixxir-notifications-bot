@@ -17,7 +17,7 @@ before_script:
   - chmod 700 ~/.ssh
   - ssh-keyscan -t rsa $GITLAB_SERVER > ~/.ssh/known_hosts
   - git config --global url."git@$GITLAB_SERVER:".insteadOf "https://gitlab.com/"
-  - git config --global url."git@$GITLAB_SERVER:".insteadOf "https://git.xx.network/"
+  - git config --global url."git@$GITLAB_SERVER:".insteadOf "https://git.xx.network/" --add
   - export PATH=$HOME/go/bin:$PATH
 
 stages:
@@ -56,6 +56,8 @@ build:
 #    - GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.win64 main.go
 #    - GOOS=windows GOARCH=386 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.win32 main.go
     - GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 go build -ldflags '-w -s' -o release/notifications.darwin64 main.go
+
+    - /hash-file.sh release/notifications.linux64
   artifacts:
     paths:
       - vendor/

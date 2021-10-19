@@ -21,13 +21,13 @@ import (
 )
 
 // function types for use in notificationsbot struct
-type SetupFunc func(string) (*messaging.Client, context.Context, error)
 type SendFunc func(FBSender, string, *mixmessages.NotificationData) (string, error)
 
 // FirebaseComm is a struct which holds the functions to setup the messaging app and sending notifications
 // Using a struct in this manner allows us to properly unit test the NotifyUser function
 type FirebaseComm struct {
 	SendNotification SendFunc
+	*messaging.Client
 }
 
 // FBSender is an interface which matches the send function in the messaging app, allowing us to unit test sendNotification
@@ -36,9 +36,10 @@ type FBSender interface {
 }
 
 // NewFirebaseComm create a *FirebaseComm object with the proper setup and send functions
-func NewFirebaseComm() *FirebaseComm {
+func NewFirebaseComm(cl *messaging.Client) *FirebaseComm {
 	return &FirebaseComm{
 		SendNotification: sendNotification,
+		Client:           cl,
 	}
 }
 
