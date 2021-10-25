@@ -95,7 +95,7 @@ func (m *MapImpl) GetAllUsers() ([]*User, error) {
 	return m.allUsers, nil
 }
 
-func (m *MapImpl) upsertEphemeral(ephemeral *Ephemeral) error {
+func (m *MapImpl) insertEphemeral(ephemeral *Ephemeral) error {
 	m.ephIDSeq++
 	ephemeral.ID = uint(m.ephIDSeq)
 	m.ephemeralsById[ephemeral.EphemeralId] = append(m.ephemeralsById[ephemeral.EphemeralId], ephemeral)

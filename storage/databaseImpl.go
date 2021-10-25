@@ -11,7 +11,6 @@ package storage
 import (
 	"github.com/pkg/errors"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // Obtain User from backend by primary key
@@ -68,10 +67,8 @@ func (impl *DatabaseImpl) GetAllUsers() ([]*User, error) {
 	return dest, impl.db.Find(&dest).Error
 }
 
-func (impl *DatabaseImpl) upsertEphemeral(ephemeral *Ephemeral) error {
-	return impl.db.Clauses(clause.OnConflict{
-		UpdateAll: true,
-	}).Create(&ephemeral).Error
+func (impl *DatabaseImpl) insertEphemeral(ephemeral *Ephemeral) error {
+	return impl.db.Create(&ephemeral).Error
 }
 
 func (impl *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
