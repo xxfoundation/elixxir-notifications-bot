@@ -10,9 +10,9 @@ package storage
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
-	"gorm.io/gorm"
 )
 
 // Obtain User from backend by primary key
@@ -96,10 +96,9 @@ func (m *MapImpl) GetAllUsers() ([]*User, error) {
 }
 
 func (m *MapImpl) upsertEphemeral(ephemeral *Ephemeral) error {
-	m.ephIDSeq++
-	ephemeral.ID = uint(m.ephIDSeq)
 	m.ephemeralsById[ephemeral.EphemeralId] = append(m.ephemeralsById[ephemeral.EphemeralId], ephemeral)
-	m.allEphemerals[int(ephemeral.ID)] = ephemeral
+	m.allEphemerals[fmt.Sprintf("%s:%d", base64.StdEncoding.EncodeToString(ephemeral.TransmissionRSAHash), ephemeral.EphemeralId)] = ephemeral
+	m.latest = *ephemeral
 	return nil
 }
 
@@ -120,7 +119,7 @@ func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
 		if elist != nil {
 			for j, e := range elist {
 				if e.Epoch < epoch {
-					delete(m.allEphemerals, int(m.ephemeralsById[i][j].ID))
+					delete(m.allEphemerals, fmt.Sprintf("%s:%d", base64.StdEncoding.EncodeToString(m.ephemeralsById[i][j].TransmissionRSAHash), m.ephemeralsById[i][j].EphemeralId))
 					m.ephemeralsById[i] = append(m.ephemeralsById[i][:j],
 						m.ephemeralsById[i][j+1:]...)
 				}
@@ -132,9 +131,5 @@ func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
 }
 
 func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
-	e, ok := m.allEphemerals[m.ephIDSeq]
-	if !ok {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return e, nil
+	return &m.latest, nil
 }

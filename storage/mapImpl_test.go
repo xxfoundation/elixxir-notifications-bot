@@ -2,6 +2,8 @@ package storage
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
@@ -286,9 +288,8 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 
 func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:       0,
 		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
+		allEphemerals:  map[string]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
@@ -320,11 +321,8 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to upsert ephemeral: %+v", err)
 	}
-
-	if m.ephIDSeq != 1 {
-		t.Error("sequence did not increment")
-	}
-	if m.allEphemerals[m.ephIDSeq] == nil {
+	fmt.Sprintf("%s:%d", base64.StdEncoding.EncodeToString(trsaHash), eid.Int64())
+	if m.allEphemerals[fmt.Sprintf("%s:%d", base64.StdEncoding.EncodeToString(trsaHash), eid.Int64())] == nil {
 		t.Error("Did not insert to allEphemerals")
 	}
 	_, ok := m.ephemeralsById[eid.Int64()]
@@ -335,9 +333,8 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 
 func TestMapImpl_GetEphemeral(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:       0,
 		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
+		allEphemerals:  map[string]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
@@ -382,9 +379,8 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 
 func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:       0,
 		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
+		allEphemerals:  map[string]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
@@ -428,7 +424,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 		t.Errorf("Failed to delete old ephemerals: %+v", err)
 	}
 
-	_, ok := m.allEphemerals[int(e[0].ID)]
+	_, ok := m.allEphemerals[fmt.Sprintf("%s:%d", base64.StdEncoding.EncodeToString(e[0].TransmissionRSAHash), e[0].EphemeralId)]
 	if ok {
 		t.Errorf("Did not delete properly")
 	}
@@ -436,9 +432,8 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 
 func TestMapImpl_GetLatestEphemeral(t *testing.T) {
 	m := &MapImpl{
-		ephIDSeq:       0,
 		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
+		allEphemerals:  map[string]*Ephemeral{},
 		allUsers:       nil,
 		usersByRsaHash: map[string]*User{},
 		usersById:      map[string]*User{},
