@@ -67,7 +67,7 @@ func (impl *DatabaseImpl) GetAllUsers() ([]*User, error) {
 	return dest, impl.db.Find(&dest).Error
 }
 
-func (impl *DatabaseImpl) upsertEphemeral(ephemeral *Ephemeral) error {
+func (impl *DatabaseImpl) insertEphemeral(ephemeral *Ephemeral) error {
 	return impl.db.Create(&ephemeral).Error
 }
 

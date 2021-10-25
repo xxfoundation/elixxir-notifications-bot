@@ -17,7 +17,7 @@ type database interface {
 	GetAllUsers() ([]*User, error)
 	DeleteUserByHash(transmissionRsaHash []byte) error
 
-	upsertEphemeral(ephemeral *Ephemeral) error
+	insertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error

@@ -311,7 +311,7 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 		t.Errorf("Failed to create ephemeral ID: %+v", err)
 	}
 
-	err = m.upsertEphemeral(&Ephemeral{
+	err = m.insertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
 		EphemeralId:         eid.Int64(),
@@ -361,7 +361,7 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
-	err = m.upsertEphemeral(&Ephemeral{
+	err = m.insertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
 		EphemeralId:         eid.Int64(),
@@ -408,7 +408,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
-	err = m.upsertEphemeral(&Ephemeral{
+	err = m.insertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
 		EphemeralId:         eid.Int64(),
@@ -462,7 +462,7 @@ func TestMapImpl_GetLatestEphemeral(t *testing.T) {
 		t.Errorf("FAiled to create ephemeral ID: %+v", err)
 	}
 
-	err = m.upsertEphemeral(&Ephemeral{
+	err = m.insertEphemeral(&Ephemeral{
 		Offset:              0,
 		TransmissionRSAHash: trsaHash,
 		EphemeralId:         eid.Int64(),
