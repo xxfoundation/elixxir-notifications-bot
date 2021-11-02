@@ -112,7 +112,7 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 			Offset:              offset,
 		})
 		if err != nil {
-			return errors.WithMessage(err, "Failed to upsert ephemeral ID for user")
+			return errors.WithMessage(err, "Failed to insert ephemeral ID for user")
 		}
 	}
 	return nil
