@@ -55,7 +55,7 @@ func (s *Storage) AddLatestEphemeral(u *User, epoch int32, size uint) (*Ephemera
 		Epoch:               epoch,
 		Offset:              u.OffsetNum,
 	}
-	err = s.upsertEphemeral(e)
+	err = s.insertEphemeral(e)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (s *Storage) AddLatestEphemeral(u *User, epoch int32, size uint) (*Ephemera
 			Epoch:               epoch + 1,
 			Offset:              u.OffsetNum,
 		}
-		err = s.upsertEphemeral(e)
+		err = s.insertEphemeral(e)
 		if err != nil {
 			return nil, err
 		}
@@ -105,14 +105,14 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 		if err != nil {
 			return errors.WithMessage(err, "Failed to get eid for user")
 		}
-		err = s.upsertEphemeral(&Ephemeral{
+		err = s.insertEphemeral(&Ephemeral{
 			TransmissionRSAHash: u.TransmissionRSAHash,
 			EphemeralId:         eid.Int64(),
 			Epoch:               epoch,
 			Offset:              offset,
 		})
 		if err != nil {
-			return errors.WithMessage(err, "Failed to upsert ephemeral ID for user")
+			return errors.WithMessage(err, "Failed to insert ephemeral ID for user")
 		}
 	}
 	return nil

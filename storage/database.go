@@ -17,7 +17,7 @@ type database interface {
 	GetAllUsers() ([]*User, error)
 	DeleteUserByHash(transmissionRsaHash []byte) error
 
-	upsertEphemeral(ephemeral *Ephemeral) error
+	insertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error
@@ -53,7 +53,7 @@ type User struct {
 type Ephemeral struct {
 	ID                  uint   `gorm:"primaryKey"`
 	Offset              int64  `gorm:"not null; index"`
-	TransmissionRSAHash []byte `gorm:"not null; unique; references users(transmission_rsa_hash)"`
+	TransmissionRSAHash []byte `gorm:"not null; references users(transmission_rsa_hash)"`
 	EphemeralId         int64  `gorm:"not null; index"`
 	Epoch               int32  `gorm:"not null; index"`
 }
