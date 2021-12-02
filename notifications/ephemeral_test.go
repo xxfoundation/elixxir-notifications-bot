@@ -2,12 +2,21 @@ package notifications
 
 import (
 	"fmt"
+	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"os"
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	jww.SetStdoutThreshold(jww.LevelTrace)
+	connect.TestingOnlyDisableTLS = true
+	os.Exit(m.Run())
+}
 
 func TestImpl_InitDeleter(t *testing.T) {
 	s, err := storage.NewStorage("", "", "", "", "")
