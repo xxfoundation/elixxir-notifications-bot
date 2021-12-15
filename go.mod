@@ -13,8 +13,8 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.0 // indirect
-	gitlab.com/elixxir/comms v0.0.4-0.20211215181643-55748529a237
-	gitlab.com/elixxir/crypto v0.0.7-0.20211215181538-688f96f4c4c0
+	gitlab.com/elixxir/comms v0.0.4-0.20211215224705-8972e6ae132f
+	gitlab.com/elixxir/crypto v0.0.7-0.20211215224351-7693f65fe1f4
 	gitlab.com/xx_network/comms v0.0.4-0.20211215181459-0918c1141509
 	gitlab.com/xx_network/crypto v0.0.5-0.20211215175729-3c916d3c5344
 	gitlab.com/xx_network/primitives v0.0.4-0.20211014163031-53405cf191fb
