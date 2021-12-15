@@ -13,11 +13,11 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.0 // indirect
-	gitlab.com/elixxir/comms v0.0.4-0.20211208211635-ad88fa2850b0
-	gitlab.com/elixxir/crypto v0.0.7-0.20211208211534-e1c1462d945f
-	gitlab.com/xx_network/comms v0.0.4-0.20211202195810-9dfc0b6cdb28
-	gitlab.com/xx_network/crypto v0.0.5-0.20211014163843-57b345890686
-	gitlab.com/xx_network/primitives v0.0.4-0.20211014163031-53405cf191fb
+	gitlab.com/elixxir/comms v0.0.4-0.20211215180139-d2725935eb68
+	gitlab.com/elixxir/crypto v0.0.7-0.20211215180030-337c9eab7db5
+	gitlab.com/xx_network/comms v0.0.4-0.20211215175944-c4c319d4f752
+	gitlab.com/xx_network/crypto v0.0.5-0.20211215175916-ef89afff7ea2
+	gitlab.com/xx_network/primitives v0.0.4-0.20211215010517-1917372c5ecc
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
 	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
 	google.golang.org/api v0.20.0
