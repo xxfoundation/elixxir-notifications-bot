@@ -6,18 +6,20 @@ import (
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"sync"
 	"time"
 )
 
 type Storage struct {
 	database
+	LastSent sync.Map
 }
 
 // Create a new Storage object wrapping a database interface
 // Returns a Storage object and error
 func NewStorage(username, password, dbName, address, port string) (*Storage, error) {
 	db, err := newDatabase(username, password, dbName, address, port)
-	storage := &Storage{db}
+	storage := &Storage{db, sync.Map{}}
 	return storage, err
 }
 
@@ -116,4 +118,17 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 		}
 	}
 	return nil
+}
+
+func (s *Storage) StartLastSentCleaner() {
+	go func() {
+		time.Sleep(5 * time.Second)
+		s.LastSent.Range(func(key, value interface{}) bool {
+			lastSent := value.(time.Time)
+			if time.Since(lastSent) > 3*time.Second {
+				s.LastSent.Delete(key)
+			}
+			return true
+		})
+	}()
 }

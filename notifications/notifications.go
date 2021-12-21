@@ -151,6 +151,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	i.SetGatewayAuthentication()
 	impl.inst = i
 
+	impl.Storage.StartLastSentCleaner()
 	go impl.Cleaner()
 
 	return impl, nil
@@ -192,6 +193,13 @@ func notifyUser(data *pb.NotificationData, apnsClient *apns.ApnsComm, fc *fireba
 		if err != nil {
 			return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 		}
+		if t, ok := db.LastSent.Load(u.Token); ok {
+			lastSent := t.(time.Time)
+			if time.Since(lastSent) > 3*time.Second {
+				jww.DEBUG.Printf("Rate limiting token %s [last sent at %+v]", u.Token, lastSent)
+				continue
+			}
+		}
 
 		isAPNS := !strings.Contains(u.Token, ":")
 		// mutableContent := 1
@@ -219,6 +227,7 @@ func notifyUser(data *pb.NotificationData, apnsClient *apns.ApnsComm, fc *fireba
 				//	return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
 				//}
 			} else {
+				db.LastSent.Store(u.Token, time.Now())
 				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", data.EphemeralID, u.Token, resp)
 			}
 		} else {
