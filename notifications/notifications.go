@@ -39,7 +39,7 @@ import (
 )
 
 const notificationsTag = "notificationData"
-const maxNotifications = 50
+const maxNotifications = 20
 
 // Function type definitions for the main operations (poll and notify)
 type NotifyFunc func(int64, []*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
@@ -374,25 +374,25 @@ func (nb *Impl) Cleaner() {
 	}
 
 	cleanTicker := time.NewTicker(time.Minute * 10)
-	sendTicker := time.NewTicker(30*time.Second)
+	sendTicker := time.NewTicker(30 * time.Second)
 
 	for {
-		select{
-			case <- cleanTicker.C:
-				nb.roundStore.Range(cleanF)
-			case <- sendTicker.C:
-				notifBuf := nb.Storage.GetNotificationBuffer()
-				notifMap := notifBuf.Swap(maxNotifications)
-				for ephID := range notifMap{
-					localEphID := ephID
-					notifList := notifMap[localEphID]
-					go func(){
-						err := nb.notifyFunc(localEphID, notifList, nb.apnsClient, nb.fcm, nb.Storage)
-						if err!=nil{
-							jww.ERROR.Printf("Failed to notify %d: %+v", localEphID, err)
-						}
-					}()
-				}
+		select {
+		case <-cleanTicker.C:
+			nb.roundStore.Range(cleanF)
+		case <-sendTicker.C:
+			notifBuf := nb.Storage.GetNotificationBuffer()
+			notifMap := notifBuf.Swap(maxNotifications)
+			for ephID := range notifMap {
+				localEphID := ephID
+				notifList := notifMap[localEphID]
+				go func() {
+					err := nb.notifyFunc(localEphID, notifList, nb.apnsClient, nb.fcm, nb.Storage)
+					if err != nil {
+						jww.ERROR.Printf("Failed to notify %d: %+v", localEphID, err)
+					}
+				}()
+			}
 		}
 	}
 }
