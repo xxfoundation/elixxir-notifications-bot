@@ -8,6 +8,7 @@ package firebase
 import (
 	"context"
 	"firebase.google.com/go/messaging"
+	"testing"
 )
 
 type MockSender struct{}
@@ -17,21 +18,17 @@ const token = "foIh7-NdlksspjDwT8O5kT:APA91bEQUCFeAadkIE-T3fHqAIIYwZm8lks0wQRIp5
 func (MockSender) Send(ctx context.Context, app *messaging.Message) (string, error) {
 	return "test", nil
 }
-/*
+
 // This tests the function which sends a notification to firebase.
 // Note: this requires you to have a valid token & service credentials
 func TestSendNotification(t *testing.T) {
 	app := MockSender{}
 
-	_, err := sendNotification(app, token, &mixmessages.NotificationData{
-		EphemeralID: 12345,
-		IdentityFP:  []byte("testfp"),
-		MessageHash: []byte("testmsghash"),
-	})
+	_, err := sendNotification(app, token, "data")
 	if err != nil {
 		t.Error(err.Error())
 	}
-}*
+}
 
 // Unit test the NewFirebaseComm method
 func TestNewFirebaseComm(t *testing.T) {

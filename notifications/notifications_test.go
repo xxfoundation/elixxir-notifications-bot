@@ -5,15 +5,37 @@
 ////////////////////////////////////////////////////////////////////////////////
 package notifications
 
+import (
+	"fmt"
+	"github.com/pkg/errors"
+	"github.com/sideshow/apns2"
+	pb "gitlab.com/elixxir/comms/mixmessages"
+	"gitlab.com/elixxir/crypto/hash"
+	"gitlab.com/elixxir/crypto/registration"
+	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
+	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/xx_network/comms/connect"
+	"gitlab.com/xx_network/crypto/csprng"
+	"gitlab.com/xx_network/crypto/signature/rsa"
+	"gitlab.com/xx_network/primitives/id"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"gitlab.com/xx_network/primitives/utils"
+	"os"
+	"strings"
+	"testing"
+	"time"
+)
+
 var port = 4200
 
-/*// Test notificationbot's notifyuser function
+// Test notificationbot's notifyuser function
 // this mocks the setup and send functions, and only tests the core logic of this function
 func TestNotifyUser(t *testing.T) {
-	badsend := func(firebase.FBSender, string, *pb.NotificationData) (string, error) {
+	badsend := func(firebase.FBSender, string, string) (string, error) {
 		return "", errors.New("Failed")
 	}
-	send := func(firebase.FBSender, string, *pb.NotificationData) (string, error) {
+	send := func(firebase.FBSender, string, string) (string, error) {
 		return "", nil
 	}
 	fcBadSend := firebase.NewMockFirebaseComm(t, badsend)
@@ -42,20 +64,20 @@ func TestNotifyUser(t *testing.T) {
 	}
 
 	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
-	err = notifyUser(&pb.NotificationData{
+	err = notifyUser(eph.EphemeralId, []*pb.NotificationData{{
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, ac, fcBadSend, s)
+	}}, ac, fcBadSend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
 
-	err = notifyUser(&pb.NotificationData{
+	err = notifyUser(eph.EphemeralId, []*pb.NotificationData{{
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}, ac, fc, s)
+	}}, ac, fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -63,35 +85,35 @@ func TestNotifyUser(t *testing.T) {
 
 // Unit test for startnotifications
 // tests logic including error cases
-//func TestStartNotifications(t *testing.T) {
-//	wd, err := os.Getwd()
-//	if err != nil {
-//		t.Errorf("Failed to get working dir: %+v", err)
-//		return
-//	}
-//
-//	params := Params{
-//		Address: "0.0.0.0:42010",
-//		APNS: APNSParams{
-//			KeyPath:  wd + "/../testutil/apnsKey.key",
-//			KeyID:    "WQT68265C5",
-//			Issuer:   "S6JDM2WW29",
-//			BundleID: "io.xxlabs.messenger",
-//		},
-//	}
-//
-//	params.KeyPath = wd + "/../testutil/cmix.rip.key"
-//	_, err = StartNotifications(params, false, true)
-//	if err == nil || !strings.Contains(err.Error(), "failed to read certificate at") {
-//		t.Errorf("Should have thrown an error for no cert path")
-//	}
-//
-//	params.CertPath = wd + "/../testutil/cmix.rip.crt"
-//	_, err = StartNotifications(params, false, true)
-//	if err != nil {
-//		t.Errorf("Failed to start notifications successfully: %+v", err)
-//	}
-//}
+func TestStartNotifications(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Errorf("Failed to get working dir: %+v", err)
+		return
+	}
+
+	params := Params{
+		Address: "0.0.0.0:42010",
+		APNS: APNSParams{
+			KeyPath:  "",
+			KeyID:    "WQT68265C5",
+			Issuer:   "S6JDM2WW29",
+			BundleID: "io.xxlabs.messenger",
+		},
+	}
+
+	params.KeyPath = wd + "/../testutil/cmix.rip.key"
+	_, err = StartNotifications(params, false, true)
+	if err == nil || !strings.Contains(err.Error(), "failed to read certificate at") {
+		t.Errorf("Should have thrown an error for no cert path")
+	}
+
+	params.CertPath = wd + "/../testutil/cmix.rip.crt"
+	_, err = StartNotifications(params, false, true)
+	if err != nil {
+		t.Errorf("Failed to start notifications successfully: %+v", err)
+	}
+}
 
 // unit test for newimplementation
 // tests logic and error cases
@@ -266,8 +288,8 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 	impl := getNewImpl()
 	dataChan := make(chan *pb.NotificationData)
-	impl.notifyFunc = func(data *pb.NotificationData, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage) error {
-		go func() { dataChan <- data }()
+	impl.notifyFunc = func(eph int64, data []*pb.NotificationData, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage) error {
+		go func() { dataChan <- data[0] }()
 		return nil
 	}
 
@@ -291,14 +313,9 @@ func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 		t.Errorf("ReceiveNotificationBatch() returned an error: %+v", err)
 	}
 
-	select {
-	case result := <-dataChan:
-		if !reflect.DeepEqual(notifBatch.Notifications[0], result) {
-			t.Errorf("Failed to receive expected NotificationData."+
-				"\nexpected: %s\nreceived: %s", notifBatch.Notifications[0], result)
-		}
-	case <-time.NewTimer(50 * time.Millisecond).C:
-		t.Error("Timed out while waiting for NotificationData.")
+	nbm := impl.Storage.GetNotificationBuffer().Swap(20)
+	if len(nbm[5]) < 1 {
+		t.Errorf("Notification was not added to notification buffer")
 	}
 }
 
@@ -313,5 +330,6 @@ func getNewImpl() *Impl {
 	}
 	port += 1
 	instance, _ := StartNotifications(params, false, true)
+	instance.Storage, _ = storage.NewStorage("", "", "", "", "")
 	return instance
-}*/
+}

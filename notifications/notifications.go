@@ -46,11 +46,13 @@ type NotifyFunc func(int64, []*pb.NotificationData, *apns.ApnsComm, *firebase.Fi
 
 // Params struct holds info passed in for configuration
 type Params struct {
-	Address  string
-	CertPath string
-	KeyPath  string
-	FBCreds  string
-	APNS     APNSParams
+	Address               string
+	CertPath              string
+	KeyPath               string
+	FBCreds               string
+	NotificationsPerBatch int
+	NotificationRate      int
+	APNS                  APNSParams
 }
 type APNSParams struct {
 	KeyPath  string
