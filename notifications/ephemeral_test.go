@@ -65,10 +65,12 @@ func TestImpl_InitCreator(t *testing.T) {
 		t.FailNow()
 	}
 	impl, err := StartNotifications(Params{
-		Address:  "",
-		CertPath: "",
-		KeyPath:  "",
-		FBCreds:  "",
+		NotificationsPerBatch: 20,
+		NotificationRate:      30,
+		Address:               "",
+		CertPath:              "",
+		KeyPath:               "",
+		FBCreds:               "",
 	}, true, true)
 	if err != nil {
 		t.Errorf("Failed to create impl: %+v", err)

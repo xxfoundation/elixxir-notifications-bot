@@ -69,13 +69,16 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			jww.FATAL.Panicf("Unable to expand apns key path: %+v", err)
 		}
-
+		viper.SetDefault("notificationRate", 30)
+		viper.SetDefault("notificationsPerBatch", 20)
 		// Populate params
 		NotificationParams = notifications.Params{
-			Address:  localAddress,
-			CertPath: certPath,
-			KeyPath:  keyPath,
-			FBCreds:  fbCreds,
+			Address:               localAddress,
+			CertPath:              certPath,
+			KeyPath:               keyPath,
+			FBCreds:               fbCreds,
+			NotificationRate:      viper.GetInt("notificationRate"),
+			NotificationsPerBatch: viper.GetInt("notificationsPerBatch"),
 			APNS: notifications.APNSParams{
 				KeyPath:  apnsKeyPath,
 				KeyID:    viper.GetString("apnsKeyID"),
