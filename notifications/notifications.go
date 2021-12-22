@@ -198,7 +198,7 @@ func notifyUser(ephID int64, data []*pb.NotificationData, apnsClient *apns.ApnsC
 			return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 		}
 
-		notificationsCSV := MakeNotificationsCSV(data)
+		notificationsCSV := pb.MakeNotificationsCSV(data)
 
 		isAPNS := !strings.Contains(u.Token, ":")
 		// mutableContent := 1
