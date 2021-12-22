@@ -6,10 +6,8 @@
 package firebase
 
 import (
-	"encoding/base64"
 	"firebase.google.com/go/messaging"
 	"github.com/pkg/errors"
-	"gitlab.com/elixxir/comms/mixmessages"
 	"testing"
 	"time"
 
@@ -21,7 +19,7 @@ import (
 )
 
 // function types for use in notificationsbot struct
-type SendFunc func(FBSender, string, *mixmessages.NotificationData) (string, error)
+type SendFunc func(FBSender, string, string) (string, error)
 
 // FirebaseComm is a struct which holds the functions to setup the messaging app and sending notifications
 // Using a struct in this manner allows us to properly unit test the NotifyUser function
@@ -74,13 +72,12 @@ func SetupMessagingApp(serviceKeyPath string) (*messaging.Client, error) {
 // sendNotification accepts a registration token and service account file
 // It gets the proper infrastructure, then builds & sends a notification through the firebase admin API
 // returns string, error (string is of dubious use, but is returned for the time being)
-func sendNotification(app FBSender, token string, data *mixmessages.NotificationData) (string, error) {
+func sendNotification(app FBSender, token string, data string) (string, error) {
 	ctx := context.Background()
 	ttl := 7 * 24 * time.Hour
 	message := &messaging.Message{
 		Data: map[string]string{
-			"messagehash":         base64.StdEncoding.EncodeToString(data.MessageHash),
-			"identityfingerprint": base64.StdEncoding.EncodeToString(data.IdentityFP),
+			"notificationsTag":  data,
 		},
 		Android: &messaging.AndroidConfig{
 			Priority: "high",

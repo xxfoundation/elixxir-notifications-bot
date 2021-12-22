@@ -5,31 +5,9 @@
 ////////////////////////////////////////////////////////////////////////////////
 package notifications
 
-import (
-	"fmt"
-	"github.com/pkg/errors"
-	"github.com/sideshow/apns2"
-	pb "gitlab.com/elixxir/comms/mixmessages"
-	"gitlab.com/elixxir/crypto/hash"
-	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/notifications/apns"
-	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
-	"gitlab.com/elixxir/notifications-bot/storage"
-	"gitlab.com/xx_network/comms/connect"
-	"gitlab.com/xx_network/crypto/csprng"
-	"gitlab.com/xx_network/crypto/signature/rsa"
-	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
-	"gitlab.com/xx_network/primitives/utils"
-	"os"
-	"reflect"
-	"testing"
-	"time"
-)
-
 var port = 4200
 
-// Test notificationbot's notifyuser function
+/*// Test notificationbot's notifyuser function
 // this mocks the setup and send functions, and only tests the core logic of this function
 func TestNotifyUser(t *testing.T) {
 	badsend := func(firebase.FBSender, string, *pb.NotificationData) (string, error) {
@@ -336,4 +314,4 @@ func getNewImpl() *Impl {
 	port += 1
 	instance, _ := StartNotifications(params, false, true)
 	return instance
-}
+}*/
