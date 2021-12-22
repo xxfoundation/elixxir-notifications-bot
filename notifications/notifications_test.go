@@ -93,7 +93,9 @@ func TestStartNotifications(t *testing.T) {
 	}
 
 	params := Params{
-		Address: "0.0.0.0:42010",
+		Address:               "0.0.0.0:42010",
+		NotificationsPerBatch: 20,
+		NotificationRate:      30,
 		APNS: APNSParams{
 			KeyPath:  "",
 			KeyID:    "WQT68265C5",
@@ -323,10 +325,12 @@ func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 func getNewImpl() *Impl {
 	wd, _ := os.Getwd()
 	params := Params{
-		Address:  fmt.Sprintf("0.0.0.0:%d", port),
-		KeyPath:  wd + "/../testutil/cmix.rip.key",
-		CertPath: wd + "/../testutil/cmix.rip.crt",
-		FBCreds:  "",
+		NotificationsPerBatch: 20,
+		NotificationRate:      30,
+		Address:               fmt.Sprintf("0.0.0.0:%d", port),
+		KeyPath:               wd + "/../testutil/cmix.rip.key",
+		CertPath:              wd + "/../testutil/cmix.rip.crt",
+		FBCreds:               "",
 	}
 	port += 1
 	instance, _ := StartNotifications(params, false, true)

@@ -39,7 +39,6 @@ import (
 )
 
 const notificationsTag = "notificationData"
-const maxNotifications = 20
 
 // Function type definitions for the main operations (poll and notify)
 type NotifyFunc func(int64, []*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
@@ -64,14 +63,15 @@ type APNSParams struct {
 
 // Local impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
-	Comms       *notificationBot.Comms
-	Storage     *storage.Storage
-	inst        *network.Instance
-	notifyFunc  NotifyFunc
-	fcm         *firebase.FirebaseComm
-	apnsClient  *apns.ApnsComm
-	receivedNdf *uint32
-	roundStore  sync.Map
+	Comms            *notificationBot.Comms
+	Storage          *storage.Storage
+	inst             *network.Instance
+	notifyFunc       NotifyFunc
+	fcm              *firebase.FirebaseComm
+	apnsClient       *apns.ApnsComm
+	receivedNdf      *uint32
+	roundStore       sync.Map
+	maxNotifications int
 
 	ndfStopper Stopper
 }
@@ -111,9 +111,10 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	receivedNdf := uint32(0)
 
 	impl := &Impl{
-		notifyFunc:  notifyUser,
-		fcm:         fbComm,
-		receivedNdf: &receivedNdf,
+		notifyFunc:       notifyUser,
+		fcm:              fbComm,
+		receivedNdf:      &receivedNdf,
+		maxNotifications: params.NotificationsPerBatch,
 	}
 
 	if params.APNS.KeyPath == "" {
@@ -157,6 +158,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	impl.inst = i
 
 	go impl.Cleaner()
+	go impl.Sender(params.NotificationRate)
 
 	return impl, nil
 }
@@ -376,15 +378,22 @@ func (nb *Impl) Cleaner() {
 	}
 
 	cleanTicker := time.NewTicker(time.Minute * 10)
-	sendTicker := time.NewTicker(30 * time.Second)
 
 	for {
 		select {
 		case <-cleanTicker.C:
 			nb.roundStore.Range(cleanF)
+		}
+	}
+}
+
+func (nb *Impl) Sender(sendFreq int) {
+	sendTicker := time.NewTicker(time.Duration(sendFreq) * time.Second)
+	for {
+		select {
 		case <-sendTicker.C:
 			notifBuf := nb.Storage.GetNotificationBuffer()
-			notifMap := notifBuf.Swap(maxNotifications)
+			notifMap := notifBuf.Swap(uint(nb.maxNotifications))
 			for ephID := range notifMap {
 				localEphID := ephID
 				notifList := notifMap[localEphID]
