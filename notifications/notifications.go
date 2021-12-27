@@ -232,23 +232,27 @@ func notifyUser(ephID int64, data []*pb.NotificationData, apnsClient *apns.ApnsC
 		} else {
 			resp, err := fc.SendNotification(fc.Client, u.Token, notificationsCSV)
 			if err != nil {
-				// Catch two firebase errors that we don't want to crash on
-				// 400 and 404 indicate that the token stored is incorrect
+				// Catch firebase errors that we don't want to crash on
+				// 404 indicate that the token stored is incorrect
 				// this means rather than crashing we should log and unregister the user
+				// 400 can also indicate incorrect token, do extra checking on this (12/27/2021)
 				// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
 				// Stale token documentation: https://firebase.google.com/docs/cloud-messaging/manage-tokens
-				if strings.Contains(err.Error(), "400") || strings.Contains(err.Error(), "404") {
+				jww.ERROR.Printf("Error sending notification: %+v", err)
+				invalidToken := strings.Contains(err.Error(), "400") &&
+					strings.Contains(err.Error(), "Invalid registration")
+				if strings.Contains(err.Error(), "404") || invalidToken {
 					jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
 					err := db.DeleteUserByHash(u.TransmissionRSAHash)
 					if err != nil {
 						return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
 					}
 				} else {
-					jww.ERROR.Printf("Error sending notification: %+v", err)
 					return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
 				}
+			} else {
+				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", ephID, u.Token, resp)
 			}
-			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", ephID, u.Token, resp)
 		}
 	}
 	return nil
