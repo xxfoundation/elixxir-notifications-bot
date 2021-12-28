@@ -310,7 +310,7 @@ func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 
 	nbm := impl.Storage.GetNotificationBuffer().Swap(20, 4096)
 	if nbm[5].Csv.Len() < 1 {
-		t.Errorf("Notification was not added to notification buffer")
+		t.Errorf("Notification was not added to notification buffer: %+v", nbm[5].Csv)
 	}
 }
 

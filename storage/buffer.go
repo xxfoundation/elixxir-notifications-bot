@@ -52,6 +52,11 @@ func (bnm *NotificationBuffer) Swap(maxNotifications uint, maxSize int) map[int6
 				Csv:   &bytes.Buffer{},
 				count: 0,
 			}
+			var ok bool
+			nSlice.Csv, ok = pb.UpdateNotificationCSV(n, nSlice.Csv, maxSize)
+			if !ok {
+				bnm.Add(n)
+			}
 		}
 		outMap[n.EphemeralID] = nSlice
 		return true
