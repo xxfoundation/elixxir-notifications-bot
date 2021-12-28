@@ -9,6 +9,7 @@
 package notifications
 
 import (
+	"bytes"
 	"encoding/base64"
 	"gitlab.com/elixxir/notifications-bot/notifications/apns"
 	"sync"
@@ -41,7 +42,7 @@ import (
 const notificationsTag = "notificationData"
 
 // Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(int64, []*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
+type NotifyFunc func(int64, *bytes.Buffer, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -184,7 +185,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(ephID int64, data []*pb.NotificationData, apnsClient *apns.ApnsComm, fc *firebase.FirebaseComm, db *storage.Storage) error {
+func notifyUser(ephID int64, data *bytes.Buffer, apnsClient *apns.ApnsComm, fc *firebase.FirebaseComm, db *storage.Storage) error {
 	elist, err := db.GetEphemeral(ephID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -200,7 +201,7 @@ func notifyUser(ephID int64, data []*pb.NotificationData, apnsClient *apns.ApnsC
 			return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
 		}
 
-		notificationsCSV := pb.MakeNotificationsCSV(data)
+		notificationsCSV := string(data.Bytes())
 
 		isAPNS := !strings.Contains(u.Token, ":")
 		// mutableContent := 1
@@ -397,12 +398,12 @@ func (nb *Impl) Sender(sendFreq int) {
 		select {
 		case <-sendTicker.C:
 			notifBuf := nb.Storage.GetNotificationBuffer()
-			notifMap := notifBuf.Swap(uint(nb.maxNotifications))
+			notifMap := notifBuf.Swap(uint(nb.maxNotifications), 4096)
 			for ephID := range notifMap {
 				localEphID := ephID
 				notifList := notifMap[localEphID]
 				go func() {
-					err := nb.notifyFunc(localEphID, notifList, nb.apnsClient, nb.fcm, nb.Storage)
+					err := nb.notifyFunc(localEphID, notifList.Csv, nb.apnsClient, nb.fcm, nb.Storage)
 					if err != nil {
 						jww.ERROR.Printf("Failed to notify %d: %+v", localEphID, err)
 					}
