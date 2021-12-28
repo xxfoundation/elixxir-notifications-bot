@@ -6,7 +6,6 @@
 package notifications
 
 import (
-	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/sideshow/apns2"
@@ -65,12 +64,20 @@ func TestNotifyUser(t *testing.T) {
 	}
 
 	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
-	err = notifyUser(eph.EphemeralId, &bytes.Buffer{}, ac, fcBadSend, s)
+	err = notifyUser(eph.EphemeralId, []*pb.NotificationData{{
+		EphemeralID: eph.EphemeralId,
+		IdentityFP:  nil,
+		MessageHash: nil,
+	}}, ac, fcBadSend, s)
 	if err == nil {
 		t.Errorf("Should have returned an error")
 	}
 
-	err = notifyUser(eph.EphemeralId, &bytes.Buffer{}, ac, fc, s)
+	err = notifyUser(eph.EphemeralId, []*pb.NotificationData{{
+		EphemeralID: eph.EphemeralId,
+		IdentityFP:  nil,
+		MessageHash: nil,
+	}}, ac, fc, s)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -282,9 +289,9 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 // Happy path.
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 	impl := getNewImpl()
-	dataChan := make(chan []byte)
-	impl.notifyFunc = func(eph int64, data *bytes.Buffer, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage) error {
-		go func() { dataChan <- data.Bytes() }()
+	dataChan := make(chan *pb.NotificationData)
+	impl.notifyFunc = func(eph int64, data []*pb.NotificationData, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage) error {
+		go func() { dataChan <- data[0] }()
 		return nil
 	}
 
@@ -308,9 +315,9 @@ func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 		t.Errorf("ReceiveNotificationBatch() returned an error: %+v", err)
 	}
 
-	nbm := impl.Storage.GetNotificationBuffer().Swap(20, 4096)
-	if nbm[5].Csv.Len() < 1 {
-		t.Errorf("Notification was not added to notification buffer: %+v", nbm[5].Csv)
+	nbm := impl.Storage.GetNotificationBuffer().Swap(20)
+	if len(nbm[5]) < 1 {
+		t.Errorf("Notification was not added to notification buffer: %+v", nbm[5])
 	}
 }
 

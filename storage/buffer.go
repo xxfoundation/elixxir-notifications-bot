@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"bytes"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"strconv"
 	"sync"
@@ -11,11 +10,6 @@ import (
 type NotificationBuffer struct {
 	bufMap  atomic.Value
 	counter *int64
-}
-
-type NotificationCSV struct {
-	Csv   *bytes.Buffer
-	count uint
 }
 
 func NewNotificationBuffer() *NotificationBuffer {
@@ -29,34 +23,22 @@ func NewNotificationBuffer() *NotificationBuffer {
 	return nb
 }
 
-func (bnm *NotificationBuffer) Swap(maxNotifications uint, maxSize int) map[int64]NotificationCSV {
+func (bnm *NotificationBuffer) Swap(maxNotifications uint) map[int64][]*pb.NotificationData {
 	newSM := &sync.Map{}
 	m := bnm.bufMap.Swap(newSM).(*sync.Map)
 
-	outMap := make(map[int64]NotificationCSV)
+	outMap := make(map[int64][]*pb.NotificationData)
 	f := func(_, value interface{}) bool {
 		n := value.(*pb.NotificationData)
 		nSlice, exists := outMap[n.EphemeralID]
 		if exists {
-			if nSlice.count >= maxNotifications || nSlice.Csv.Len() >= maxSize {
+			if uint(len(nSlice)) >= maxNotifications {
 				bnm.Add(n)
 			} else {
-				var ok bool
-				nSlice.Csv, ok = pb.UpdateNotificationCSV(n, nSlice.Csv, maxSize)
-				if !ok {
-					bnm.Add(n)
-				}
+				nSlice = append(nSlice, n)
 			}
 		} else {
-			nSlice = NotificationCSV{
-				Csv:   &bytes.Buffer{},
-				count: 0,
-			}
-			var ok bool
-			nSlice.Csv, ok = pb.UpdateNotificationCSV(n, nSlice.Csv, maxSize)
-			if !ok {
-				bnm.Add(n)
-			}
+			nSlice = []*pb.NotificationData{n}
 		}
 		outMap[n.EphemeralID] = nSlice
 		return true

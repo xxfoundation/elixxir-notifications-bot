@@ -391,6 +391,8 @@ gitlab.com/elixxir/comms v0.0.4-0.20211228150016-76f94b5a6f38 h1:dWY+Mefvy4FR1wz
 gitlab.com/elixxir/comms v0.0.4-0.20211228150016-76f94b5a6f38/go.mod h1:RzQ0m/+09p7K/wvdQoSZ+P4NU4FWtS6MxsjFOlcee9s=
 gitlab.com/elixxir/comms v0.0.4-0.20211228161118-eb558a5eec7d h1:9/l5zgh5dRtQTFiuNLs6V3iACeqg51ys4RkLw/F4XQQ=
 gitlab.com/elixxir/comms v0.0.4-0.20211228161118-eb558a5eec7d/go.mod h1:RzQ0m/+09p7K/wvdQoSZ+P4NU4FWtS6MxsjFOlcee9s=
+gitlab.com/elixxir/comms v0.0.4-0.20211228170018-18a2653e9847 h1:Yt+rRA4RJcpGMllRDUtSfaGTSKsRAZTMWdRRKq6oLVY=
+gitlab.com/elixxir/comms v0.0.4-0.20211228170018-18a2653e9847/go.mod h1:RzQ0m/+09p7K/wvdQoSZ+P4NU4FWtS6MxsjFOlcee9s=
 gitlab.com/elixxir/crypto v0.0.0-20200804182833-984246dea2c4/go.mod h1:ucm9SFKJo+K0N2GwRRpaNr+tKXMIOVWzmyUD0SbOu2c=
 gitlab.com/elixxir/crypto v0.0.3/go.mod h1:ZNgBOblhYToR4m8tj4cMvJ9UsJAUKq+p0gCp07WQmhA=
 gitlab.com/elixxir/crypto v0.0.7-0.20211222194952-736897f54f09 h1:gMbXI+gsKaZyyriGrYOFihf40R6UMcuEE6NfpM+dpp8=
