@@ -71,7 +71,8 @@ var rootCmd = &cobra.Command{
 		}
 		viper.SetDefault("notificationRate", 30)
 		viper.SetDefault("notificationsPerBatch", 20)
-		viper.SetDefault("maxNotificationPayload", 4096)
+		// This is set to approx. 90% of the stated limit (4096)
+		viper.SetDefault("maxNotificationPayload", 3686)
 		// Populate params
 		NotificationParams = notifications.Params{
 			Address:                localAddress,
