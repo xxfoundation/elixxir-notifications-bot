@@ -46,13 +46,14 @@ type NotifyFunc func(int64, []*notifications.Data, *apns.ApnsComm,
 
 // Params struct holds info passed in for configuration
 type Params struct {
-	Address               string
-	CertPath              string
-	KeyPath               string
-	FBCreds               string
-	NotificationsPerBatch int
-	NotificationRate      int
-	APNS                  APNSParams
+	Address                string
+	CertPath               string
+	KeyPath                string
+	FBCreds                string
+	NotificationsPerBatch  int
+	MaxNotificationPayload int
+	NotificationRate       int
+	APNS                   APNSParams
 }
 type APNSParams struct {
 	KeyPath  string
@@ -117,6 +118,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		fcm:              fbComm,
 		receivedNdf:      &receivedNdf,
 		maxNotifications: params.NotificationsPerBatch,
+		maxPayloadBytes:  params.MaxNotificationPayload,
 	}
 
 	if params.APNS.KeyPath == "" {
