@@ -15,6 +15,7 @@ import (
 	"gitlab.com/elixxir/notifications-bot/notifications/apns"
 	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/csprng"
 	"gitlab.com/xx_network/crypto/signature/rsa"
@@ -23,6 +24,7 @@ import (
 	"gitlab.com/xx_network/primitives/utils"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -64,20 +66,20 @@ func TestNotifyUser(t *testing.T) {
 	}
 
 	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
-	err = notifyUser(eph.EphemeralId, []*pb.NotificationData{{
+	_, err = notifyUser(eph.EphemeralId, []*notifications.Data{{
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}}, ac, fcBadSend, s)
-	if err == nil {
-		t.Errorf("Should have returned an error")
+	}}, ac, fcBadSend, s, 20, 4096)
+	if err != nil {
+		t.Errorf("This no longer returns an error but should print one to log - not testable but leaving the case")
 	}
 
-	err = notifyUser(eph.EphemeralId, []*pb.NotificationData{{
+	_, err = notifyUser(eph.EphemeralId, []*notifications.Data{{
 		EphemeralID: eph.EphemeralId,
 		IdentityFP:  nil,
 		MessageHash: nil,
-	}}, ac, fc, s)
+	}}, ac, fc, s, 20, 4096)
 	if err != nil {
 		t.Errorf("Failed to notify user properly")
 	}
@@ -288,11 +290,18 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 
 // Happy path.
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
-	impl := getNewImpl()
-	dataChan := make(chan *pb.NotificationData)
-	impl.notifyFunc = func(eph int64, data []*pb.NotificationData, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage) error {
+	dataChan := make(chan *notifications.Data)
+
+	s, err := storage.NewStorage("", "", "", "", "")
+	impl := &Impl{
+		Storage:          s,
+		roundStore:       sync.Map{},
+		maxNotifications: 0,
+		maxPayloadBytes:  0,
+	}
+	impl.notifyFunc = func(eph int64, data []*notifications.Data, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage, batchSize, maxBytes int) ([]*notifications.Data, error) {
 		go func() { dataChan <- data[0] }()
-		return nil
+		return nil, nil
 	}
 
 	notifBatch := &pb.NotificationBatch{
@@ -310,12 +319,12 @@ func TestImpl_ReceiveNotificationBatch(t *testing.T) {
 		IsAuthenticated: true,
 	}
 
-	err := impl.ReceiveNotificationBatch(notifBatch, auth)
+	err = impl.ReceiveNotificationBatch(notifBatch, auth)
 	if err != nil {
 		t.Errorf("ReceiveNotificationBatch() returned an error: %+v", err)
 	}
 
-	nbm := impl.Storage.GetNotificationBuffer().Swap(20)
+	nbm := impl.Storage.GetNotificationBuffer().Swap()
 	if len(nbm[5]) < 1 {
 		t.Errorf("Notification was not added to notification buffer: %+v", nbm[5])
 	}

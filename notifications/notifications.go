@@ -13,7 +13,6 @@ import (
 	"gitlab.com/elixxir/notifications-bot/notifications/apns"
 	"sync"
 
-	// "github.com/jonahh-yeti/apns"
 	"github.com/pkg/errors"
 	"github.com/sideshow/apns2"
 	"github.com/sideshow/apns2/payload"
@@ -26,6 +25,7 @@ import (
 	"gitlab.com/elixxir/crypto/registration"
 	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
@@ -41,7 +41,8 @@ import (
 const notificationsTag = "notificationData"
 
 // Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(int64, []*pb.NotificationData, *apns.ApnsComm, *firebase.FirebaseComm, *storage.Storage) error
+type NotifyFunc func(int64, []*notifications.Data, *apns.ApnsComm,
+	*firebase.FirebaseComm, *storage.Storage, int, int) ([]*notifications.Data, error)
 
 // Params struct holds info passed in for configuration
 type Params struct {
@@ -72,6 +73,7 @@ type Impl struct {
 	receivedNdf      *uint32
 	roundStore       sync.Map
 	maxNotifications int
+	maxPayloadBytes  int
 
 	ndfStopper Stopper
 }
@@ -184,27 +186,35 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 // NotifyUser accepts a UID and service key file path.
 // It handles the logic involved in retrieving a user's token and sending the notification
-func notifyUser(ephID int64, data []*pb.NotificationData, apnsClient *apns.ApnsComm, fc *firebase.FirebaseComm, db *storage.Storage) error {
+func notifyUser(ephID int64, data []*notifications.Data, apnsClient *apns.ApnsComm,
+	fc *firebase.FirebaseComm, db *storage.Storage, maxBatchSize, maxBytes int) ([]*notifications.Data, error) {
 	elist, err := db.GetEphemeral(ephID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			jww.DEBUG.Printf("No registration found for ephemeral ID %+v", ephID)
 			// This path is not an error.  if no results are returned, the user hasn't registered for notifications
-			return nil
+			return nil, nil
 		}
-		return errors.WithMessagef(err, "Could not retrieve registration for ephemeral ID %+v", ephID)
+		return nil, errors.WithMessagef(err, "Could not retrieve registration for ephemeral ID %+v", ephID)
 	}
+	var overflow []*notifications.Data
+	if len(data) > maxBatchSize {
+		overflow = data[maxBatchSize:]
+		data = data[:maxBatchSize]
+	}
+
+	notifs, rest := notifications.BuildNotificationCSV(data, maxBytes-len([]byte(notificationsTag)))
+	for _, nd := range rest {
+		db.GetNotificationBuffer().Add(id.Round(nd.RoundID), []*notifications.Data{nd}) // TODO build lists by rid for more efficient re-insertion?  Accumulator would let us do this with the other size check in swap
+	}
+	overflow = append(overflow, rest...)
+	notificationsCSV := string(notifs)
+
 	for _, e := range elist {
 		u, err := db.GetUserByHash(e.TransmissionRSAHash)
 		if err != nil {
-			return errors.WithMessagef(err, "Failed to lookup user with tRSA hash %+v", e.TransmissionRSAHash)
+			jww.ERROR.Printf("Failed to lookup user with tRSA hash %+v: %+v", e.TransmissionRSAHash, err)
 		}
-
-		notifs, rest := pb.BuildNotificationCSV(data, 4096-len([]byte(notificationsTag)))
-		for _, nd := range rest {
-			db.GetNotificationBuffer().Add(nd)
-		}
-		notificationsCSV := string(notifs)
 
 		isAPNS := !strings.Contains(u.Token, ":")
 		// mutableContent := 1
@@ -249,17 +259,17 @@ func notifyUser(ephID int64, data []*pb.NotificationData, apnsClient *apns.ApnsC
 					jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", u.TransmissionRSAHash)
 					err := db.DeleteUserByHash(u.TransmissionRSAHash)
 					if err != nil {
-						return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
+						jww.ERROR.Printf("Failed to remove user registration tRSA hash %+v: %+v", u.TransmissionRSAHash, err)
 					}
 				} else {
-					return errors.WithMessagef(err, "Failed to send notification to user with tRSA hash %+v", u.TransmissionRSAHash)
+					jww.ERROR.Printf("Failed to send notification to user with tRSA hash %+v: %+v", u.TransmissionRSAHash, err)
 				}
 			} else {
 				jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", ephID, u.Token, resp)
 			}
 		}
 	}
-	return nil
+	return overflow, nil
 }
 
 // RegisterForNotifications is called by the client, and adds a user registration to our database
@@ -364,12 +374,23 @@ func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth 
 	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
 
 	buffer := nb.Storage.GetNotificationBuffer()
-
-	for _, notifData := range notifBatch.GetNotifications() {
-		buffer.Add(notifData)
-	}
+	data := processNotificationBatch(notifBatch)
+	buffer.Add(id.Round(notifBatch.RoundID), data)
 
 	return nil
+}
+
+func processNotificationBatch(l *pb.NotificationBatch) []*notifications.Data {
+	var res []*notifications.Data
+	for _, item := range l.Notifications {
+		res = append(res, &notifications.Data{
+			EphemeralID: item.EphemeralID,
+			RoundID:     l.RoundID,
+			IdentityFP:  item.IdentityFP,
+			MessageHash: item.MessageHash,
+		})
+	}
+	return res
 }
 
 func (nb *Impl) ReceivedNdf() *uint32 {
@@ -400,18 +421,25 @@ func (nb *Impl) Sender(sendFreq int) {
 	for {
 		select {
 		case <-sendTicker.C:
-			notifBuf := nb.Storage.GetNotificationBuffer()
-			notifMap := notifBuf.Swap(uint(nb.maxNotifications))
-			for ephID := range notifMap {
-				localEphID := ephID
-				notifList := notifMap[localEphID]
-				go func() {
-					err := nb.notifyFunc(localEphID, notifList, nb.apnsClient, nb.fcm, nb.Storage)
+			go func() {
+				notifBuf := nb.Storage.GetNotificationBuffer()
+				notifMap := notifBuf.Swap()
+				unsent := map[uint64][]*notifications.Data{}
+				for ephID := range notifMap {
+					localEphID := ephID
+					notifList := notifMap[localEphID]
+					rest, err := nb.notifyFunc(localEphID, notifList, nb.apnsClient, nb.fcm, nb.Storage, nb.maxNotifications, nb.maxPayloadBytes)
 					if err != nil {
 						jww.ERROR.Printf("Failed to notify %d: %+v", localEphID, err)
 					}
-				}()
-			}
+					for _, n := range rest {
+						unsent[n.RoundID] = append(unsent[n.RoundID], n)
+					}
+				}
+				for rid, nd := range unsent {
+					notifBuf.Add(id.Round(rid), nd)
+				}
+			}()
 		}
 	}
 }
