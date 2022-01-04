@@ -18,7 +18,7 @@ func (impl *DatabaseImpl) GetUser(userId []byte) (*User, error) {
 	u := &User{}
 	err := impl.db.Take(u, "intermediary_id = ?", userId).Error
 	if err != nil {
-		return nil, errors.Errorf("Failed to retrieve user with ID %s: %+v", userId, err)
+		return nil, err
 	}
 	return u, nil
 }
@@ -28,7 +28,7 @@ func (impl *DatabaseImpl) GetUserByHash(transmissionRsaHash []byte) (*User, erro
 	u := &User{}
 	err := impl.db.Take(u, "transmission_rsa_hash = ?", transmissionRsaHash).Error
 	if err != nil {
-		return nil, errors.Errorf("Failed to retrieve user with tRSA hash %s: %+v", transmissionRsaHash, err)
+		return nil, err
 	}
 	return u, nil
 }
