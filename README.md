@@ -42,5 +42,9 @@ apnsKeyID: ""
 apnsIssuer: ""
 apnsBundleID: ""
 apnsDev: true
+
+# Notification params
+notificationRate: 30  # Duration in seconds
+notificationsPerBatch: 20
 # === END YAML
 ```

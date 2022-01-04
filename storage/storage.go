@@ -11,13 +11,15 @@ import (
 
 type Storage struct {
 	database
+	notificationBuffer *NotificationBuffer
 }
 
 // Create a new Storage object wrapping a database interface
 // Returns a Storage object and error
 func NewStorage(username, password, dbName, address, port string) (*Storage, error) {
 	db, err := newDatabase(username, password, dbName, address, port)
-	storage := &Storage{db}
+	nb := NewNotificationBuffer()
+	storage := &Storage{db, nb}
 	return storage, err
 }
 
@@ -116,4 +118,8 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 		}
 	}
 	return nil
+}
+
+func (s *Storage) GetNotificationBuffer()*NotificationBuffer {
+	return s.notificationBuffer
 }
