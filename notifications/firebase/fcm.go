@@ -77,7 +77,7 @@ func sendNotification(app FBSender, token string, data string) (string, error) {
 	ttl := 7 * 24 * time.Hour
 	message := &messaging.Message{
 		Data: map[string]string{
-			"notificationsTag":  data,
+			"notificationsTag": data, // TODO: swap to notificationsTag constant from notifications package (move to avoid circular dep)
 		},
 		Android: &messaging.AndroidConfig{
 			Priority: "high",
