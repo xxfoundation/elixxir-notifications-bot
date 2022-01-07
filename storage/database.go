@@ -2,10 +2,12 @@ package storage
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"time"
 )
 
 // interface declaration for storage methods
@@ -104,6 +106,20 @@ func newDatabase(username, password, dbName, address,
 
 		return database(mapImpl), nil
 	}
+
+	// Get and configure the internal database ConnPool
+	sqlDb, err := db.DB()
+	if err != nil {
+		return database(&DatabaseImpl{}), errors.Errorf("Unable to configure database connection pool: %+v", err)
+	}
+	// SetMaxIdleConns sets the maximum number of connections in the idle connection pool.
+	sqlDb.SetMaxIdleConns(10)
+	// SetMaxOpenConns sets the maximum number of open connections to the Database.
+	sqlDb.SetMaxOpenConns(50)
+	// SetConnMaxLifetime sets the maximum amount of time a connection may be idle.
+	sqlDb.SetConnMaxIdleTime(10 * time.Minute)
+	// SetConnMaxLifetime sets the maximum amount of time a connection may be reused.
+	sqlDb.SetConnMaxLifetime(12 * time.Hour)
 
 	// Initialize the database schema
 	// WARNING: Order is important. Do not change without database testing

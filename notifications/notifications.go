@@ -216,6 +216,7 @@ func notifyUser(ephID int64, data []*notifications.Data, apnsClient *apns.ApnsCo
 		u, err := db.GetUserByHash(e.TransmissionRSAHash)
 		if err != nil {
 			jww.ERROR.Printf("Failed to lookup user with tRSA hash %+v: %+v", e.TransmissionRSAHash, err)
+			continue
 		}
 
 		isAPNS := !strings.Contains(u.Token, ":")
