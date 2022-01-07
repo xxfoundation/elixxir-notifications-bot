@@ -11,7 +11,7 @@ import (
 // This file contains testing for mapImpl.go
 
 func TestDatabaseImpl(t *testing.T) {
-	s, err := NewStorage("jonahhusson", "", "nbtest", "0.0.0.0", "5432")
+	s, err := NewStorage("", "", "nbtest", "0.0.0.0", "5432")
 	if err != nil {
 		t.Errorf("Failed to create db: %+v", err)
 		t.FailNow()
@@ -65,7 +65,7 @@ func TestDatabaseImpl(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
-	_, err = s.AddLatestEphemeral(u2, 5, 16)
+	e1, err := s.AddLatestEphemeral(u2, 5, 16)
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}
@@ -75,14 +75,22 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("failed to update ephemerals for offset: %+v", err)
 	}
 
-	e, err := s.GetLatestEphemeral()
+	e2, err := s.GetLatestEphemeral()
 	if err != nil {
 		t.Errorf("Failed to get latest ephemeral: %+v", err)
 	}
 
-	_, err = s.GetEphemeral(e.EphemeralId)
+	_, err = s.GetEphemeral(e2.EphemeralId)
 	if err != nil {
 		t.Errorf("Failed to get ephemeral: %+v", err)
+	}
+
+	res, err := s.GetToNotify([]int64{e2.EphemeralId, e1.EphemeralId})
+	if err != nil {
+		t.Errorf("Failed to get list to notify: %+v", err)
+	}
+	if len(res) != 2 {
+		t.Errorf("Expected 2 GTNResults, instead got %+v", res)
 	}
 
 	err = s.DeleteOldEphemerals(6)
