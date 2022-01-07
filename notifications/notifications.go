@@ -33,7 +33,6 @@ import (
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
-	"gorm.io/gorm"
 	"strings"
 	"time"
 )
@@ -68,7 +67,6 @@ type Impl struct {
 	Comms            *notificationBot.Comms
 	Storage          *storage.Storage
 	inst             *network.Instance
-	notifyFunc       NotifyFunc
 	fcm              *firebase.FirebaseComm
 	apnsClient       *apns.ApnsComm
 	receivedNdf      *uint32
@@ -114,7 +112,6 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	receivedNdf := uint32(0)
 
 	impl := &Impl{
-		notifyFunc:       notifyUser,
 		fcm:              fbComm,
 		receivedNdf:      &receivedNdf,
 		maxNotifications: params.NotificationsPerBatch,
@@ -186,32 +183,34 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	return impl
 }
 
-func (nb *Impl) SendBatch(data map[int64][]*notifications.Data, maxBatchSize, maxBytes int) error {
+func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notifications.Data, error) {
 	csvs := map[int64]string{}
 	var ephemerals []int64
+	var unsent []*notifications.Data
 	for i, ilist := range data {
 		var overflow, trimmed []*notifications.Data
-		if len(data) > maxBatchSize {
-			overflow = ilist[maxBatchSize:]
-			trimmed = ilist[:maxBatchSize]
+		if len(data) > nb.maxNotifications {
+			overflow = ilist[nb.maxNotifications:]
+			trimmed = ilist[:nb.maxNotifications]
 		}
 
-		notifs, rest := notifications.BuildNotificationCSV(trimmed, maxBytes-len([]byte(notificationsTag)))
+		notifs, rest := notifications.BuildNotificationCSV(trimmed, nb.maxPayloadBytes-len([]byte(notificationsTag)))
 		for _, nd := range rest {
 			nb.Storage.GetNotificationBuffer().Add(id.Round(nd.RoundID), []*notifications.Data{nd}) // TODO build lists by rid for more efficient re-insertion?  Accumulator would let us do this with the other size check in swap
 		}
 		overflow = append(overflow, rest...)
 		csvs[i] = string(notifs)
 		ephemerals = append(ephemerals, i)
+		unsent = append(unsent, overflow...)
 	}
 	toNotify, err := nb.Storage.GetToNotify(ephemerals)
 	if err != nil {
-		return errors.WithMessage(err, "Failed to get list of tokens to notify")
+		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
 	}
 	for _, n := range toNotify {
 		nb.notify(n.Token, csvs[n.EphemeralId], n.EphemeralId, n.TransmissionRSAHash)
 	}
-	return nil
+	return unsent, nil
 }
 
 func (nb *Impl) notify(token, csv string, ephID int64, transmissionRSAHash []byte) {
@@ -422,13 +421,15 @@ func (nb *Impl) Sender(sendFreq int) {
 				notifBuf := nb.Storage.GetNotificationBuffer()
 				notifMap := notifBuf.Swap()
 				unsent := map[uint64][]*notifications.Data{}
-				for ephID := range notifMap {
-					localEphID := ephID
-					notifList := notifMap[localEphID]
-					rest, err := nb.notifyFunc(localEphID, notifList, nb.apnsClient, nb.fcm, nb.Storage, nb.maxNotifications, nb.maxPayloadBytes)
-					if err != nil {
-						jww.ERROR.Printf("Failed to notify %d: %+v", localEphID, err)
+				rest, err := nb.SendBatch(notifMap)
+				if err != nil {
+					jww.ERROR.Printf("Failed to send notification batch: %+v", err)
+					for _, elist := range notifMap {
+						for _, n := range elist {
+							unsent[n.RoundID] = append(unsent[n.RoundID], n)
+						}
 					}
+				} else {
 					for _, n := range rest {
 						unsent[n.RoundID] = append(unsent[n.RoundID], n)
 					}
