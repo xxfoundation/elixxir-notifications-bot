@@ -14,7 +14,7 @@ require (
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.0 // indirect
 	gitlab.com/elixxir/comms v0.0.4-0.20220104182551-5f9da6b4a832
-	gitlab.com/elixxir/crypto v0.0.7-0.20220104182450-8ae43b36323a
+	gitlab.com/elixxir/crypto v0.0.7-0.20220107212555-7b80ecaff6d6
 	gitlab.com/elixxir/primitives v0.0.3-0.20220104173924-275cb9d7834f
 	gitlab.com/xx_network/comms v0.0.4-0.20211227194445-c099754b3cda
 	gitlab.com/xx_network/crypto v0.0.5-0.20211227194420-f311e8920467
