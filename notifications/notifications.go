@@ -183,6 +183,8 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	return impl
 }
 
+// SendBatch accepts the map of ephemeralID:list[notifications.Data]
+// It handles logic for building the CSV & sending to devices
 func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notifications.Data, error) {
 	csvs := map[int64]string{}
 	var ephemerals []int64
@@ -208,22 +210,23 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
 	}
 	for _, n := range toNotify {
-		nb.notify(n.Token, csvs[n.EphemeralId], n.EphemeralId, n.TransmissionRSAHash)
+		nb.notify(csvs[n.EphemeralId], n)
 	}
 	return unsent, nil
 }
 
-func (nb *Impl) notify(token, csv string, ephID int64, transmissionRSAHash []byte) {
-	isAPNS := !strings.Contains(token, ":")
+// notify is a helper function which handles sending notifications to either APNS or firebase
+func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
+	isAPNS := !strings.Contains(toNotify.Token, ":")
 	// mutableContent := 1
 	if isAPNS {
-		jww.INFO.Printf("Notifying ephemeral ID %+v via APNS to token %+v", ephID, token)
+		jww.INFO.Printf("Notifying ephemeral ID %+v via APNS to token %+v", toNotify.EphemeralId, toNotify.Token)
 		notifPayload := payload.NewPayload().AlertTitle("Privacy: protected!").AlertBody(
 			"Some notifications are not for you to ensure privacy; we hope to remove this notification soon").MutableContent().Custom(
 			notificationsTag, csv)
 		notif := &apns2.Notification{
-			CollapseID:  base64.StdEncoding.EncodeToString(transmissionRSAHash),
-			DeviceToken: token,
+			CollapseID:  base64.StdEncoding.EncodeToString(toNotify.TransmissionRSAHash),
+			DeviceToken: toNotify.Token,
 			Expiration:  time.Now().Add(time.Hour * 24 * 7),
 			Priority:    apns2.PriorityHigh,
 			Payload:     notifPayload,
@@ -239,10 +242,10 @@ func (nb *Impl) notify(token, csv string, ephID int64, transmissionRSAHash []byt
 			//	return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
 			//}
 		} else {
-			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", ephID, token, resp)
+			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", toNotify.EphemeralId, toNotify.Token, resp)
 		}
 	} else {
-		resp, err := nb.fcm.SendNotification(nb.fcm.Client, token, csv)
+		resp, err := nb.fcm.SendNotification(nb.fcm.Client, toNotify.Token, csv)
 		if err != nil {
 			// Catch firebase errors that we don't want to crash on
 			// 404 indicate that the token stored is incorrect
@@ -254,16 +257,16 @@ func (nb *Impl) notify(token, csv string, ephID int64, transmissionRSAHash []byt
 			invalidToken := strings.Contains(err.Error(), "400") &&
 				strings.Contains(err.Error(), "Invalid registration")
 			if strings.Contains(err.Error(), "404") || invalidToken {
-				jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", transmissionRSAHash)
-				err := nb.Storage.DeleteUserByHash(transmissionRSAHash)
+				jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", toNotify.TransmissionRSAHash)
+				err := nb.Storage.DeleteUserByHash(toNotify.TransmissionRSAHash)
 				if err != nil {
-					jww.ERROR.Printf("Failed to remove user registration tRSA hash %+v: %+v", transmissionRSAHash, err)
+					jww.ERROR.Printf("Failed to remove user registration tRSA hash %+v: %+v", toNotify.TransmissionRSAHash, err)
 				}
 			} else {
-				jww.ERROR.Printf("Failed to send notification to user with tRSA hash %+v: %+v", transmissionRSAHash, err)
+				jww.ERROR.Printf("Failed to send notification to user with tRSA hash %+v: %+v", toNotify.TransmissionRSAHash, err)
 			}
 		} else {
-			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", ephID, token, resp)
+			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", toNotify.EphemeralId, toNotify.Token, resp)
 		}
 	}
 }
