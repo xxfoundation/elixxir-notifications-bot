@@ -50,6 +50,8 @@ type Params struct {
 	NotificationRate       int
 	APNS                   APNSParams
 }
+
+// APNSParams holds config info specific to apple's push notification service
 type APNSParams struct {
 	KeyPath  string
 	KeyID    string
@@ -58,7 +60,7 @@ type APNSParams struct {
 	Dev      bool
 }
 
-// Local impl for notifications; holds comms, storage object, creds and main functions
+// Impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
 	Comms            *notificationBot.Comms
 	Storage          *storage.Storage
@@ -249,7 +251,7 @@ func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
 			// 400 can also indicate incorrect token, do extra checking on this (12/27/2021)
 			// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
 			// Stale token documentation: https://firebase.google.com/docs/cloud-messaging/manage-tokens
-			jww.ERROR.Printf("Error sending notification: %+v", err)
+			jww.ERROR.Printf("Error sending notification via FCM: %+v", err)
 			invalidToken := strings.Contains(err.Error(), "400") &&
 				strings.Contains(err.Error(), "Invalid registration")
 			if strings.Contains(err.Error(), "404") || invalidToken {
