@@ -39,10 +39,6 @@ import (
 
 const notificationsTag = "notificationData"
 
-// Function type definitions for the main operations (poll and notify)
-type NotifyFunc func(int64, []*notifications.Data, *apns.ApnsComm,
-	*firebase.FirebaseComm, *storage.Storage, int, int) ([]*notifications.Data, error)
-
 // Params struct holds info passed in for configuration
 type Params struct {
 	Address                string
