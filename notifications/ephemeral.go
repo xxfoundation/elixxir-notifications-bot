@@ -52,19 +52,23 @@ func (nb *Impl) initCreator() {
 	// handle the next epoch
 	_, epoch := ephemeral.HandleQuantization(lastEpochTime)
 	nextTrigger := time.Unix(0, int64(epoch)*offsetPhase)
-	jww.INFO.Println(fmt.Sprintf("Sleeping until next trigger at %+v", nextTrigger))
 
+	// Check for users with no associated ephemerals, add them if found (this should not happen unless there were issues)
 	orphaned, err := nb.Storage.GetOrphanedUsers()
 	if err != nil {
 		jww.FATAL.Panicf("Failed to retrieve orphaned users: %+v", err)
 	}
+	if len(orphaned) > 0 {
+		jww.WARN.Printf("Found %d orphaned users in database", len(orphaned))
+	}
 	for _, u := range orphaned {
-		_, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(nb.inst.GetPartialNdf().Get().AddressSpace[0].Size))
+		_, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)) // TODO: is this the correct epoch?  Should we do the previous one as well?
 		if err != nil {
 			jww.WARN.Printf("Failed to add latest ephemeral for orphaned user %+v: %+v", u.TransmissionRSAHash, err)
 		}
 	}
 
+	jww.INFO.Println(fmt.Sprintf("Sleeping until next trigger at %+v", nextTrigger))
 	time.Sleep(time.Until(nextTrigger))
 }
 
