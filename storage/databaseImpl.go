@@ -89,6 +89,18 @@ func (d *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
 	return result, nil
 }
 
+type GTNResult struct {
+	EphemeralId         int64
+	Token               string
+	TransmissionRSAHash []byte
+}
+
+func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
+	var result []GTNResult
+	raw := "select ephemerals.ephemeral_id, users.transmission_rsa_hash, users.token from ephemerals left join users on ephemerals.transmission_rsa_hash = users.transmission_rsa_hash where ephemerals.ephemeral_id in ?;"
+	return result, d.db.Raw(raw, ephemeralIds).Scan(&result).Error
+}
+
 func (d *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
 	var result []*User
 	err := d.db.Where(&User{OffsetNum: offset}).Find(&result).Error

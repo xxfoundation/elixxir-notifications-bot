@@ -27,6 +27,7 @@ type database interface {
 	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error
+	GetToNotify(ephemeralIds []int64) ([]GTNResult, error)
 }
 
 // Struct implementing the Database Interface with an underlying DB

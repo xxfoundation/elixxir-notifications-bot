@@ -16,6 +16,21 @@ import (
 	"gorm.io/gorm"
 )
 
+func (m *MapImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
+	var results []GTNResult
+	for _, eid := range ephemeralIds {
+		for _, eph := range m.ephemeralsById[eid] {
+			u := m.usersByRsaHash[string(eph.TransmissionRSAHash)]
+			results = append(results, GTNResult{
+				EphemeralId:         eid,
+				TransmissionRSAHash: u.TransmissionRSA,
+				Token:               u.Token,
+			})
+		}
+	}
+	return results, nil
+}
+
 // Obtain User from backend by primary key
 func (m *MapImpl) GetUser(userId []byte) (*User, error) {
 	// Attempt to load from map
