@@ -7,11 +7,14 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"sync"
 	"time"
 )
 
 // interface declaration for storage methods
 type database interface {
+	UpsertState(state *State) error
+	GetStateValue(key string) (string, error)
 	upsertUser(user *User) error
 	GetUser(iid []byte) (*User, error)
 	GetUserByHash(transmissionRsaHash []byte) (*User, error)
@@ -32,6 +35,8 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
+	mut            sync.Mutex
+	states         map[string]string
 	usersById      map[string]*User
 	usersByRsaHash map[string]*User
 	usersByOffset  map[int64][]*User
@@ -39,6 +44,11 @@ type MapImpl struct {
 	allEphemerals  map[int]*Ephemeral
 	ephemeralsById map[int64][]*Ephemeral
 	ephIDSeq       int
+}
+
+type State struct {
+	Key   string `gorm:"primary_key"`
+	Value string `gorm:"NOT NULL"`
 }
 
 // Structure representing a User in the Storage backend

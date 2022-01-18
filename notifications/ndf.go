@@ -12,6 +12,7 @@ package notifications
 import (
 	//"github.com/pkg/errors"
 	"bytes"
+	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/io"
@@ -24,24 +25,24 @@ type Stopper func(timeout time.Duration) bool
 
 // GatewaysChanged function processes the gateways changed event when detected
 // in the NDF
-type GatewaysChanged func(ndf pb.NDF) []byte
+type GatewaysChanged func(ndf pb.NDF) ([]byte, error)
 
 // TrackNdf kicks off the ndf tracking thread
 func (nb *Impl) TrackNdf() {
 	// Handler function for the gateways changed event
-	gatewayEventHandler := func(ndf pb.NDF) []byte {
+	gatewayEventHandler := func(ndf pb.NDF) ([]byte, error) {
 		jww.DEBUG.Printf("Updating Gateways with new NDF")
 		// TODO: If this returns an error, print that error if it occurs
 		err := nb.inst.UpdatePartialNdf(&ndf)
 		if err != nil {
-			jww.ERROR.Printf("Failed to update partial NDF: %+v", err)
+			return nil, errors.WithMessage(err, "Failed to update partial NDF")
 		}
 		err = nb.inst.UpdateGatewayConnections()
 		if err != nil {
-			jww.ERROR.Printf("Failed to update gateway connections: %+v", err)
+			return nil, errors.WithMessage(err, "Failed to update gateway connections")
 		}
 		atomic.SwapUint32(nb.receivedNdf, 1)
-		return nb.inst.GetPartialNdf().GetHash()
+		return nb.inst.GetPartialNdf().GetHash(), nil
 	}
 
 	// Stopping function for the thread
@@ -96,7 +97,14 @@ func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
 		if ndf != nil && len(ndf.Ndf) > 0 && !bytes.Equal(ndf.Ndf, lastNdf.Ndf) {
 			// FIXME: we should be able to get hash from the ndf
 			// object, but we can't.
-			go func() { hashCh <- gwEvt(*ndf) }()
+			go func() {
+				h, err := gwEvt(*ndf)
+				if err != nil {
+					jww.ERROR.Println(err)
+					return
+				}
+				hashCh <- h
+			}()
 			lastNdf = *ndf
 		}
 

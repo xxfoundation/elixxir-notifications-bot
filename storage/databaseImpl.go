@@ -10,6 +10,7 @@ package storage
 
 import (
 	"github.com/pkg/errors"
+	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
 )
 
@@ -104,4 +105,40 @@ func (impl *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	return result[0], nil
+}
+
+// Inserts the given State into Storage if it does not exist
+// Or updates the Database State if its value does not match the given State
+func (d *DatabaseImpl) UpsertState(state *State) error {
+	jww.TRACE.Printf("Attempting to insert State into DB: %+v", state)
+
+	// Build a transaction to prevent race conditions
+	return d.db.Transaction(func(tx *gorm.DB) error {
+		// Make a copy of the provided state
+		newState := *state
+
+		// Attempt to insert state into the Database,
+		// or if it already exists, replace state with the Database value
+		err := tx.FirstOrCreate(state, &State{Key: state.Key}).Error
+		if err != nil {
+			return err
+		}
+
+		// If state is already present in the Database, overwrite it with newState
+		if newState.Value != state.Value {
+			return tx.Save(newState).Error
+		}
+
+		// Commit
+		return nil
+	})
+}
+
+// Returns a State's value from Storage with the given key
+// Or an error if a matching State does not exist
+func (d *DatabaseImpl) GetStateValue(key string) (string, error) {
+	result := &State{Key: key}
+	err := d.db.Take(result).Error
+	jww.TRACE.Printf("Obtained State from DB: %+v", result)
+	return result.Value, err
 }

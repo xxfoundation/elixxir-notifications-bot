@@ -10,8 +10,9 @@ package storage
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
+	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
 )
 
@@ -137,4 +138,31 @@ func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
 		return nil, gorm.ErrRecordNotFound
 	}
 	return e, nil
+}
+
+// Inserts the given State into Storage if it does not exist
+// Or updates the Database State if its value does not match the given State
+func (m *MapImpl) UpsertState(state *State) error {
+	jww.TRACE.Printf("Attempting to insert State into Map: %+v", state)
+
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
+	m.states[state.Key] = state.Value
+	return nil
+}
+
+// Returns a State's value from Storage with the given key
+// Or an error if a matching State does not exist
+func (m *MapImpl) GetStateValue(key string) (string, error) {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+
+	if val, ok := m.states[key]; ok {
+		jww.TRACE.Printf("Obtained State from Map: %+v", val)
+		return val, nil
+	}
+
+	// NOTE: Other code depends on this error string
+	return "", errors.Errorf("Unable to locate state for key %s", key)
 }
