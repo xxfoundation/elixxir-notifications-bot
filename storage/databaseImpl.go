@@ -70,7 +70,7 @@ func (d *DatabaseImpl) GetAllUsers() ([]*User, error) {
 
 func (d *DatabaseImpl) GetOrphanedUsers() ([]*User, error) {
 	var dest []*User
-	return dest, d.db.Find(dest, "NOT EXISTS (select * from ephemerals where ephemerals.transmission_rsa_hash = users.transmission_rsa_hash)").Error
+	return dest, d.db.Find(&dest, "NOT EXISTS (select * from ephemerals where ephemerals.transmission_rsa_hash = users.transmission_rsa_hash)").Error
 }
 
 func (d *DatabaseImpl) insertEphemeral(ephemeral *Ephemeral) error {

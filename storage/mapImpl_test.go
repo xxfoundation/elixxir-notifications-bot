@@ -65,6 +65,13 @@ func TestDatabaseImpl(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
+	orphaned, err := s.GetOrphanedUsers()
+	if err != nil {
+		t.Errorf("Failed to get orphaned users: %+v", err)
+	}
+	if len(orphaned) < 1 {
+		t.Errorf("Should have found orphaned users, instead found %+v", orphaned)
+	}
 	_, err = s.AddLatestEphemeral(u2, 5, 16)
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
