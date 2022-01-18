@@ -15,9 +15,9 @@ import (
 )
 
 // Obtain User from backend by primary key
-func (impl *DatabaseImpl) GetUser(userId []byte) (*User, error) {
+func (d *DatabaseImpl) GetUser(userId []byte) (*User, error) {
 	u := &User{}
-	err := impl.db.Take(u, "intermediary_id = ?", userId).Error
+	err := d.db.Take(u, "intermediary_id = ?", userId).Error
 	if err != nil {
 		return nil, err
 	}
@@ -25,9 +25,9 @@ func (impl *DatabaseImpl) GetUser(userId []byte) (*User, error) {
 }
 
 // Obtain User from backend by primary key
-func (impl *DatabaseImpl) GetUserByHash(transmissionRsaHash []byte) (*User, error) {
+func (d *DatabaseImpl) GetUserByHash(transmissionRsaHash []byte) (*User, error) {
 	u := &User{}
-	err := impl.db.Take(u, "transmission_rsa_hash = ?", transmissionRsaHash).Error
+	err := d.db.Take(u, "transmission_rsa_hash = ?", transmissionRsaHash).Error
 	if err != nil {
 		return nil, err
 	}
@@ -35,8 +35,8 @@ func (impl *DatabaseImpl) GetUserByHash(transmissionRsaHash []byte) (*User, erro
 }
 
 // Delete User from backend by primary key
-func (impl *DatabaseImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
-	err := impl.db.Delete(&User{
+func (d *DatabaseImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
+	err := d.db.Delete(&User{
 		TransmissionRSAHash: transmissionRsaHash,
 	}).Error
 	if err != nil {
@@ -46,10 +46,10 @@ func (impl *DatabaseImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 }
 
 // Insert or Update User into backend
-func (impl *DatabaseImpl) upsertUser(user *User) error {
+func (d *DatabaseImpl) upsertUser(user *User) error {
 	newUser := *user
 
-	return impl.db.Transaction(func(tx *gorm.DB) error {
+	return d.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.FirstOrCreate(user, &User{TransmissionRSAHash: user.TransmissionRSAHash}).Error
 		if err != nil {
 			return err
@@ -63,18 +63,23 @@ func (impl *DatabaseImpl) upsertUser(user *User) error {
 	})
 }
 
-func (impl *DatabaseImpl) GetAllUsers() ([]*User, error) {
+func (d *DatabaseImpl) GetAllUsers() ([]*User, error) {
 	var dest []*User
-	return dest, impl.db.Find(&dest).Error
+	return dest, d.db.Find(&dest).Error
 }
 
-func (impl *DatabaseImpl) insertEphemeral(ephemeral *Ephemeral) error {
-	return impl.db.Create(&ephemeral).Error
+func (d *DatabaseImpl) GetOrphanedUsers() ([]*User, error) {
+	var dest []*User
+	return dest, d.db.Find(dest, "NOT EXISTS (select * from ephemerals where ephemerals.transmission_rsa_hash = users.transmission_rsa_hash)").Error
 }
 
-func (impl *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
+func (d *DatabaseImpl) insertEphemeral(ephemeral *Ephemeral) error {
+	return d.db.Create(&ephemeral).Error
+}
+
+func (d *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
 	var result []*Ephemeral
-	err := impl.db.Where("ephemeral_id = ?", ephemeralId).Find(&result).Error
+	err := d.db.Where("ephemeral_id = ?", ephemeralId).Find(&result).Error
 	if err != nil {
 		return nil, err
 	}
@@ -84,20 +89,20 @@ func (impl *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) 
 	return result, nil
 }
 
-func (impl *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
+func (d *DatabaseImpl) getUsersByOffset(offset int64) ([]*User, error) {
 	var result []*User
-	err := impl.db.Where(&User{OffsetNum: offset}).Find(&result).Error
+	err := d.db.Where(&User{OffsetNum: offset}).Find(&result).Error
 	return result, err
 }
 
-func (impl *DatabaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
-	res := impl.db.Where("epoch < ?", currentEpoch).Delete(&Ephemeral{})
+func (d *DatabaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
+	res := d.db.Where("epoch < ?", currentEpoch).Delete(&Ephemeral{})
 	return res.Error
 }
 
-func (impl *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
+func (d *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
 	var result []*Ephemeral
-	err := impl.db.Order("epoch desc").Limit(1).Find(&result).Error
+	err := d.db.Order("epoch desc").Limit(1).Find(&result).Error
 	if err != nil {
 		return nil, err
 	}

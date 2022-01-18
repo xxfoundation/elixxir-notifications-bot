@@ -49,7 +49,7 @@ func TestTrackNdf(t *testing.T) {
 
 	gwUpdates := 0
 	lastNdf := make([]byte, 10)
-	gatewayEventHandler := func(ndf pb.NDF) []byte {
+	gatewayEventHandler := func(ndf pb.NDF) ([]byte, error) {
 		t.Logf("Updating Gateways with new NDF")
 		t.Logf("%v == %v?", ndf.Ndf, lastNdf)
 		if !bytes.Equal(lastNdf, ndf.Ndf) {
@@ -59,7 +59,7 @@ func TestTrackNdf(t *testing.T) {
 		}
 		// We control the hash, so we control the update calls...
 		ndfHash := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, byte(gwUpdates % 255)}
-		return ndfHash
+		return ndfHash, nil
 	}
 
 	go trackNdf(poller, quitCh, gatewayEventHandler)

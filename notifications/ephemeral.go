@@ -1,12 +1,10 @@
 package notifications
 
 import (
-	"errors"
 	"fmt"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
-	"gorm.io/gorm"
 	"strconv"
 	"time"
 )
@@ -32,11 +30,9 @@ func (nb *Impl) initCreator() {
 	// Retrieve most recent ephemeral from storage
 	var lastEpochTime time.Time
 	lastEphEpoch, err := nb.Storage.GetStateValue(ephemeralStateKey)
-	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-		jww.WARN.Printf("Failed to get latest ephemeral (no records found): %+v", err)
+	if err != nil {
+		jww.WARN.Printf("Failed to get latest ephemeral: %+v", err)
 		lastEpochTime = time.Now().Add(-time.Duration(ephemeral.Period))
-	} else if err != nil {
-		jww.FATAL.Panicf("Database lookup for latest ephemeral failed: %+v", err)
 	} else {
 		lastEpochInt, err := strconv.Atoi(lastEphEpoch)
 		if err != nil {
@@ -57,6 +53,18 @@ func (nb *Impl) initCreator() {
 	_, epoch := ephemeral.HandleQuantization(lastEpochTime)
 	nextTrigger := time.Unix(0, int64(epoch)*offsetPhase)
 	jww.INFO.Println(fmt.Sprintf("Sleeping until next trigger at %+v", nextTrigger))
+
+	orphaned, err := nb.Storage.GetOrphanedUsers()
+	if err != nil {
+		jww.FATAL.Panicf("Failed to retrieve orphaned users: %+v", err)
+	}
+	for _, u := range orphaned {
+		_, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(nb.inst.GetPartialNdf().Get().AddressSpace[0].Size))
+		if err != nil {
+			jww.WARN.Printf("Failed to add latest ephemeral for orphaned user %+v: %+v", u.TransmissionRSAHash, err)
+		}
+	}
+
 	time.Sleep(time.Until(nextTrigger))
 }
 

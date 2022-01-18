@@ -74,6 +74,7 @@ func (m *MapImpl) upsertUser(user *User) error {
 		}
 	}
 	// Insert new user
+	m.ephemeralsByUser[string(user.TransmissionRSAHash)] = map[int64]*Ephemeral{} // init user's ephemeral map
 	m.usersByRsaHash[string(user.TransmissionRSAHash)] = user
 	m.usersById[string(user.IntermediaryId)] = user
 	var found bool
@@ -96,11 +97,22 @@ func (m *MapImpl) GetAllUsers() ([]*User, error) {
 	return m.allUsers, nil
 }
 
+func (m *MapImpl) GetOrphanedUsers() ([]*User, error) {
+	var res []*User
+	for _, u := range m.allUsers {
+		if len(m.ephemeralsByUser[string(u.TransmissionRSAHash)]) < 1 {
+			res = append(res, u)
+		}
+	}
+	return res, nil
+}
+
 func (m *MapImpl) insertEphemeral(ephemeral *Ephemeral) error {
 	m.ephIDSeq++
 	ephemeral.ID = uint(m.ephIDSeq)
 	m.ephemeralsById[ephemeral.EphemeralId] = append(m.ephemeralsById[ephemeral.EphemeralId], ephemeral)
 	m.allEphemerals[int(ephemeral.ID)] = ephemeral
+	m.ephemeralsByUser[string(ephemeral.TransmissionRSAHash)][ephemeral.EphemeralId] = ephemeral
 	return nil
 }
 
@@ -121,6 +133,7 @@ func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
 		if elist != nil {
 			for j, e := range elist {
 				if e.Epoch < epoch {
+					delete(m.ephemeralsByUser[string(e.TransmissionRSAHash)], e.EphemeralId)
 					delete(m.allEphemerals, int(m.ephemeralsById[i][j].ID))
 					m.ephemeralsById[i] = append(m.ephemeralsById[i][:j],
 						m.ephemeralsById[i][j+1:]...)
