@@ -138,7 +138,7 @@ func newDatabase(username, password, dbName, address,
 
 	// Initialize the database schema
 	// WARNING: Order is important. Do not change without database testing
-	models := []interface{}{&User{}, &Ephemeral{}}
+	models := []interface{}{&User{}, &Ephemeral{}, &State{}}
 	for _, model := range models {
 		err = db.AutoMigrate(model)
 		if err != nil {

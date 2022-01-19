@@ -188,16 +188,15 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 	var ephemerals []int64
 	var unsent []*notifications.Data
 	for i, ilist := range data {
-		var overflow, trimmed []*notifications.Data
+		var overflow, toSend []*notifications.Data
 		if len(data) > nb.maxNotifications {
 			overflow = ilist[nb.maxNotifications:]
-			trimmed = ilist[:nb.maxNotifications]
+			toSend = ilist[:nb.maxNotifications]
+		} else {
+			toSend = ilist[:]
 		}
 
-		notifs, rest := notifications.BuildNotificationCSV(trimmed, nb.maxPayloadBytes-len([]byte(notificationsTag)))
-		for _, nd := range rest {
-			nb.Storage.GetNotificationBuffer().Add(id.Round(nd.RoundID), []*notifications.Data{nd})
-		}
+		notifs, rest := notifications.BuildNotificationCSV(toSend, nb.maxPayloadBytes-len([]byte(notificationsTag)))
 		overflow = append(overflow, rest...)
 		csvs[i] = string(notifs)
 		ephemerals = append(ephemerals, i)
@@ -208,7 +207,10 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
 	}
 	for _, n := range toNotify {
-		nb.notify(csvs[n.EphemeralId], n)
+		tn := n
+		go func() {
+			nb.notify(csvs[tn.EphemeralId], tn)
+		}()
 	}
 	return unsent, nil
 }
