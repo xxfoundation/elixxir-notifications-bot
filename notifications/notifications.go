@@ -206,11 +206,10 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
 	}
-	for _, n := range toNotify {
-		tn := n
-		go func() {
-			nb.notify(csvs[tn.EphemeralId], tn)
-		}()
+	for i := range toNotify {
+		go func(res storage.GTNResult) {
+			nb.notify(csvs[res.EphemeralId], res)
+		}(toNotify[i])
 	}
 	return unsent, nil
 }
