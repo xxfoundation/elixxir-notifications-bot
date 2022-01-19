@@ -189,7 +189,7 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 	var unsent []*notifications.Data
 	for i, ilist := range data {
 		var overflow, toSend []*notifications.Data
-		if len(data) > nb.maxNotifications {
+		if len(ilist) > nb.maxNotifications {
 			overflow = ilist[nb.maxNotifications:]
 			toSend = ilist[:nb.maxNotifications]
 		} else {
