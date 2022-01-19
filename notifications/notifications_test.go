@@ -7,7 +7,6 @@ package notifications
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/sideshow/apns2"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
@@ -31,22 +30,39 @@ import (
 
 var port = 4200
 
-// Test notificationbot's notifyuser function
-// this mocks the setup and send functions, and only tests the core logic of this function
-func TestNotifyUser(t *testing.T) {
-	badsend := func(firebase.FBSender, string, string) (string, error) {
-		return "", errors.New("Failed")
-	}
-	send := func(firebase.FBSender, string, string) (string, error) {
-		return "", nil
-	}
-	fcBadSend := firebase.NewMockFirebaseComm(t, badsend)
-	fc := firebase.NewMockFirebaseComm(t, send)
-
+func TestImpl_SendBatch(t *testing.T) {
+	// Init storage
 	s, err := storage.NewStorage("", "", "", "", "")
 	if err != nil {
 		t.Errorf("Failed to make new storage: %+v", err)
 	}
+
+	dchan := make(chan string, 10)
+	// Init mock firebase comms
+	//badsend := func(firebase.FBSender, string, string) (string, error) {
+	//	return "", errors.New("Failed")
+	//}
+	send := func(s1 firebase.FBSender, s2 string, s3 string) (string, error) {
+		dchan <- s2
+		return "", nil
+	}
+	//fcBadSend := firebase.NewMockFirebaseComm(t, badsend)
+	fc := firebase.NewMockFirebaseComm(t, send)
+
+	// Make apns comm object
+	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
+
+	// Create impl
+	i := Impl{
+		Storage:          s,
+		fcm:              fc,
+		apnsClient:       ac,
+		roundStore:       sync.Map{},
+		maxNotifications: 0,
+		maxPayloadBytes:  0,
+	}
+
+	// Identity setup
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
@@ -55,7 +71,7 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), ":token")
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "fcm:token")
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
@@ -64,24 +80,39 @@ func TestNotifyUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}
-
-	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
-	_, err = notifyUser(eph.EphemeralId, []*notifications.Data{{
-		EphemeralID: eph.EphemeralId,
-		IdentityFP:  nil,
-		MessageHash: nil,
-	}}, ac, fcBadSend, s, 20, 4096)
+	_, err = i.SendBatch(map[int64][]*notifications.Data{})
 	if err != nil {
-		t.Errorf("This no longer returns an error but should print one to log - not testable but leaving the case")
+		t.Errorf("Error on sending empty batch: %+v", err)
 	}
 
-	_, err = notifyUser(eph.EphemeralId, []*notifications.Data{{
-		EphemeralID: eph.EphemeralId,
-		IdentityFP:  nil,
-		MessageHash: nil,
-	}}, ac, fc, s, 20, 4096)
+	unsent, err := i.SendBatch(map[int64][]*notifications.Data{
+		eph.EphemeralId: {{EphemeralID: eph.EphemeralId, RoundID: 3, MessageHash: []byte("hello"), IdentityFP: []byte("identity")}},
+	})
 	if err != nil {
-		t.Errorf("Failed to notify user properly")
+		t.Errorf("Error on sending small batch: %+v", err)
+	}
+	if len(unsent) < 1 {
+		t.Errorf("Should have received notification back as unsent, instead got %+v", unsent)
+	}
+
+	i.maxPayloadBytes = 4096
+	i.maxNotifications = 20
+	unsent, err = i.SendBatch(map[int64][]*notifications.Data{
+		1: {{EphemeralID: eph.EphemeralId, RoundID: 3, MessageHash: []byte("hello"), IdentityFP: []byte("identity")}},
+	})
+	if err != nil {
+		t.Errorf("Error on sending small batch again: %+v", err)
+	}
+	if len(unsent) > 0 {
+		t.Errorf("Should have received notification back as unsent, instead got %+v", unsent)
+	}
+
+	timeout := time.NewTicker(3 * time.Second)
+	select {
+	case <-dchan:
+		t.Logf("Received on data chan!")
+	case <-timeout.C:
+		t.Errorf("Did not receive data before timeout")
 	}
 }
 
@@ -290,18 +321,12 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 
 // Happy path.
 func TestImpl_ReceiveNotificationBatch(t *testing.T) {
-	dataChan := make(chan *notifications.Data)
-
 	s, err := storage.NewStorage("", "", "", "", "")
 	impl := &Impl{
 		Storage:          s,
 		roundStore:       sync.Map{},
 		maxNotifications: 0,
 		maxPayloadBytes:  0,
-	}
-	impl.notifyFunc = func(eph int64, data []*notifications.Data, apns *apns.ApnsComm, fc *firebase.FirebaseComm, s *storage.Storage, batchSize, maxBytes int) ([]*notifications.Data, error) {
-		go func() { dataChan <- data[0] }()
-		return nil, nil
 	}
 
 	notifBatch := &pb.NotificationBatch{
