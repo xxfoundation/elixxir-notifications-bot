@@ -65,6 +65,13 @@ func TestDatabaseImpl(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
+	orphaned, err := s.GetOrphanedUsers()
+	if err != nil {
+		t.Errorf("Failed to get orphaned users: %+v", err)
+	}
+	if len(orphaned) < 1 {
+		t.Errorf("Should have found orphaned users, instead found %+v", orphaned)
+	}
 	e1, err := s.AddLatestEphemeral(u2, 5, 16)
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
@@ -109,11 +116,7 @@ func TestDatabaseImpl(t *testing.T) {
 
 // This tests getting a user that does exist in the database
 func TestMapImpl_GetUser_Happy(t *testing.T) {
-	m := &MapImpl{
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 	m.usersById[string(u.IntermediaryId)] = u
 	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
@@ -144,11 +147,7 @@ func TestMapImpl_GetUser_Happy(t *testing.T) {
 
 // This tests getting a user that does *not* exist in the database
 func TestMapImpl_GetUser_NoUser(t *testing.T) {
-	m := &MapImpl{
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 
 	user, err := m.GetUser(u.IntermediaryId)
@@ -164,11 +163,7 @@ func TestMapImpl_GetUser_NoUser(t *testing.T) {
 
 // This tests deleting a user that does exist in the database
 func TestMapImpl_DeleteUser_Happy(t *testing.T) {
-	m := &MapImpl{
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	u := &User{IntermediaryId: []byte("test"), Token: "token", TransmissionRSAHash: []byte("hash")}
 	m.usersById[string(u.IntermediaryId)] = u
 	m.usersByRsaHash[string(u.TransmissionRSAHash)] = u
@@ -196,11 +191,7 @@ func TestMapImpl_DeleteUser_Happy(t *testing.T) {
 
 // This tests inserting a user once and verifying we can read it back right
 func TestMapImpl_UpsertUser_Happy(t *testing.T) {
-	m := &MapImpl{
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
@@ -234,11 +225,7 @@ func TestMapImpl_UpsertUser_Happy(t *testing.T) {
 
 // This tests inserting a user *twice* and verifying we can read it back right each time
 func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
-	m := &MapImpl{
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
@@ -293,15 +280,7 @@ func TestMapImpl_UpsertUser_HappyTwice(t *testing.T) {
 }
 
 func TestMapImpl_UpsertEphemeral(t *testing.T) {
-	m := &MapImpl{
-		ephIDSeq:       0,
-		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
-		allUsers:       nil,
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	trsaHash := []byte("TransmissionRSAHash")
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
@@ -342,15 +321,7 @@ func TestMapImpl_UpsertEphemeral(t *testing.T) {
 }
 
 func TestMapImpl_GetEphemeral(t *testing.T) {
-	m := &MapImpl{
-		ephIDSeq:       0,
-		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
-		allUsers:       nil,
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	trsaHash := []byte("TransmissionRSAHash")
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
@@ -389,15 +360,7 @@ func TestMapImpl_GetEphemeral(t *testing.T) {
 }
 
 func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
-	m := &MapImpl{
-		ephIDSeq:       0,
-		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
-		allUsers:       nil,
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	trsaHash := []byte("TransmissionRSAHash")
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
@@ -443,15 +406,7 @@ func TestMapImpl_DeleteOldEphemerals(t *testing.T) {
 }
 
 func TestMapImpl_GetLatestEphemeral(t *testing.T) {
-	m := &MapImpl{
-		ephIDSeq:       0,
-		ephemeralsById: map[int64][]*Ephemeral{},
-		allEphemerals:  map[int]*Ephemeral{},
-		allUsers:       nil,
-		usersByRsaHash: map[string]*User{},
-		usersById:      map[string]*User{},
-		usersByOffset:  map[int64][]*User{},
-	}
+	m := getMapImpl()
 	trsaHash := []byte("TransmissionRSAHash")
 	uid := id.NewIdFromString("zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
@@ -484,4 +439,18 @@ func TestMapImpl_GetLatestEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to get latest ephemeral: %+v", err)
 	}
+}
+
+func getMapImpl() *MapImpl {
+	m := &MapImpl{
+		ephIDSeq:         0,
+		ephemeralsById:   map[int64][]*Ephemeral{},
+		allEphemerals:    map[int]*Ephemeral{},
+		allUsers:         nil,
+		usersByRsaHash:   map[string]*User{},
+		usersById:        map[string]*User{},
+		usersByOffset:    map[int64][]*User{},
+		ephemeralsByUser: map[string]map[int64]*Ephemeral{},
+	}
+	return m
 }

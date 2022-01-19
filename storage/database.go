@@ -7,16 +7,20 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"sync"
 	"time"
 )
 
 // interface declaration for storage methods
 type database interface {
+	UpsertState(state *State) error
+	GetStateValue(key string) (string, error)
 	upsertUser(user *User) error
 	GetUser(iid []byte) (*User, error)
 	GetUserByHash(transmissionRsaHash []byte) (*User, error)
 	getUsersByOffset(offset int64) ([]*User, error)
 	GetAllUsers() ([]*User, error)
+	GetOrphanedUsers() ([]*User, error)
 	DeleteUserByHash(transmissionRsaHash []byte) error
 
 	insertEphemeral(ephemeral *Ephemeral) error
@@ -33,13 +37,21 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
-	usersById      map[string]*User
-	usersByRsaHash map[string]*User
-	usersByOffset  map[int64][]*User
-	allUsers       []*User
-	allEphemerals  map[int]*Ephemeral
-	ephemeralsById map[int64][]*Ephemeral
-	ephIDSeq       int
+	mut              sync.Mutex
+	states           map[string]string
+	usersById        map[string]*User
+	usersByRsaHash   map[string]*User
+	usersByOffset    map[int64][]*User
+	allUsers         []*User
+	allEphemerals    map[int]*Ephemeral
+	ephemeralsById   map[int64][]*Ephemeral
+	ephemeralsByUser map[string]map[int64]*Ephemeral
+	ephIDSeq         int
+}
+
+type State struct {
+	Key   string `gorm:"primary_key"`
+	Value string `gorm:"NOT NULL"`
 }
 
 // Structure representing a User in the Storage backend
@@ -96,13 +108,15 @@ func newDatabase(username, password, dbName, address,
 		defer jww.INFO.Println("Map backend initialized successfully!")
 
 		mapImpl := &MapImpl{
-			usersById:      map[string]*User{},
-			usersByRsaHash: map[string]*User{},
-			usersByOffset:  map[int64][]*User{},
-			allUsers:       nil,
-			ephemeralsById: map[int64][]*Ephemeral{},
-			allEphemerals:  map[int]*Ephemeral{},
-			ephIDSeq:       0,
+			usersById:        map[string]*User{},
+			usersByRsaHash:   map[string]*User{},
+			usersByOffset:    map[int64][]*User{},
+			allUsers:         nil,
+			ephemeralsById:   map[int64][]*Ephemeral{},
+			allEphemerals:    map[int]*Ephemeral{},
+			ephemeralsByUser: map[string]map[int64]*Ephemeral{},
+			states:           map[string]string{},
+			ephIDSeq:         0,
 		}
 
 		return database(mapImpl), nil
