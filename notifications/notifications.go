@@ -11,6 +11,7 @@ package notifications
 import (
 	"encoding/base64"
 	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+	"gorm.io/gorm"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -350,7 +351,12 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 	}
 	err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
 	if err != nil {
-		return errors.Wrap(err, "Failed to unregister user with notifications")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			jww.WARN.Println(err)
+			return nil
+		} else {
+			return errors.Wrap(err, "Failed to unregister user with notifications")
+		}
 	}
 	return nil
 }

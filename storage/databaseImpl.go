@@ -9,6 +9,7 @@
 package storage
 
 import (
+	"encoding/base64"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
@@ -40,7 +41,7 @@ func (d *DatabaseImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 		TransmissionRSAHash: transmissionRsaHash,
 	}).Error
 	if err != nil {
-		return errors.Errorf("Failed to delete user with tRSA hash %s: %+v", transmissionRsaHash, err)
+		return errors.WithMessagef(err, "Could not delete user with tRSA hash %s", base64.StdEncoding.EncodeToString(transmissionRsaHash))
 	}
 	return nil
 }

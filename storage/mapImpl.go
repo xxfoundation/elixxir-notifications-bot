@@ -10,6 +10,7 @@ package storage
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
@@ -58,7 +59,7 @@ func (m *MapImpl) GetUserByHash(transmissionRsaHash []byte) (*User, error) {
 func (m *MapImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
 	user, ok := m.usersByRsaHash[string(transmissionRsaHash)]
 	if !ok {
-		return nil
+		return errors.WithMessagef(gorm.ErrRecordNotFound, "No user with hash %s in MapImpl.usersByRsaHash", base64.StdEncoding.EncodeToString(transmissionRsaHash))
 	}
 	delete(m.usersByRsaHash, string(transmissionRsaHash))
 	delete(m.usersById, string(user.IntermediaryId))
