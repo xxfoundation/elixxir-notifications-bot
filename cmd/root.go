@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 	"gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/notifications"
+	"gitlab.com/elixxir/notifications-bot/notifications/notificationProvider"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
@@ -82,7 +83,7 @@ var rootCmd = &cobra.Command{
 			NotificationRate:       viper.GetInt("notificationRate"),
 			NotificationsPerBatch:  viper.GetInt("notificationsPerBatch"),
 			MaxNotificationPayload: viper.GetInt("maxNotificationPayload"),
-			APNS: notifications.APNSParams{
+			APNS: notificationProvider.APNSParams{
 				KeyPath:  apnsKeyPath,
 				KeyID:    viper.GetString("apnsKeyID"),
 				Issuer:   viper.GetString("apnsIssuer"),

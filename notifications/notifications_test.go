@@ -7,12 +7,11 @@ package notifications
 
 import (
 	"fmt"
-	"github.com/sideshow/apns2"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/notifications/apns"
-	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
+	"gitlab.com/elixxir/notifications-bot/constants"
+	"gitlab.com/elixxir/notifications-bot/notifications/notificationProvider"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/comms/connect"
@@ -30,6 +29,15 @@ import (
 
 var port = 4200
 
+type MockFB struct {
+	c chan string
+}
+
+func (mfb *MockFB) Notify(csv string, target storage.GTNResult) (bool, error) {
+	mfb.c <- csv
+	return true, nil
+}
+
 func TestImpl_SendBatch(t *testing.T) {
 	// Init storage
 	s, err := storage.NewStorage("", "", "", "", "")
@@ -42,25 +50,17 @@ func TestImpl_SendBatch(t *testing.T) {
 	//badsend := func(firebase.FBSender, string, string) (string, error) {
 	//	return "", errors.New("Failed")
 	//}
-	send := func(s1 firebase.FBSender, s2 string, s3 string) (string, error) {
-		dchan <- s2
-		return "", nil
-	}
-	//fcBadSend := firebase.NewMockFirebaseComm(t, badsend)
-	fc := firebase.NewMockFirebaseComm(t, send)
-
-	// Make apns comm object
-	ac := apns.NewApnsComm(apns2.NewTokenClient(nil), "")
+	fc := &MockFB{dchan}
 
 	// Create impl
 	i := Impl{
-		Storage:          s,
-		fcm:              fc,
-		apnsClient:       ac,
-		roundStore:       sync.Map{},
-		maxNotifications: 0,
-		maxPayloadBytes:  0,
+		Storage:               s,
+		notificationProviders: map[constants.NotificationProvider]notificationProvider.Provider{},
+		roundStore:            sync.Map{},
+		maxNotifications:      0,
+		maxPayloadBytes:       0,
 	}
+	i.notificationProviders[constants.FCM] = fc
 
 	// Identity setup
 	uid := id.NewIdFromString("zezima", id.User, t)
@@ -129,7 +129,7 @@ func TestStartNotifications(t *testing.T) {
 		Address:               "0.0.0.0:42010",
 		NotificationsPerBatch: 20,
 		NotificationRate:      30,
-		APNS: APNSParams{
+		APNS: notificationProvider.APNSParams{
 			KeyPath:  "",
 			KeyID:    "WQT68265C5",
 			Issuer:   "S6JDM2WW29",

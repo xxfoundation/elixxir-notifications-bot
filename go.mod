@@ -3,7 +3,6 @@ module gitlab.com/elixxir/notifications-bot
 go 1.13
 
 require (
-	cloud.google.com/go v0.55.0 // indirect
 	cloud.google.com/go/firestore v1.1.1 // indirect
 	cloud.google.com/go/pubsub v1.3.1 // indirect
 	firebase.google.com/go v3.12.0+incompatible
@@ -19,8 +18,8 @@ require (
 	gitlab.com/xx_network/crypto v0.0.5-0.20211227194420-f311e8920467
 	gitlab.com/xx_network/primitives v0.0.4-0.20211222205802-03e9d7d835b0
 	golang.org/x/net v0.0.0-20210525063256-abc453219eb5
-	golang.org/x/tools v0.0.0-20200318150045-ba25ddc85566 // indirect
-	google.golang.org/api v0.20.0
+	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8 // indirect
+	google.golang.org/api v0.30.0
 	google.golang.org/genproto v0.0.0-20201030142918-24207fddd1c3 // indirect
 	gopkg.in/ini.v1 v1.56.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

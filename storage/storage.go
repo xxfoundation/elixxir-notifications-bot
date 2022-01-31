@@ -120,6 +120,6 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 	return nil
 }
 
-func (s *Storage) GetNotificationBuffer()*NotificationBuffer {
+func (s *Storage) GetNotificationBuffer() *NotificationBuffer {
 	return s.notificationBuffer
 }

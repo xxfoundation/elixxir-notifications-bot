@@ -56,13 +56,14 @@ type State struct {
 
 // Structure representing a User in the Storage backend
 type User struct {
-	TransmissionRSAHash []byte      `gorm:"primaryKey"`
-	IntermediaryId      []byte      `gorm:"not null; index"`
-	OffsetNum           int64       `gorm:"not null; index"`
-	TransmissionRSA     []byte      `gorm:"not null"`
-	Signature           []byte      `gorm:"not null"`
-	Token               string      `gorm:"not null"`
-	Ephemerals          []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash;constraint:OnDelete:CASCADE;"`
+	TransmissionRSAHash  []byte      `gorm:"primaryKey"`
+	IntermediaryId       []byte      `gorm:"not null; index"`
+	OffsetNum            int64       `gorm:"not null; index"`
+	TransmissionRSA      []byte      `gorm:"not null"`
+	Signature            []byte      `gorm:"not null"`
+	Token                string      `gorm:"not null"`
+	NotificationProvider uint8       `gorm:"not null"`
+	Ephemerals           []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash;constraint:OnDelete:CASCADE;"`
 }
 
 type Ephemeral struct {

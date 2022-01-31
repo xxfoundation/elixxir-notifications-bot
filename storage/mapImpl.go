@@ -22,9 +22,10 @@ func (m *MapImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 		for _, eph := range m.ephemeralsById[eid] {
 			u := m.usersByRsaHash[string(eph.TransmissionRSAHash)]
 			results = append(results, GTNResult{
-				EphemeralId:         eid,
-				TransmissionRSAHash: u.TransmissionRSA,
-				Token:               u.Token,
+				EphemeralId:          eid,
+				TransmissionRSAHash:  u.TransmissionRSA,
+				Token:                u.Token,
+				NotificationProvider: u.NotificationProvider,
 			})
 		}
 	}

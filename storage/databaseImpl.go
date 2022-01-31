@@ -90,14 +90,15 @@ func (d *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
 }
 
 type GTNResult struct {
-	EphemeralId         int64
-	Token               string
-	TransmissionRSAHash []byte
+	EphemeralId          int64
+	Token                string
+	TransmissionRSAHash  []byte
+	NotificationProvider uint8
 }
 
 func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 	var result []GTNResult
-	raw := "select ephemerals.ephemeral_id, users.transmission_rsa_hash, users.token from ephemerals left join users on ephemerals.transmission_rsa_hash = users.transmission_rsa_hash where ephemerals.ephemeral_id in ?;"
+	raw := "select ephemerals.ephemeral_id, users.transmission_rsa_hash, users.token, users.notification_provider from ephemerals left join users on ephemerals.transmission_rsa_hash = users.transmission_rsa_hash where ephemerals.ephemeral_id in ?;"
 	return result, d.db.Raw(raw, ephemeralIds).Scan(&result).Error
 }
 
