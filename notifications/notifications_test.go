@@ -71,7 +71,7 @@ func TestImpl_SendBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "fcm:token")
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "fcm:token", constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}

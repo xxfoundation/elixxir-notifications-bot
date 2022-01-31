@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
@@ -19,7 +20,7 @@ func TestStorage_AddUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	_, err = s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	_, err = s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token", constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}
@@ -38,7 +39,7 @@ func TestStorage_DeleteUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token", constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}
@@ -61,7 +62,7 @@ func TestStorage_AddLatestEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token", constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}

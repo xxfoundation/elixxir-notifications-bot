@@ -239,7 +239,7 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	}
 
 	// Add the user to storage
-	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token)
+	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token, constants.FCM)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}

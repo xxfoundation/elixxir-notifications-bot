@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bytes"
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
@@ -26,7 +27,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
 	token1 := "i'm a token"
-	_, err = s.AddUser(iid, []byte("rsa"), sig, token1)
+	_, err = s.AddUser(iid, []byte("rsa"), sig, token1, constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to upsert user: %+v", err)
 	}
@@ -40,7 +41,7 @@ func TestDatabaseImpl(t *testing.T) {
 	}
 
 	token2 := "you're a token"
-	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2)
+	u1, err := s.AddUser(iid, []byte("rsa"), sig, token2, constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
@@ -61,7 +62,7 @@ func TestDatabaseImpl(t *testing.T) {
 		t.Errorf("Expected user with token %s.  Instead got %s.", token1, u.Token)
 	}
 
-	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2)
+	u2, err := s.AddUser([]byte("jakexx360"), []byte("rsa2"), sig, token2, constants.FCM)
 	if err != nil {
 		t.Errorf("Failed to upsert updated user: %+v", err)
 	}
