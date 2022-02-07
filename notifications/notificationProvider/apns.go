@@ -27,8 +27,8 @@ type APNS struct {
 }
 
 func (a *APNS) Notify(csv string, target storage.GTNResult) (bool, error) {
-	notifPayload := payload.NewPayload().AlertTitle("Privacy: protected!").AlertBody(
-		"Some notifications are not for you to ensure privacy; we hope to remove this notification soon").MutableContent().Custom(
+	notifPayload := payload.NewPayload().AlertTitle(constants.NotificationTitle).AlertBody(
+		constants.NotificationBody).MutableContent().Custom(
 		constants.NotificationsTag, csv)
 	notif := &apns2.Notification{
 		CollapseID:  base64.StdEncoding.EncodeToString(target.TransmissionRSAHash),
