@@ -10,7 +10,6 @@ import (
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/elixxir/notifications-bot/notifications/notificationProvider"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/notifications"
@@ -55,12 +54,12 @@ func TestImpl_SendBatch(t *testing.T) {
 	// Create impl
 	i := Impl{
 		Storage:               s,
-		notificationProviders: map[constants.NotificationProvider]notificationProvider.Provider{},
+		notificationProviders: map[notifications.Provider]notificationProvider.Provider{},
 		roundStore:            sync.Map{},
 		maxNotifications:      0,
 		maxPayloadBytes:       0,
 	}
-	i.notificationProviders[constants.FCM] = fc
+	i.notificationProviders[notifications.FCM] = fc
 
 	// Identity setup
 	uid := id.NewIdFromString("zezima", id.User, t)
@@ -71,7 +70,7 @@ func TestImpl_SendBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "fcm:token", constants.FCM)
+	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "fcm:token", notifications.FCM)
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
@@ -221,7 +220,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	psig, err := registration.SignWithTimestamp(csprng.NewSystemRNG(), loadedPermKey, ts, string(crt))
 
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
-		Token:                 "token",
+		Token:                 "fcm:token",
 		IntermediaryId:        iid,
 		TransmissionRsa:       crt,
 		TransmissionSalt:      []byte("salt"),
@@ -231,6 +230,15 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
+	}
+
+	u, err := impl.Storage.GetUser(iid)
+	if err != nil {
+		t.Errorf("Could not find registered user: %+v", err)
+	}
+	storedProvider := notifications.Provider(u.NotificationProvider)
+	if storedProvider != notifications.FCM {
+		t.Errorf("Unknown notification parsing did not work as expected.  Should have been %s, instead got %s", notifications.FCM.String(), storedProvider.String())
 	}
 }
 

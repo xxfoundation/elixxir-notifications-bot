@@ -2,8 +2,8 @@ package notifications
 
 import (
 	jww "github.com/spf13/jwalterweatherman"
-	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/elixxir/notifications-bot/storage"
+	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
@@ -34,7 +34,7 @@ func TestImpl_InitDeleter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token", constants.FCM)
+	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token", notifications.FCM)
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}

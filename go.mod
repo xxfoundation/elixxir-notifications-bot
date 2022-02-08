@@ -4,16 +4,15 @@ go 1.13
 
 require (
 	cloud.google.com/go/firestore v1.1.1 // indirect
-	cloud.google.com/go/pubsub v1.3.1 // indirect
 	firebase.google.com/go v3.12.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/sideshow/apns2 v0.20.0
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20220126233028-dc64691c7d3e
+	gitlab.com/elixxir/comms v0.0.4-0.20220208155528-2fe599a0218d
 	gitlab.com/elixxir/crypto v0.0.7-0.20220110170041-7e42f2e8b062
-	gitlab.com/elixxir/primitives v0.0.3-0.20220104173924-275cb9d7834f
+	gitlab.com/elixxir/primitives v0.0.3-0.20220208153511-67470fbdbd1c
 	gitlab.com/xx_network/comms v0.0.4-0.20220126231737-fe2338016cce
 	gitlab.com/xx_network/crypto v0.0.5-0.20211227194420-f311e8920467
 	gitlab.com/xx_network/primitives v0.0.4-0.20211222205802-03e9d7d835b0

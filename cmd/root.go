@@ -90,6 +90,12 @@ var rootCmd = &cobra.Command{
 				BundleID: viper.GetString("apnsBundleID"),
 				Dev:      viper.GetBool("apnsDev"),
 			},
+			Huawei: notificationProvider.HuaweiParams{
+				AppId:     viper.GetString("huaweiClientID"),
+				AppSecret: viper.GetString("huaweiClientSecret"),
+				AuthUrl:   viper.GetString("huaweiAuthURL"),
+				PushUrl:   viper.GetString("huaweiPushURL"),
+			},
 		}
 
 		rawAddr := viper.GetString("dbAddress")
