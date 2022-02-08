@@ -62,7 +62,7 @@ type User struct {
 	TransmissionRSA      []byte      `gorm:"not null"`
 	Signature            []byte      `gorm:"not null"`
 	Token                string      `gorm:"not null"`
-	NotificationProvider uint8       `gorm:"not null"`
+	NotificationProvider uint32      `gorm:"not null"`
 	Ephemerals           []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash;constraint:OnDelete:CASCADE;"`
 }
 

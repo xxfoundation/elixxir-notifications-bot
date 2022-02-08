@@ -39,8 +39,8 @@ type Huawei struct {
 	expires   time.Time
 }
 
-// HuaweiConfig details the config to create a huawei provider
-type HuaweiConfig struct {
+// HuaweiParams details the config to create a huawei provider
+type HuaweiParams struct {
 	AppId     string
 	AppSecret string
 	AuthUrl   string
@@ -133,7 +133,6 @@ func (h *Huawei) Notify(payload string, target storage.GTNResult) (bool, error) 
 			return true, errors.WithMessage(err, "Could not get a current auth token with huawei")
 		}
 	}
-
 	n := Message{
 		Data: payload,
 		Notification: &Notification{
@@ -152,12 +151,10 @@ func (h *Huawei) Notify(payload string, target storage.GTNResult) (bool, error) 
 		return true, errors.WithMessage(err, "Failed to create HTTP request to send notification")
 	}
 	h.resetRequestAuthHeader(req)
-
 	messageResponse, err := h.doNotifyRequest(req)
 	if err != nil {
 		return true, err
 	}
-
 	// Check oauth token responses
 	if messageResponse.Code == TokenTimeoutErr || messageResponse.Code == TokenFailedErr {
 		jww.DEBUG.Print("Token authentication failed, retrieving new token & retrying...")
@@ -178,7 +175,7 @@ func (h *Huawei) Notify(payload string, target storage.GTNResult) (bool, error) 
 	return true, nil
 }
 
-func NewHuawei(config *HuaweiConfig) (*Huawei, error) {
+func NewHuawei(config HuaweiParams) (*Huawei, error) {
 	transport := &http.Transport{
 		MaxIdleConns:       10,
 		IdleConnTimeout:    30 * time.Second,
@@ -204,16 +201,14 @@ func (h *Huawei) getAuthToken(ctx *context.Context) error {
 	if err != nil {
 		return errors.WithMessage(err, "Failed to create http request")
 	}
-
 	// Execute authentication request
 	resp, err := h.client.Do(req)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to execute http request")
 	} else if resp.StatusCode != 200 {
-		// TODO: flesh out this error path
-		return errors.New("Bad status code")
+		tokenResponse, _ := ioutil.ReadAll(resp.Body)
+		return errors.Errorf("Bad status code: %+v", string(tokenResponse))
 	}
-
 	// Parse response from server
 	tokenMsg := &TokenMsg{}
 	tokenResponse, err := ioutil.ReadAll(resp.Body)

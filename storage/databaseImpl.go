@@ -93,7 +93,7 @@ type GTNResult struct {
 	EphemeralId          int64
 	Token                string
 	TransmissionRSAHash  []byte
-	NotificationProvider uint8
+	NotificationProvider uint32
 }
 
 func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {

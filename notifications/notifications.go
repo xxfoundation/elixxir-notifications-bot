@@ -11,6 +11,7 @@ package notifications
 import (
 	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/elixxir/notifications-bot/notifications/notificationProvider"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -41,6 +42,7 @@ type Params struct {
 	NotificationsPerBatch  int
 	MaxNotificationPayload int
 	NotificationRate       int
+	Huawei                 notificationProvider.HuaweiParams
 	APNS                   notificationProvider.APNSParams
 }
 
@@ -49,7 +51,7 @@ type Impl struct {
 	Comms                 *notificationBot.Comms
 	Storage               *storage.Storage
 	inst                  *network.Instance
-	notificationProviders map[constants.NotificationProvider]notificationProvider.Provider
+	notificationProviders map[notifications.Provider]notificationProvider.Provider
 	receivedNdf           *uint32
 	roundStore            sync.Map
 	maxNotifications      int
@@ -87,7 +89,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		receivedNdf:           &receivedNdf,
 		maxNotifications:      params.NotificationsPerBatch,
 		maxPayloadBytes:       params.MaxNotificationPayload,
-		notificationProviders: map[constants.NotificationProvider]notificationProvider.Provider{},
+		notificationProviders: map[notifications.Provider]notificationProvider.Provider{},
 	}
 
 	if params.APNS.KeyPath == "" {
@@ -97,7 +99,7 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if err != nil {
 			return nil, errors.WithMessage(err, "Failed to create APNS provider")
 		}
-		impl.notificationProviders[constants.APNS] = apnsProvider
+		impl.notificationProviders[notifications.APNS] = apnsProvider
 	}
 
 	// Set up firebase messaging client
@@ -108,7 +110,17 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		if err != nil {
 			return nil, errors.WithMessage(err, "Failed to create FCM provider")
 		}
-		impl.notificationProviders[constants.FCM] = fcm
+		impl.notificationProviders[notifications.FCM] = fcm
+	}
+
+	if params.Huawei.AppId == "" {
+		jww.WARN.Println("WARNING: RUNNING WITHOUT HUAWEI")
+	} else {
+		huawei, err := notificationProvider.NewHuawei(params.Huawei)
+		if err != nil {
+			return nil, errors.WithMessage(err, "Failed to create Huawei notification provider")
+		}
+		impl.notificationProviders[notifications.HUAWEI] = huawei
 	}
 
 	// Start notification comms server
@@ -182,7 +194,7 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 
 // notify is a helper function which handles sending notifications to either APNS or firebase
 func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
-	targetProvider := constants.NotificationProvider(toNotify.NotificationProvider)
+	targetProvider := notifications.Provider(toNotify.NotificationProvider)
 	jww.INFO.Printf("Notifying ephemeral ID %d via %s to token %s", toNotify.EphemeralId, targetProvider.String(), toNotify.Token)
 	provider, ok := nb.notificationProviders[targetProvider]
 	if !ok {
@@ -238,8 +250,22 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 		return errors.Wrap(err, "Failed to verify IID signature from client")
 	}
 
+	// Set provider if not known
+	var provider notifications.Provider
+	requestProvider := notifications.Provider(request.NotificationProvider)
+	if requestProvider == notifications.UNKNOWN {
+		isAPNS := !strings.Contains(request.Token, ":")
+		if isAPNS {
+			provider = notifications.APNS
+		} else {
+			provider = notifications.FCM
+		}
+	} else {
+		provider = requestProvider
+	}
+
 	// Add the user to storage
-	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token, constants.FCM)
+	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token, provider)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}

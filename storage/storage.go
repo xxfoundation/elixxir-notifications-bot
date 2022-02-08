@@ -5,7 +5,7 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gitlab.com/elixxir/crypto/hash"
-	"gitlab.com/elixxir/notifications-bot/constants"
+	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"time"
 )
@@ -24,7 +24,7 @@ func NewStorage(username, password, dbName, address, port string) (*Storage, err
 	return storage, err
 }
 
-func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string, provider constants.NotificationProvider) (*User, error) {
+func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string, provider notifications.Provider) (*User, error) {
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to create cmix hash")
@@ -39,7 +39,7 @@ func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string, 
 		TransmissionRSA:      transmissionRSA,
 		Signature:            signature,
 		OffsetNum:            ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-		NotificationProvider: uint8(provider),
+		NotificationProvider: uint32(provider),
 		Token:                token,
 	}
 	jww.INFO.Printf("Adding user %+v with token %s", u.TransmissionRSAHash, token)
