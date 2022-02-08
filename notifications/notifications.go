@@ -254,11 +254,11 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	var provider notifications.Provider
 	requestProvider := notifications.Provider(request.NotificationProvider)
 	if requestProvider == notifications.UNKNOWN {
-		isAPNS := !strings.Contains(request.Token, ":")
-		if isAPNS {
-			provider = notifications.APNS
-		} else {
+		isFCM := strings.Contains(request.Token, ":")
+		if isFCM {
 			provider = notifications.FCM
+		} else {
+			provider = notifications.APNS
 		}
 	} else {
 		provider = requestProvider
