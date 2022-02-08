@@ -15,6 +15,10 @@ logLevel: "${verbose}"
 # Path to log file
 log: "${log_path}"
 
+# Notification params
+notificationRate: 30  # Duration in seconds
+notificationsPerBatch: 20
+
 # Database connection information
 dbUsername: "${db_username}"
 dbPassword: "${db_password}"
@@ -28,13 +32,13 @@ certPath: "${cert_path}"
 # The listening port of this server
 port: ${port}
 
-# Path to the firebase credentials file
-firebaseCredentialsPath: "{fb_creds_path}"
-
 # Path to the permissioning server certificate file
 permissioningCertPath: "${permissioning_cert_path}"
 # Address:port of the permissioning server
 permissioningAddress: "${permissioning_address}:${port}"
+
+# Path to the firebase credentials file
+firebaseCredentialsPath: "{fb_creds_path}"
 
 # APNS parameters
 apnsKeyPath: ""
@@ -43,8 +47,10 @@ apnsIssuer: ""
 apnsBundleID: ""
 apnsDev: true
 
-# Notification params
-notificationRate: 30  # Duration in seconds
-notificationsPerBatch: 20
+# Huawei Parameters
+huaweiClientID: ""
+huaweiClientSecret: ""
+huaweiAuthURL: ""
+huaweiPushURL: ""
 # === END YAML
 ```
