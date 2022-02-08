@@ -1,3 +1,11 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright © 2020 Privategrity Corporation                                   /
+//                                                                             /
+// All rights reserved.                                                        /
+////////////////////////////////////////////////////////////////////////////////
+
+// huawei_test.go contains testing code for huawei notifications
+
 package notificationProvider
 
 //func TestHuawei_Notify(t *testing.T) {

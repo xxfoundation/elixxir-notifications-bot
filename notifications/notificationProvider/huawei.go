@@ -1,3 +1,11 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright © 2021 Privategrity Corporation                                   /
+//                                                                             /
+// All rights reserved.                                                        /
+////////////////////////////////////////////////////////////////////////////////
+
+// huawei.go contains a notification provider implementation for Huawei Push notifications
+
 package notificationProvider
 
 import (
@@ -125,6 +133,7 @@ type AlertDictionary struct {
 	LaunchImage  string   `json:"launch-image,omitempty"`
 }
 
+// Notify sends a huawei notification
 func (h *Huawei) Notify(payload string, target storage.GTNResult) (bool, error) {
 	ctx := context.Background()
 	if h.token == "" || time.Now().After(h.expires) {
@@ -175,6 +184,7 @@ func (h *Huawei) Notify(payload string, target storage.GTNResult) (bool, error) 
 	return true, nil
 }
 
+// NewHuawei creates a Huawei provider from a set of HuaweiParams
 func NewHuawei(config HuaweiParams) (*Huawei, error) {
 	transport := &http.Transport{
 		MaxIdleConns:       10,
@@ -194,6 +204,8 @@ func NewHuawei(config HuaweiParams) (*Huawei, error) {
 	}, nil
 }
 
+// getAuthToken is a helper function used to get a huawei auth token
+// it sets the parameters on the Huawei object which are used when setting bearer auth headers
 func (h *Huawei) getAuthToken(ctx *context.Context) error {
 	// Create authentication request
 	body := fmt.Sprintf("grant_type=client_credentials&client_secret=%s&client_id=%s", h.appSecret, h.appID)
@@ -227,12 +239,14 @@ func (h *Huawei) getAuthToken(ctx *context.Context) error {
 	return nil
 }
 
+// resetRequestAuthHeader is a helper to set huawei oauth tokens on an http request
 func (h *Huawei) resetRequestAuthHeader(req *http.Request) {
 	req.Header = http.Header{}
 	req.Header.Set("Content-Type", "application/json;charset=utf-8")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", h.token))
 }
 
+// doNotifyRequest is a helper for sendign a notification request
 func (h *Huawei) doNotifyRequest(req *http.Request) (*MessageResponse, error) {
 	resp, err := h.client.Do(req)
 	if err != nil {

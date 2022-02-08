@@ -1,3 +1,11 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright © 2020 Privategrity Corporation                                   /
+//                                                                             /
+// All rights reserved.                                                        /
+////////////////////////////////////////////////////////////////////////////////
+
+// provider.go defines the Provider interface for notifications
+
 package notificationProvider
 
 import "gitlab.com/elixxir/notifications-bot/storage"

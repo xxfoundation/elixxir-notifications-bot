@@ -352,6 +352,7 @@ func (nb *Impl) ReceivedNdf() *uint32 {
 	return nb.receivedNdf
 }
 
+// Cleaner is a long-running thread which periodically clears the round store of old data
 func (nb *Impl) Cleaner() {
 	cleanF := func(key, val interface{}) bool {
 		t := val.(time.Time)
@@ -371,6 +372,7 @@ func (nb *Impl) Cleaner() {
 	}
 }
 
+// Sender is a long-running thread which periodically batches & sends all notifications received from gateways
 func (nb *Impl) Sender(sendFreq int) {
 	sendTicker := time.NewTicker(time.Duration(sendFreq) * time.Second)
 	for {
