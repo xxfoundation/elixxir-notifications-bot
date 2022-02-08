@@ -220,7 +220,7 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	psig, err := registration.SignWithTimestamp(csprng.NewSystemRNG(), loadedPermKey, ts, string(crt))
 
 	err = impl.RegisterForNotifications(&pb.NotificationRegisterRequest{
-		Token:                 "token",
+		Token:                 "fcm:token",
 		IntermediaryId:        iid,
 		TransmissionRsa:       crt,
 		TransmissionSalt:      []byte("salt"),
@@ -230,6 +230,15 @@ func TestImpl_RegisterForNotifications(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("Failed to register for notifications: %+v", err)
+	}
+
+	u, err := impl.Storage.GetUser(iid)
+	if err != nil {
+		t.Errorf("Could not find registered user: %+v", err)
+	}
+	storedProvider := notifications.Provider(u.NotificationProvider)
+	if storedProvider != notifications.FCM {
+		t.Errorf("Unknown notification parsing did not work as expected.  Should have been %s, instead got %s", notifications.FCM.String(), storedProvider.String())
 	}
 }
 
