@@ -424,6 +424,8 @@ gitlab.com/elixxir/primitives v0.0.3-0.20220208153511-67470fbdbd1c h1:NBL03RMUhU
 gitlab.com/elixxir/primitives v0.0.3-0.20220208153511-67470fbdbd1c/go.mod h1:zA+1Lp9fGPo6pl1QxtMoNPLeZJ1O5m4kcH7HNxePQnQ=
 gitlab.com/elixxir/primitives v0.0.3-0.20220209225643-ae03845af237 h1:Ok1Eyje4sdTd0ffMHwL8z7pu/lfLBm3C6gw+AsZwCVA=
 gitlab.com/elixxir/primitives v0.0.3-0.20220209225643-ae03845af237/go.mod h1:BGKbQL4Iox2D+CHdknZTC46snQfTrOqP+EpCDQ3/GIA=
+gitlab.com/elixxir/primitives v0.0.3-0.20220210222615-2efad6692ecf h1:pwyEzSpVUtgNl4wr/XhS/nj8X7Cl2jWUTriJmQF93Ps=
+gitlab.com/elixxir/primitives v0.0.3-0.20220210222615-2efad6692ecf/go.mod h1:BGKbQL4Iox2D+CHdknZTC46snQfTrOqP+EpCDQ3/GIA=
 gitlab.com/xx_network/comms v0.0.0-20200805174823-841427dd5023/go.mod h1:owEcxTRl7gsoM8c3RQ5KAm5GstxrJp5tn+6JfQ4z5Hw=
 gitlab.com/xx_network/comms v0.0.4-0.20220126231737-fe2338016cce h1:PCOf9nyehdz2IIUsssakxH+YT2q3YQ6OlAFpcOgsd88=
 gitlab.com/xx_network/comms v0.0.4-0.20220126231737-fe2338016cce/go.mod h1:5arueRMa2MNa6dALnfJwyZOhqhV53Gqc+tlHRz+Ycjw=
