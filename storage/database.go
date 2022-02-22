@@ -2,25 +2,32 @@ package storage
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"sync"
+	"time"
 )
 
 // interface declaration for storage methods
 type database interface {
+	UpsertState(state *State) error
+	GetStateValue(key string) (string, error)
 	upsertUser(user *User) error
 	GetUser(iid []byte) (*User, error)
 	GetUserByHash(transmissionRsaHash []byte) (*User, error)
 	getUsersByOffset(offset int64) ([]*User, error)
 	GetAllUsers() ([]*User, error)
+	GetOrphanedUsers() ([]*User, error)
 	DeleteUserByHash(transmissionRsaHash []byte) error
 
 	insertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error
+	GetToNotify(ephemeralIds []int64) ([]GTNResult, error)
 }
 
 // Struct implementing the Database Interface with an underlying DB
@@ -30,13 +37,21 @@ type DatabaseImpl struct {
 
 // Struct implementing the Database Interface with an underlying Map
 type MapImpl struct {
-	usersById      map[string]*User
-	usersByRsaHash map[string]*User
-	usersByOffset  map[int64][]*User
-	allUsers       []*User
-	allEphemerals  map[int]*Ephemeral
-	ephemeralsById map[int64][]*Ephemeral
-	ephIDSeq       int
+	mut              sync.Mutex
+	states           map[string]string
+	usersById        map[string]*User
+	usersByRsaHash   map[string]*User
+	usersByOffset    map[int64][]*User
+	allUsers         []*User
+	allEphemerals    map[int]*Ephemeral
+	ephemeralsById   map[int64][]*Ephemeral
+	ephemeralsByUser map[string]map[int64]*Ephemeral
+	ephIDSeq         int
+}
+
+type State struct {
+	Key   string `gorm:"primary_key"`
+	Value string `gorm:"NOT NULL"`
 }
 
 // Structure representing a User in the Storage backend
@@ -93,21 +108,37 @@ func newDatabase(username, password, dbName, address,
 		defer jww.INFO.Println("Map backend initialized successfully!")
 
 		mapImpl := &MapImpl{
-			usersById:      map[string]*User{},
-			usersByRsaHash: map[string]*User{},
-			usersByOffset:  map[int64][]*User{},
-			allUsers:       nil,
-			ephemeralsById: map[int64][]*Ephemeral{},
-			allEphemerals:  map[int]*Ephemeral{},
-			ephIDSeq:       0,
+			usersById:        map[string]*User{},
+			usersByRsaHash:   map[string]*User{},
+			usersByOffset:    map[int64][]*User{},
+			allUsers:         nil,
+			ephemeralsById:   map[int64][]*Ephemeral{},
+			allEphemerals:    map[int]*Ephemeral{},
+			ephemeralsByUser: map[string]map[int64]*Ephemeral{},
+			states:           map[string]string{},
+			ephIDSeq:         0,
 		}
 
 		return database(mapImpl), nil
 	}
 
+	// Get and configure the internal database ConnPool
+	sqlDb, err := db.DB()
+	if err != nil {
+		return database(&DatabaseImpl{}), errors.Errorf("Unable to configure database connection pool: %+v", err)
+	}
+	// SetMaxIdleConns sets the maximum number of connections in the idle connection pool.
+	sqlDb.SetMaxIdleConns(10)
+	// SetMaxOpenConns sets the maximum number of open connections to the Database.
+	sqlDb.SetMaxOpenConns(50)
+	// SetConnMaxLifetime sets the maximum amount of time a connection may be idle.
+	sqlDb.SetConnMaxIdleTime(10 * time.Minute)
+	// SetConnMaxLifetime sets the maximum amount of time a connection may be reused.
+	sqlDb.SetConnMaxLifetime(12 * time.Hour)
+
 	// Initialize the database schema
 	// WARNING: Order is important. Do not change without database testing
-	models := []interface{}{&User{}, &Ephemeral{}}
+	models := []interface{}{&User{}, &Ephemeral{}, &State{}}
 	for _, model := range models {
 		err = db.AutoMigrate(model)
 		if err != nil {
