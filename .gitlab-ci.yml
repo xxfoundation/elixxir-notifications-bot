@@ -26,8 +26,8 @@ build:
     - go mod vendor -v
     - go build ./...
     - go mod tidy
-    - apt-get update
-    - apt-get install bc -y
+    - sudo apt-get update
+    - sudo apt-get install bc -y
 
     - mkdir -p testdata
     # Test coverage
