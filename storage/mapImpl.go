@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/pkg/errors"
-	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
 )
 
@@ -172,8 +171,6 @@ func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
 // Inserts the given State into Storage if it does not exist
 // Or updates the Database State if its value does not match the given State
 func (m *MapImpl) UpsertState(state *State) error {
-	jww.TRACE.Printf("Attempting to insert State into Map: %+v", state)
-
 	m.mut.Lock()
 	defer m.mut.Unlock()
 
@@ -188,7 +185,6 @@ func (m *MapImpl) GetStateValue(key string) (string, error) {
 	defer m.mut.Unlock()
 
 	if val, ok := m.states[key]; ok {
-		jww.TRACE.Printf("Obtained State from Map: %+v", val)
 		return val, nil
 	}
 
