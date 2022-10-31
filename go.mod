@@ -1,6 +1,6 @@
 module gitlab.com/elixxir/notifications-bot
 
-go 1.17
+go 1.19
 
 require (
 	firebase.google.com/go v3.12.0+incompatible
