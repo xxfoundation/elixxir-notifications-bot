@@ -84,4 +84,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	honnef.co/go/tools v0.0.1-2020.1.3 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
+	src.agwa.name/tlshacks v0.0.0-20220518131152-d2c6f4e2b780 // indirect
 )
