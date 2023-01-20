@@ -9,7 +9,7 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20230113232310-712ff1217195
+	gitlab.com/elixxir/comms v0.0.4-0.20230116232020-39f76a2aeccc
 	gitlab.com/elixxir/crypto v0.0.7-0.20230113231934-c833bffda448
 	gitlab.com/elixxir/primitives v0.0.3-0.20230109222259-f62b2a90b62c
 	gitlab.com/xx_network/comms v0.0.4-0.20230113193654-a3a18c6bbb90
@@ -59,6 +59,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
+	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
