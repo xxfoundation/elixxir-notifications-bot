@@ -9,12 +9,12 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.7.0
-	gitlab.com/elixxir/comms v0.0.4-0.20230116232020-39f76a2aeccc
-	gitlab.com/elixxir/crypto v0.0.7-0.20230113231934-c833bffda448
-	gitlab.com/elixxir/primitives v0.0.3-0.20230109222259-f62b2a90b62c
-	gitlab.com/xx_network/comms v0.0.4-0.20230113193654-a3a18c6bbb90
-	gitlab.com/xx_network/crypto v0.0.5-0.20230113190331-06f2eb12b97f
-	gitlab.com/xx_network/primitives v0.0.4-0.20221219230308-4b5550a9247d
+	gitlab.com/elixxir/comms v0.0.4-0.20230213195359-6e5bcdb8fe81
+	gitlab.com/elixxir/crypto v0.0.7-0.20230213195303-2cb8d3c1ea05
+	gitlab.com/elixxir/primitives v0.0.3-0.20230213194606-08e65dd1a646
+	gitlab.com/xx_network/comms v0.0.4-0.20230213195240-a34baf4a722a
+	gitlab.com/xx_network/crypto v0.0.5-0.20230213194530-577973730e2e
+	gitlab.com/xx_network/primitives v0.0.4-0.20230203173415-81c2cb07da44
 	golang.org/x/net v0.5.0
 	google.golang.org/api v0.20.0
 	gorm.io/driver/postgres v1.0.8
@@ -27,7 +27,7 @@ require (
 	cloud.google.com/go/firestore v1.1.1 // indirect
 	cloud.google.com/go/pubsub v1.3.1 // indirect
 	cloud.google.com/go/storage v1.6.0 // indirect
-	git.xx.network/elixxir/grpc-web-go-client v0.0.0-20221221204132-2ed1fec765f1 // indirect
+	git.xx.network/elixxir/grpc-web-go-client v0.0.0-20230213195139-913e760b9cdd // indirect
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
@@ -59,7 +59,6 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/pelletier/go-toml v1.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
