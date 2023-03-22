@@ -198,7 +198,7 @@ func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephe
 
 func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t time.Time) error {
 	identities, err := s.getIdentitiesByOffset(offset)
-	if err != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return errors.WithMessage(err, "Failed to get users for given offset")
 	}
 	if len(identities) > 0 {
