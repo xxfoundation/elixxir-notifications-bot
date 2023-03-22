@@ -22,8 +22,7 @@ type Storage struct {
 	notificationBuffer *NotificationBuffer
 }
 
-// Create a new Storage object wrapping a database interface
-// Returns a Storage object and error
+// NewStorage creates a new Storage object with the given connection parameters
 func NewStorage(username, password, dbName, address, port string) (*Storage, error) {
 	db, err := newDatabase(username, password, dbName, address, port)
 	nb := NewNotificationBuffer()
@@ -31,6 +30,8 @@ func NewStorage(username, password, dbName, address, port string) (*Storage, err
 	return storage, err
 }
 
+// RegisterForNotifications registers a user with the passed in transmissionRSA
+// to receive notifications on the identity with intermediary id iid, with the passed in token
 func (s *Storage) RegisterForNotifications(iid, transmissionRSA, signature []byte, token string, epoch int32, addressSpace uint8) (*User, error) {
 	h, err := hash.NewCMixHash()
 	if err != nil {
@@ -82,6 +83,8 @@ func (s *Storage) RegisterForNotifications(iid, transmissionRSA, signature []byt
 	return u, s.registerForNotifications(u, *identity, token)
 }
 
+// UnregisterForNotifications breaks the association between a user and any passed in intermediary IDs and/or tokens
+// Token entries will be deleted, identity entries will be deleted iff there are no other users associated with them, and user records will be deleted if they have no associated tokens
 func (s *Storage) UnregisterForNotifications(transmissionRSA []byte, iids [][]byte, tokens []string) error {
 	h, err := hash.NewCMixHash()
 	if err != nil {
@@ -122,28 +125,7 @@ func (s *Storage) UnregisterForNotifications(transmissionRSA []byte, iids [][]by
 	return nil
 }
 
-//
-//func (s *Storage) AddUser(iid, transmissionRSA, signature []byte, token string) (*User, error) {
-//	h, err := hash.NewCMixHash()
-//	if err != nil {
-//		return nil, errors.WithMessage(err, "Failed to create cmix hash")
-//	}
-//	_, err = h.Write(transmissionRSA)
-//	if err != nil {
-//		return nil, errors.WithMessage(err, "Failed to hash transmission RSA")
-//	}
-//	u := &User{
-//		IntermediaryId:      iid,
-//		TransmissionRSAHash: h.Sum(nil),
-//		TransmissionRSA:     transmissionRSA,
-//		Signature:           signature,
-//		OffsetNum:           ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-//		Token:               token,
-//	}
-//	jww.INFO.Printf("Adding user %+v with token %s", u.TransmissionRSAHash, token)
-//	return u, s.upsertUser(u)
-//}
-
+// AddLatestEphemeral generates an ephemeral ID for the passed in identity and adds it to storage
 func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephemeral, error) {
 	now := time.Now()
 	eid, _, _, err := ephemeral.GetIdFromIntermediary(i.IntermediaryId, size, now.UnixNano())
@@ -183,19 +165,7 @@ func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephe
 	return e, err
 }
 
-//
-//func (s *Storage) deleteUser(transmissionRSA []byte) error {
-//	h, err := hash.NewCMixHash()
-//	if err != nil {
-//		return errors.WithMessage(err, "Failed to create cmix hash")
-//	}
-//	_, err = h.Write(transmissionRSA)
-//	if err != nil {
-//		return errors.WithMessage(err, "Failed to hash transmission RSA")
-//	}
-//	return s.DeleteUserByHash(h.Sum(nil))
-//}
-
+// AddEphemeralsForOffset generates new ephemerals for all identities with the given offset, using the passed in parameters
 func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t time.Time) error {
 	identities, err := s.getIdentitiesByOffset(offset)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {

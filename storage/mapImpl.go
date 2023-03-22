@@ -10,7 +10,6 @@ package storage
 
 import (
 	"encoding/base64"
-	"fmt"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
@@ -36,12 +35,12 @@ type MapImpl struct {
 	states map[string]State
 
 	tokens       map[string]Token
-	tokensByUser map[string][]Token
+	tokensByUser map[string]map[string]Token
 
 	users map[string]User
 
-	userIdentities map[string][]string
-	identityUsers  map[string][]string
+	userIdentities map[string]map[string]bool
+	identityUsers  map[string]map[string]bool
 
 	identities         map[string]Identity
 	identitiesByOffset map[int64][]*Identity
@@ -84,12 +83,8 @@ func (m *MapImpl) DeleteToken(token string) error {
 		return nil
 	}
 	userId := base64.StdEncoding.EncodeToString(toDelete.TransmissionRSAHash)
-	for i, t := range m.tokensByUser[userId] {
-		if t.Token == token {
-			m.tokensByUser[userId] = append(m.tokensByUser[userId][:i], m.tokensByUser[userId][:i+1]...)
-			break
-		}
-	}
+	delete(m.tokensByUser[userId], token)
+
 	delete(m.tokens, token)
 	return nil
 }
@@ -98,17 +93,17 @@ func (m *MapImpl) insertUser(user *User) error {
 	userId := base64.StdEncoding.EncodeToString(user.TransmissionRSAHash)
 	m.users[userId] = *user
 
-	m.userIdentities[userId] = []string{}
+	m.userIdentities[userId] = map[string]bool{}
 
 	for _, ident := range user.Identities {
 		identityId := base64.StdEncoding.EncodeToString(ident.IntermediaryId)
-		m.userIdentities[userId] = append(m.userIdentities[userId], identityId)
-		m.identityUsers[identityId] = append(m.identityUsers[identityId], userId)
+		m.userIdentities[userId][identityId] = true
+		m.identityUsers[identityId][userId] = true
 	}
 
-	m.tokensByUser[userId] = []Token{}
+	m.tokensByUser[userId] = map[string]Token{}
 	for _, token := range user.Tokens {
-		m.tokensByUser[userId] = append(m.tokensByUser[userId], token)
+		m.tokensByUser[userId][token.Token] = token
 		m.tokens[token.Token] = token
 	}
 	return nil
@@ -153,7 +148,7 @@ func (m *MapImpl) insertIdentity(identity *Identity) error {
 		m.identitiesByOffset[identity.OffsetNum] = []*Identity{}
 	}
 	m.identitiesByOffset[identity.OffsetNum] = append(m.identitiesByOffset[identity.OffsetNum], identity)
-	m.identityUsers[identityId] = []string{}
+	m.identityUsers[identityId] = map[string]bool{}
 	return nil
 }
 func (m *MapImpl) getIdentitiesByOffset(offset int64) ([]*Identity, error) {
@@ -175,7 +170,6 @@ func (m *MapImpl) GetOrphanedIdentities() ([]*Identity, error) {
 }
 
 func (m *MapImpl) insertEphemeral(ephemeral *Ephemeral) error {
-	fmt.Printf("insertEphemeral: %+v\n", ephemeral)
 	ephemeral.ID = uint(m.ephemeralSequence)
 	m.ephemerals[m.ephemeralSequence] = *ephemeral
 	_, ok := m.ephemeralsById[ephemeral.EphemeralId]
@@ -209,11 +203,8 @@ func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
 	return m.latest, nil
 }
 func (m *MapImpl) DeleteOldEphemerals(currentEpoch int32) error {
-	fmt.Printf("DeleteOldEphemerals: %+v\n", currentEpoch)
 	for _, v := range m.ephemerals {
-		fmt.Printf("CurrentEpoch: %d, Record epoch: %d\n", currentEpoch, v.Epoch)
 		if v.Epoch < currentEpoch {
-			fmt.Println("Deleting record")
 			identityId := base64.StdEncoding.EncodeToString(v.IntermediaryId)
 			for i := range m.ephemeralsByIdentity[identityId] {
 				if m.ephemeralsByIdentity[identityId][i].ID == v.ID {
@@ -233,6 +224,7 @@ func (m *MapImpl) DeleteOldEphemerals(currentEpoch int32) error {
 	return nil
 }
 func (m *MapImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
+	foundTokens := map[string]interface{}{}
 	res := []GTNResult{}
 	for _, eid := range ephemeralIds {
 		ephsToNotify, ok := m.ephemeralsById[eid]
@@ -245,12 +237,17 @@ func (m *MapImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 			if !ok {
 				continue
 			}
-			for _, userId := range userIDs {
+			for userId, _ := range userIDs {
 				tokens, ok := m.tokensByUser[userId]
 				if !ok {
 					continue
 				}
 				for _, token := range tokens {
+					if _, ok := foundTokens[token.Token]; ok {
+						continue
+					}
+
+					foundTokens[token.Token] = struct{}{}
 					res = append(res, GTNResult{
 						Token:               token.Token,
 						TransmissionRSAHash: m.users[userId].TransmissionRSAHash,
@@ -267,12 +264,7 @@ func (m *MapImpl) unregisterIdentities(u *User, iids []Identity) error {
 	userId := base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)
 	for _, ident := range iids {
 		identityId := base64.StdEncoding.EncodeToString(ident.IntermediaryId)
-		for i, relatedIdentityId := range m.userIdentities[userId] {
-			if identityId == relatedIdentityId {
-				m.userIdentities[userId] = append(m.userIdentities[userId][:i], m.userIdentities[userId][i+1:]...)
-				break
-			}
-		}
+		delete(m.userIdentities[userId], identityId)
 	}
 	return nil
 }
@@ -280,12 +272,7 @@ func (m *MapImpl) unregisterIdentities(u *User, iids []Identity) error {
 func (m *MapImpl) unregisterTokens(u *User, tokens []Token) error {
 	userId := base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)
 	for _, token := range tokens {
-		for i, relatedToken := range m.tokensByUser[userId] {
-			if relatedToken.Token == token.Token {
-				m.tokensByUser[userId] = append(m.tokensByUser[userId][:i], m.tokensByUser[userId][i+1:]...)
-				break
-			}
-		}
+		delete(m.tokensByUser[userId], token.Token)
 	}
 	return nil
 }
@@ -293,14 +280,14 @@ func (m *MapImpl) unregisterTokens(u *User, tokens []Token) error {
 func (m *MapImpl) registerForNotifications(u *User, identity Identity, token string) error {
 	identityId := base64.StdEncoding.EncodeToString(identity.IntermediaryId)
 	userId := base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)
-	m.userIdentities[userId] = append(m.userIdentities[userId], identityId)
-	m.identityUsers[identityId] = append(m.identityUsers[identityId], userId)
+	m.userIdentities[userId][identityId] = true
+	m.identityUsers[identityId][userId] = true
 
 	t := Token{
 		Token:               token,
 		TransmissionRSAHash: u.TransmissionRSA,
 	}
-	m.tokensByUser[userId] = append(m.tokensByUser[userId], t)
+	m.tokensByUser[userId][token] = t
 	m.tokens[token] = t
 	return nil
 }
