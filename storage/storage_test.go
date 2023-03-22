@@ -1,10 +1,11 @@
-////////////////////////////////////////////////////////////////////////////////
+// //////////////////////////////////////////////////////////////////////////////
 // Copyright © 2022 xx foundation                                             //
-//                                                                            //
+//
+//	//
+//
 // Use of this source code is governed by a license that can be found in the  //
 // LICENSE file.                                                              //
-////////////////////////////////////////////////////////////////////////////////
-
+// //////////////////////////////////////////////////////////////////////////////
 package storage
 
 import (
@@ -26,7 +27,7 @@ func TestStorage_AddUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	_, err = s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	_, err = s.RegisterForNotifications(iid, []byte("transmissionrsa"), []byte("signature"), "token", 0, 8)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}
@@ -45,11 +46,11 @@ func TestStorage_DeleteUser(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	u, err := s.RegisterForNotifications(iid, []byte("transmissionrsa"), []byte("signature"), "token", 0, 8)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}
-	err = s.DeleteUser(u.TransmissionRSA)
+	err = s.UnregisterForNotifications(u.TransmissionRSA, [][]byte{iid}, []string{"token"})
 	if err != nil {
 		t.Errorf("Failed to delete user: %+v", err)
 	}
@@ -68,11 +69,15 @@ func TestStorage_AddLatestEphemeral(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("transmissionrsa"), []byte("signature"), "token")
+	ident := &Identity{
+		IntermediaryId: iid,
+		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
+	}
+	err = s.insertIdentity(ident)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}
-	_, err = s.AddLatestEphemeral(u, 5, 16)
+	_, err = s.AddLatestEphemeral(ident, 5, 16)
 	if err != nil {
 		t.Errorf("Failed to add latest ephemeral: %+v", err)
 	}

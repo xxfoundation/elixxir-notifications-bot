@@ -14,7 +14,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"sync"
 	"time"
 )
 
@@ -22,47 +21,43 @@ import (
 type database interface {
 	UpsertState(state *State) error
 	GetStateValue(key string) (string, error)
-	upsertUser(user *User) error
-	GetUser(iid []byte) (*User, error)
-	GetUserByHash(transmissionRsaHash []byte) (*User, error)
-	getUsersByOffset(offset int64) ([]*User, error)
+
+	insertUser(user *User) error
+	GetUser(transmissionRsaHash []byte) (*User, error)
+	deleteUser(transmissionRsaHash []byte) error
 	GetAllUsers() ([]*User, error)
-	GetOrphanedUsers() ([]*User, error)
-	DeleteUserByHash(transmissionRsaHash []byte) error
+
+	getIdentity(iid []byte) (*Identity, error)
+	insertIdentity(identity *Identity) error
+	getIdentitiesByOffset(offset int64) ([]*Identity, error)
+	GetOrphanedIdentities() ([]*Identity, error)
 
 	insertEphemeral(ephemeral *Ephemeral) error
 	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
 	GetLatestEphemeral() (*Ephemeral, error)
 	DeleteOldEphemerals(currentEpoch int32) error
 	GetToNotify(ephemeralIds []int64) ([]GTNResult, error)
+
+	DeleteToken(token string) error
+
+	unregisterIdentities(u *User, iids []Identity) error
+	unregisterTokens(u *User, tokens []Token) error
+	registerForNotifications(u *User, identity Identity, token string) error
+	LegacyUnregister(iid []byte) error
 }
 
-// Struct implementing the Database Interface with an underlying DB
+// DatabaseImpl is a struct which implements database on an underlying gorm.DB
 type DatabaseImpl struct {
 	db *gorm.DB // Stored database connection
 }
 
-// Struct implementing the Database Interface with an underlying Map
-type MapImpl struct {
-	mut              sync.Mutex
-	states           map[string]string
-	usersById        map[string]*User
-	usersByRsaHash   map[string]*User
-	usersByOffset    map[int64][]*User
-	allUsers         []*User
-	allEphemerals    map[int]*Ephemeral
-	ephemeralsById   map[int64][]*Ephemeral
-	ephemeralsByUser map[string]map[int64]*Ephemeral
-	ephIDSeq         int
-}
-
+// State table
 type State struct {
 	Key   string `gorm:"primary_key"`
 	Value string `gorm:"NOT NULL"`
 }
 
-// Structure representing a User in the Storage backend
-type User struct {
+type UserV1 struct {
 	TransmissionRSAHash []byte      `gorm:"primaryKey"`
 	IntermediaryId      []byte      `gorm:"not null; index"`
 	OffsetNum           int64       `gorm:"not null; index"`
@@ -72,19 +67,49 @@ type User struct {
 	Ephemerals          []Ephemeral `gorm:"foreignKey:transmission_rsa_hash;references:transmission_rsa_hash;constraint:OnDelete:CASCADE;"`
 }
 
+type Token struct {
+	Token               string `gorm:"primaryKey"`
+	TransmissionRSAHash []byte `gorm:"not null;references users(transmission_rsa_hash)"`
+}
+
+type User struct {
+	TransmissionRSAHash []byte     `gorm:"primaryKey"`
+	TransmissionRSA     []byte     `gorm:"not null"`
+	Signature           []byte     `gorm:"not null"`
+	Tokens              []Token    `gorm:"foreignKey:TransmissionRSAHash;constraint:OnDelete:CASCADE;"`
+	Identities          []Identity `gorm:"many2many:user_identities;"`
+}
+
+// CREATES JOIN TABLE user_identities
+// Table "public.user_identities"
+// Column           | Type  | Collation | Nullable | Default
+// ----------------------------+-------+-----------+----------+---------
+// user_transmission_rsa_hash | bytea |           | not null |
+// identity_intermediary_id   | bytea |           | not null |
+// Indexes:
+// "user_identities_pkey" PRIMARY KEY, btree (user_transmission_rsa_hash, identity_intermediary_id)
+// Foreign-key constraints:
+// "fk_user_identities_identity" FOREIGN KEY (identity_intermediary_id) REFERENCES identities(intermediary_id)
+// "fk_user_identities_user" FOREIGN KEY (user_transmission_rsa_hash) REFERENCES users(transmission_rsa_hash)
+
+type Identity struct {
+	IntermediaryId []byte      `gorm:"primaryKey"`
+	OffsetNum      int64       `gorm:"not null; index"`
+	Ephemerals     []Ephemeral `gorm:"foreignKey:intermediary_id;references:intermediary_id;constraint:OnDelete:CASCADE;"`
+}
+
 type Ephemeral struct {
-	ID                  uint   `gorm:"primaryKey"`
-	Offset              int64  `gorm:"not null; index"`
-	TransmissionRSAHash []byte `gorm:"not null; references users(transmission_rsa_hash)"`
-	EphemeralId         int64  `gorm:"not null; index"`
-	Epoch               int32  `gorm:"not null; index"`
+	ID             uint   `gorm:"primaryKey"`
+	IntermediaryId []byte `gorm:"not null;references identities(intermediary_id)"`
+	Offset         int64  `gorm:"not null; index"`
+	EphemeralId    int64  `gorm:"not null; index"`
+	Epoch          int32  `gorm:"not null; index"`
 }
 
 // Initialize the database interface with database backend
 // Returns a database interface, close function, and error
 func newDatabase(username, password, dbName, address,
 	port string) (database, error) {
-
 	var err error
 	var db *gorm.DB
 	// Connect to the database if the correct information is provided
@@ -105,7 +130,6 @@ func newDatabase(username, password, dbName, address,
 	// Return the map-backend interface
 	// in the event there is a database error or information is not provided
 	if (address == "" || port == "") || err != nil {
-
 		if err != nil {
 			jww.WARN.Printf("Unable to initialize database backend: %+v", err)
 		} else {
@@ -115,15 +139,19 @@ func newDatabase(username, password, dbName, address,
 		defer jww.INFO.Println("Map backend initialized successfully!")
 
 		mapImpl := &MapImpl{
-			usersById:        map[string]*User{},
-			usersByRsaHash:   map[string]*User{},
-			usersByOffset:    map[int64][]*User{},
-			allUsers:         nil,
-			ephemeralsById:   map[int64][]*Ephemeral{},
-			allEphemerals:    map[int]*Ephemeral{},
-			ephemeralsByUser: map[string]map[int64]*Ephemeral{},
-			states:           map[string]string{},
-			ephIDSeq:         0,
+			states:               map[string]State{},
+			tokens:               map[string]Token{},
+			tokensByUser:         map[string][]Token{},
+			users:                map[string]User{},
+			userIdentities:       map[string][]string{},
+			identityUsers:        map[string][]string{},
+			identities:           map[string]Identity{},
+			identitiesByOffset:   map[int64][]*Identity{},
+			ephemerals:           map[int]Ephemeral{},
+			ephemeralsById:       map[int64][]*Ephemeral{},
+			ephemeralsByIdentity: map[string][]*Ephemeral{},
+			ephemeralSequence:    0,
+			latest:               nil,
 		}
 
 		return database(mapImpl), nil
@@ -145,7 +173,7 @@ func newDatabase(username, password, dbName, address,
 
 	// Initialize the database schema
 	// WARNING: Order is important. Do not change without database testing
-	models := []interface{}{&User{}, &Ephemeral{}, &State{}}
+	models := []interface{}{&Token{}, &User{}, &Identity{}, &Ephemeral{}, &State{}}
 	for _, model := range models {
 		err = db.AutoMigrate(model)
 		if err != nil {

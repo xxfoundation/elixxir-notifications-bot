@@ -73,14 +73,14 @@ func TestImpl_SendBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("rsacert"), []byte("sig"), "fcm:token")
+	_, epoch := ephemeral.HandleQuantization(time.Now())
+	_, err = s.RegisterForNotifications(iid, []byte("rsacert"), []byte("sig"), "fcm:token", epoch, 16)
 	if err != nil {
 		t.Errorf("Failed to add fake user: %+v", err)
 	}
-	_, e := ephemeral.HandleQuantization(time.Now())
-	eph, err := s.AddLatestEphemeral(u, e, 16)
+	eph, err := s.GetLatestEphemeral()
 	if err != nil {
-		t.Errorf("Failed to add latest ephemeral: %+v", err)
+		t.Fatal(err)
 	}
 	_, err = i.SendBatch(map[int64][]*notifications.Data{})
 	if err != nil {
@@ -313,8 +313,10 @@ func TestImpl_UnregisterForNotifications(t *testing.T) {
 		t.Errorf("Failed to register for notifications: %+v", err)
 	}
 	err = impl.UnregisterForNotifications(&pb.NotificationUnregisterRequest{
+		TransmissionRSA:       crt,
 		IntermediaryId:        iid,
 		IIDTransmissionRsaSig: sig,
+		Token:                 "token",
 	})
 	if err != nil {
 		t.Errorf("Failed to unregister for notifications: %+v", err)

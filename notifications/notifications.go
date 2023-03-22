@@ -12,6 +12,7 @@ package notifications
 import (
 	"encoding/base64"
 	"gitlab.com/elixxir/notifications-bot/notifications/apns"
+	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -30,7 +31,6 @@ import (
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
@@ -188,6 +188,7 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 	csvs := map[int64]string{}
 	var ephemerals []int64
 	var unsent []*notifications.Data
+	jww.INFO.Printf("data: %+v", data)
 	for i, ilist := range data {
 		var overflow, toSend []*notifications.Data
 		if len(ilist) > nb.maxNotifications {
@@ -203,7 +204,9 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 		ephemerals = append(ephemerals, i)
 		unsent = append(unsent, overflow...)
 	}
+	jww.INFO.Printf("Ephemerals: %+v", ephemerals)
 	toNotify, err := nb.Storage.GetToNotify(ephemerals)
+	jww.INFO.Printf("GTN result: %+v", toNotify)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
 	}
@@ -258,7 +261,7 @@ func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
 				strings.Contains(err.Error(), "Invalid registration")
 			if strings.Contains(err.Error(), "404") || invalidToken {
 				jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", toNotify.TransmissionRSAHash)
-				err := nb.Storage.DeleteUserByHash(toNotify.TransmissionRSAHash)
+				err := nb.Storage.DeleteToken(toNotify.Token)
 				if err != nil {
 					jww.ERROR.Printf("Failed to remove user registration tRSA hash %+v: %+v", toNotify.TransmissionRSAHash, err)
 				}
@@ -309,36 +312,40 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 	}
 
 	// Add the user to storage
-	u, err := nb.Storage.AddUser(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token)
+	_, epoch := ephemeral.HandleQuantization(time.Now())
+	_, err = nb.Storage.RegisterForNotifications(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token, epoch, nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}
-	_, epoch := ephemeral.HandleQuantization(time.Now())
-	def := nb.inst.GetPartialNdf()
-	// FIXME: Does the address space need more logic here?
-	e, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(def.Get().AddressSpace[0].Size))
-	if err != nil {
-		return errors.WithMessage(err, "Failed to add ephemeral ID for user")
-	}
-	jww.INFO.Printf("Added ephemeral ID %+v for user %+v", e.EphemeralId, u.IntermediaryId)
 
 	return nil
 }
 
 // UnregisterForNotifications is called by the client, and removes a user registration from our database
 func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest) error {
+	if request.TransmissionRSA == nil && request.Token == "" {
+		return nb.Storage.LegacyUnregister(request.IntermediaryId)
+	}
+
 	h, err := hash.NewCMixHash()
 	if err != nil {
 		return errors.WithMessage(err, "Failed to create cmix hash")
 	}
+	_, err = h.Write(request.TransmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to hash transmission RSA")
+	}
+	transmissionRSAHash := h.Sum(nil)
+
+	u, err := nb.Storage.GetUser(transmissionRSAHash)
+	if err != nil {
+		return errors.WithMessagef(err, "Failed to find user with intermediary ID %+v", request.IntermediaryId)
+	}
+
+	h.Reset()
 	_, err = h.Write(request.IntermediaryId)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to write intermediary id to hash")
-	}
-
-	u, err := nb.Storage.GetUser(request.IntermediaryId)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to find user with intermediary ID %+v", request.IntermediaryId)
 	}
 
 	pub, err := rsa.LoadPublicKeyFromPem(u.TransmissionRSA)
@@ -349,7 +356,7 @@ func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterReq
 	if err != nil {
 		return errors.Wrap(err, "Failed to verify IID signature from client")
 	}
-	err = nb.Storage.DeleteUserByHash(u.TransmissionRSAHash)
+	err = nb.Storage.UnregisterForNotifications(request.TransmissionRSA, [][]byte{request.IntermediaryId}, []string{request.Token})
 	if err != nil {
 		return errors.Wrap(err, "Failed to unregister user with notifications")
 	}
@@ -424,6 +431,10 @@ func (nb *Impl) Sender(sendFreq int) {
 				// Retreive & swap notification buffer
 				notifBuf := nb.Storage.GetNotificationBuffer()
 				notifMap := notifBuf.Swap()
+
+				if len(notifMap) == 0 {
+					return
+				}
 
 				unsent := map[uint64][]*notifications.Data{}
 				rest, err := nb.SendBatch(notifMap)

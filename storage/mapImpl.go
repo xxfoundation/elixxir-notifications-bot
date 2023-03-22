@@ -6,188 +6,305 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 // Handles the implementation of the map backend
-
 package storage
 
 import (
-	"bytes"
+	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
+	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
+	"sync"
 )
 
-func (m *MapImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
-	var results []GTNResult
-	for _, eid := range ephemeralIds {
-		for _, eph := range m.ephemeralsById[eid] {
-			u := m.usersByRsaHash[string(eph.TransmissionRSAHash)]
-			results = append(results, GTNResult{
-				EphemeralId:         eid,
-				TransmissionRSAHash: u.TransmissionRSA,
-				Token:               u.Token,
-			})
-		}
-	}
-	return results, nil
+type MapImplV1 struct {
+	mut              sync.Mutex
+	states           map[string]string
+	usersById        map[string]*User
+	usersByRsaHash   map[string]*User
+	usersByOffset    map[int64][]*User
+	allUsers         []*User
+	allEphemerals    map[int]*Ephemeral
+	ephemeralsById   map[int64][]*Ephemeral
+	ephemeralsByUser map[string]map[int64]*Ephemeral
+	ephIDSeq         int
 }
 
-// Obtain User from backend by primary key
-func (m *MapImpl) GetUser(userId []byte) (*User, error) {
-	// Attempt to load from map
-	v, found := m.usersById[string(userId)]
-	// Check if it was found, Load function sets it as a bool
-	if found == false {
-		return nil, errors.New("user could not be found")
-	}
+// Struct implementing the Database Interface with an underlying Map
+type MapImpl struct {
+	mux    sync.Mutex
+	states map[string]State
 
-	return v, nil
-}
+	tokens       map[string]Token
+	tokensByUser map[string][]Token
 
-func (m *MapImpl) GetUserByHash(transmissionRsaHash []byte) (*User, error) {
-	// Attempt to load from map
-	v, found := m.usersByRsaHash[string(transmissionRsaHash)]
-	// Check if it was found, Load function sets it as a bool
-	if found == false {
-		return nil, errors.New("user could not be found")
-	}
+	users map[string]User
 
-	return v, nil
-}
+	userIdentities map[string][]string
+	identityUsers  map[string][]string
 
-// Delete User from backend by primary key
-func (m *MapImpl) DeleteUserByHash(transmissionRsaHash []byte) error {
-	user, ok := m.usersByRsaHash[string(transmissionRsaHash)]
-	if !ok {
-		return nil
-	}
-	delete(m.usersByRsaHash, string(transmissionRsaHash))
-	delete(m.usersById, string(user.IntermediaryId))
-	for i, u := range m.allUsers {
-		if bytes.Compare(transmissionRsaHash, u.TransmissionRSAHash) == 0 {
-			m.allUsers = append(m.allUsers[:i], m.allUsers[i+1:]...)
-		}
-	}
-	for i, u := range m.usersByOffset[user.OffsetNum] {
-		if bytes.Compare(transmissionRsaHash, u.TransmissionRSAHash) == 0 {
-			m.usersByOffset[user.OffsetNum] = append(m.usersByOffset[user.OffsetNum][:i],
-				m.usersByOffset[user.OffsetNum][i+1:]...)
-		}
-	}
+	identities         map[string]Identity
+	identitiesByOffset map[int64][]*Identity
 
-	return nil
-}
-
-// Insert or Update User into backend
-func (m *MapImpl) upsertUser(user *User) error {
-	if u, ok := m.usersByRsaHash[string(user.TransmissionRSAHash)]; ok {
-		if u.Token == user.Token {
-			return nil
-		}
-		err := m.DeleteUserByHash(user.TransmissionRSAHash)
-		if err != nil {
-			return err
-		}
-	}
-	// Insert new user
-	m.ephemeralsByUser[string(user.TransmissionRSAHash)] = map[int64]*Ephemeral{} // init user's ephemeral map
-	m.usersByRsaHash[string(user.TransmissionRSAHash)] = user
-	m.usersById[string(user.IntermediaryId)] = user
-	var found bool
-	for i, u := range m.usersByOffset[user.OffsetNum] {
-		if string(user.TransmissionRSAHash) == string(u.TransmissionRSAHash) {
-			found = true
-			m.usersByOffset[user.OffsetNum][i] = user
-			break
-		}
-	}
-	if !found {
-		m.usersByOffset[user.OffsetNum] = append(m.usersByOffset[user.OffsetNum], user)
-	}
-	m.allUsers = append(m.allUsers, user)
-
-	return nil
-}
-
-func (m *MapImpl) GetAllUsers() ([]*User, error) {
-	return m.allUsers, nil
-}
-
-func (m *MapImpl) GetOrphanedUsers() ([]*User, error) {
-	var res []*User
-	for _, u := range m.allUsers {
-		if len(m.ephemeralsByUser[string(u.TransmissionRSAHash)]) < 1 {
-			res = append(res, u)
-		}
-	}
-	return res, nil
-}
-
-func (m *MapImpl) insertEphemeral(ephemeral *Ephemeral) error {
-	m.ephIDSeq++
-	ephemeral.ID = uint(m.ephIDSeq)
-	m.ephemeralsById[ephemeral.EphemeralId] = append(m.ephemeralsById[ephemeral.EphemeralId], ephemeral)
-	m.allEphemerals[int(ephemeral.ID)] = ephemeral
-	m.ephemeralsByUser[string(ephemeral.TransmissionRSAHash)][ephemeral.EphemeralId] = ephemeral
-	return nil
-}
-
-func (m *MapImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
-	e, ok := m.ephemeralsById[ephemeralId]
-	if !ok || len(e) < 1 {
-		return nil, errors.New(fmt.Sprintf("Could not find ephemeral with transmission RSA hash %+v", ephemeralId))
-	}
-	return e, nil
-}
-
-func (m *MapImpl) getUsersByOffset(offset int64) ([]*User, error) {
-	return m.usersByOffset[offset], nil
-}
-
-func (m *MapImpl) DeleteOldEphemerals(epoch int32) error {
-	for i, elist := range m.ephemeralsById {
-		if elist != nil {
-			for j, e := range elist {
-				if e.Epoch < epoch {
-					delete(m.ephemeralsByUser[string(e.TransmissionRSAHash)], e.EphemeralId)
-					delete(m.allEphemerals, int(m.ephemeralsById[i][j].ID))
-					m.ephemeralsById[i] = append(m.ephemeralsById[i][:j],
-						m.ephemeralsById[i][j+1:]...)
-				}
-			}
-		}
-
-	}
-	return nil
-}
-
-func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
-	e, ok := m.allEphemerals[m.ephIDSeq]
-	if !ok {
-		return nil, gorm.ErrRecordNotFound
-	}
-	return e, nil
+	ephemerals           map[int]Ephemeral
+	ephemeralsById       map[int64][]*Ephemeral
+	ephemeralsByIdentity map[string][]*Ephemeral
+	ephemeralSequence    int
+	latest               *Ephemeral
 }
 
 // Inserts the given State into Storage if it does not exist
 // Or updates the Database State if its value does not match the given State
 func (m *MapImpl) UpsertState(state *State) error {
-	m.mut.Lock()
-	defer m.mut.Unlock()
+	m.mux.Lock()
+	defer m.mux.Unlock()
 
-	m.states[state.Key] = state.Value
+	m.states[state.Key] = *state
 	return nil
 }
 
 // Returns a State's value from Storage with the given key
 // Or an error if a matching State does not exist
 func (m *MapImpl) GetStateValue(key string) (string, error) {
-	m.mut.Lock()
-	defer m.mut.Unlock()
+	m.mux.Lock()
+	defer m.mux.Unlock()
 
 	if val, ok := m.states[key]; ok {
-		return val, nil
+		return val.Value, nil
 	}
 
 	// NOTE: Other code depends on this error string
 	return "", errors.Errorf("Unable to locate state for key %s", key)
+}
+
+func (m *MapImpl) DeleteToken(token string) error {
+	toDelete, ok := m.tokens[token]
+	if !ok {
+		jww.WARN.Printf("Could not find token %s to delete", token)
+		return nil
+	}
+	userId := base64.StdEncoding.EncodeToString(toDelete.TransmissionRSAHash)
+	for i, t := range m.tokensByUser[userId] {
+		if t.Token == token {
+			m.tokensByUser[userId] = append(m.tokensByUser[userId][:i], m.tokensByUser[userId][:i+1]...)
+			break
+		}
+	}
+	delete(m.tokens, token)
+	return nil
+}
+
+func (m *MapImpl) insertUser(user *User) error {
+	userId := base64.StdEncoding.EncodeToString(user.TransmissionRSAHash)
+	m.users[userId] = *user
+
+	m.userIdentities[userId] = []string{}
+
+	for _, ident := range user.Identities {
+		identityId := base64.StdEncoding.EncodeToString(ident.IntermediaryId)
+		m.userIdentities[userId] = append(m.userIdentities[userId], identityId)
+		m.identityUsers[identityId] = append(m.identityUsers[identityId], userId)
+	}
+
+	m.tokensByUser[userId] = []Token{}
+	for _, token := range user.Tokens {
+		m.tokensByUser[userId] = append(m.tokensByUser[userId], token)
+		m.tokens[token.Token] = token
+	}
+	return nil
+}
+func (m *MapImpl) GetUser(transmissionRsaHash []byte) (*User, error) {
+	userId := base64.StdEncoding.EncodeToString(transmissionRsaHash)
+	u, ok := m.users[userId]
+	if !ok {
+		return nil, errors.Wrap(gorm.ErrRecordNotFound, "user could not be found")
+	}
+	return &u, nil
+}
+
+func (m *MapImpl) deleteUser(transmissionRsaHash []byte) error {
+	userId := base64.StdEncoding.EncodeToString(transmissionRsaHash)
+	delete(m.users, userId)
+	return nil
+}
+
+func (m *MapImpl) GetAllUsers() ([]*User, error) {
+	var userList []*User
+	for _, u := range m.users {
+		userList = append(userList, &u)
+	}
+
+	return userList, nil
+}
+
+func (m *MapImpl) getIdentity(iid []byte) (*Identity, error) {
+	identityId := base64.StdEncoding.EncodeToString(iid)
+	ident, ok := m.identities[identityId]
+	if !ok {
+		return nil, errors.Wrap(gorm.ErrRecordNotFound, "identity could not be found")
+	}
+	return &ident, nil
+}
+func (m *MapImpl) insertIdentity(identity *Identity) error {
+	identityId := base64.StdEncoding.EncodeToString(identity.IntermediaryId)
+	m.identities[identityId] = *identity
+	_, ok := m.identitiesByOffset[identity.OffsetNum]
+	if !ok {
+		m.identitiesByOffset[identity.OffsetNum] = []*Identity{}
+	}
+	m.identitiesByOffset[identity.OffsetNum] = append(m.identitiesByOffset[identity.OffsetNum], identity)
+	m.identityUsers[identityId] = []string{}
+	return nil
+}
+func (m *MapImpl) getIdentitiesByOffset(offset int64) ([]*Identity, error) {
+	idents, ok := m.identitiesByOffset[offset]
+	if !ok {
+		return nil, errors.Wrap(gorm.ErrRecordNotFound, "identities could not be found")
+	}
+	return idents, nil
+}
+func (m *MapImpl) GetOrphanedIdentities() ([]*Identity, error) {
+	var orphaned []*Identity
+	for k, v := range m.identities {
+		ephs, ok := m.ephemeralsByIdentity[k]
+		if ok && len(ephs) == 0 {
+			orphaned = append(orphaned, &v)
+		}
+	}
+	return orphaned, nil
+}
+
+func (m *MapImpl) insertEphemeral(ephemeral *Ephemeral) error {
+	fmt.Printf("insertEphemeral: %+v\n", ephemeral)
+	ephemeral.ID = uint(m.ephemeralSequence)
+	m.ephemerals[m.ephemeralSequence] = *ephemeral
+	_, ok := m.ephemeralsById[ephemeral.EphemeralId]
+	if !ok {
+		m.ephemeralsById[ephemeral.EphemeralId] = []*Ephemeral{}
+	}
+	m.ephemeralsById[ephemeral.EphemeralId] = append(m.ephemeralsById[ephemeral.EphemeralId], ephemeral)
+
+	identityId := base64.StdEncoding.EncodeToString(ephemeral.IntermediaryId)
+	_, ok = m.ephemeralsByIdentity[identityId]
+	if !ok {
+		m.ephemeralsByIdentity[identityId] = []*Ephemeral{}
+	}
+	m.ephemeralsByIdentity[identityId] = append(m.ephemeralsByIdentity[identityId], ephemeral)
+	m.ephemeralSequence += 1
+	m.latest = ephemeral
+	return nil
+}
+
+func (m *MapImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
+	ephs, ok := m.ephemeralsById[ephemeralId]
+	if !ok || len(ephs) == 0 {
+		return nil, errors.Wrap(gorm.ErrRecordNotFound, "ephemerals could not be found")
+	}
+	return ephs, nil
+}
+func (m *MapImpl) GetLatestEphemeral() (*Ephemeral, error) {
+	if m.latest == nil {
+		return nil, errors.Wrap(gorm.ErrRecordNotFound, "No latest ephemeral")
+	}
+	return m.latest, nil
+}
+func (m *MapImpl) DeleteOldEphemerals(currentEpoch int32) error {
+	fmt.Printf("DeleteOldEphemerals: %+v\n", currentEpoch)
+	for _, v := range m.ephemerals {
+		fmt.Printf("CurrentEpoch: %d, Record epoch: %d\n", currentEpoch, v.Epoch)
+		if v.Epoch < currentEpoch {
+			fmt.Println("Deleting record")
+			identityId := base64.StdEncoding.EncodeToString(v.IntermediaryId)
+			for i := range m.ephemeralsByIdentity[identityId] {
+				if m.ephemeralsByIdentity[identityId][i].ID == v.ID {
+					m.ephemeralsByIdentity[identityId] = append(m.ephemeralsByIdentity[identityId][:i], m.ephemeralsByIdentity[identityId][i+1:]...)
+					break
+				}
+			}
+			for i := range m.ephemeralsById[v.EphemeralId] {
+				if m.ephemeralsById[v.EphemeralId][i].ID == v.ID {
+					m.ephemeralsById[v.EphemeralId] = append(m.ephemeralsById[v.EphemeralId][:i], m.ephemeralsById[v.EphemeralId][i+1:]...)
+					break
+				}
+			}
+			delete(m.ephemerals, int(v.ID))
+		}
+	}
+	return nil
+}
+func (m *MapImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
+	res := []GTNResult{}
+	for _, eid := range ephemeralIds {
+		ephsToNotify, ok := m.ephemeralsById[eid]
+		if !ok {
+			continue
+		}
+		for _, eph := range ephsToNotify {
+			identityId := base64.StdEncoding.EncodeToString(eph.IntermediaryId)
+			userIDs, ok := m.identityUsers[identityId]
+			if !ok {
+				continue
+			}
+			for _, userId := range userIDs {
+				tokens, ok := m.tokensByUser[userId]
+				if !ok {
+					continue
+				}
+				for _, token := range tokens {
+					res = append(res, GTNResult{
+						Token:               token.Token,
+						TransmissionRSAHash: m.users[userId].TransmissionRSAHash,
+						EphemeralId:         eph.EphemeralId,
+					})
+				}
+			}
+		}
+	}
+	return res, nil
+}
+
+func (m *MapImpl) unregisterIdentities(u *User, iids []Identity) error {
+	userId := base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)
+	for _, ident := range iids {
+		identityId := base64.StdEncoding.EncodeToString(ident.IntermediaryId)
+		for i, relatedIdentityId := range m.userIdentities[userId] {
+			if identityId == relatedIdentityId {
+				m.userIdentities[userId] = append(m.userIdentities[userId][:i], m.userIdentities[userId][i+1:]...)
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (m *MapImpl) unregisterTokens(u *User, tokens []Token) error {
+	userId := base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)
+	for _, token := range tokens {
+		for i, relatedToken := range m.tokensByUser[userId] {
+			if relatedToken.Token == token.Token {
+				m.tokensByUser[userId] = append(m.tokensByUser[userId][:i], m.tokensByUser[userId][i+1:]...)
+				break
+			}
+		}
+	}
+	return nil
+}
+
+func (m *MapImpl) registerForNotifications(u *User, identity Identity, token string) error {
+	identityId := base64.StdEncoding.EncodeToString(identity.IntermediaryId)
+	userId := base64.StdEncoding.EncodeToString(u.TransmissionRSAHash)
+	m.userIdentities[userId] = append(m.userIdentities[userId], identityId)
+	m.identityUsers[identityId] = append(m.identityUsers[identityId], userId)
+
+	t := Token{
+		Token:               token,
+		TransmissionRSAHash: u.TransmissionRSA,
+	}
+	m.tokensByUser[userId] = append(m.tokensByUser[userId], t)
+	m.tokens[token] = t
+	return nil
+}
+
+func (m *MapImpl) LegacyUnregister(iid []byte) error {
+	return errors.New("Legacy unregister not implemented in map backend")
 }
