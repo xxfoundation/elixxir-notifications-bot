@@ -21,8 +21,37 @@ import (
 const postgresConnectString = "host=%s port=%s user=%s dbname=%s sslmode=disable"
 const sqliteDatabasePath = "file:%s?mode=memory&cache=shared"
 
-// databaseImpl is a struct which implements database on an underlying gorm.DB
-type databaseImpl struct {
+// interface declaration for storage methods
+type database interface {
+	UpsertState(state *State) error
+	GetStateValue(key string) (string, error)
+
+	insertUser(user *User) error
+	GetUser(transmissionRsaHash []byte) (*User, error)
+	deleteUser(transmissionRsaHash []byte) error
+	GetAllUsers() ([]*User, error)
+
+	getIdentity(iid []byte) (*Identity, error)
+	insertIdentity(identity *Identity) error
+	getIdentitiesByOffset(offset int64) ([]*Identity, error)
+	GetOrphanedIdentities() ([]*Identity, error)
+
+	insertEphemeral(ephemeral *Ephemeral) error
+	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
+	GetLatestEphemeral() (*Ephemeral, error)
+	DeleteOldEphemerals(currentEpoch int32) error
+	GetToNotify(ephemeralIds []int64) ([]GTNResult, error)
+
+	DeleteToken(token string) error
+
+	unregisterIdentities(u *User, iids []Identity) error
+	unregisterTokens(u *User, tokens []Token) error
+	registerForNotifications(u *User, identity Identity, token string) error
+	LegacyUnregister(iid []byte) error
+}
+
+// DatabaseImpl is a struct which implements database on an underlying gorm.DB
+type DatabaseImpl struct {
 	db *gorm.DB // Stored database connection
 }
 
@@ -85,7 +114,7 @@ type Ephemeral struct {
 // Initialize the database interface with database backend
 // Returns a database interface, close function, and error
 func newDatabase(username, password, dbName, address,
-	port string) (*databaseImpl, error) {
+	port string) (database, error) {
 	var err error
 	var db *gorm.DB
 	var useSqlite bool
@@ -153,10 +182,10 @@ func newDatabase(username, password, dbName, address,
 	}
 
 	// Build the interface
-	di := &databaseImpl{
+	di := &DatabaseImpl{
 		db: db,
 	}
 
 	jww.INFO.Println("Database backend initialized successfully!")
-	return di, nil
+	return database(di), nil
 }
