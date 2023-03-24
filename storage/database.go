@@ -96,6 +96,7 @@ type User struct {
 type Identity struct {
 	IntermediaryId []byte      `gorm:"primaryKey"`
 	OffsetNum      int64       `gorm:"not null; index"`
+	Users          []User      `gorm:"many2many:user_identities;"`
 	Ephemerals     []Ephemeral `gorm:"foreignKey:intermediary_id;references:intermediary_id;constraint:OnDelete:CASCADE;"`
 }
 

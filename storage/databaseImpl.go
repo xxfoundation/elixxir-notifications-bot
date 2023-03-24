@@ -243,27 +243,27 @@ func (d *DatabaseImpl) unregisterTokens(u *User, tokens []Token) error {
 
 func (d *DatabaseImpl) LegacyUnregister(iid []byte) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
-		var count int64
-		err := tx.Table("user_identities").Where("identity_intermediary_id = ?", iid).Count(&count).Error
+		var res Identity
+		err := tx.Preload("Users").Find(&res, "intermediary_id = ?", iid).Error
 		if err != nil {
 			return err
 		}
-		if count > 1 {
+		if len(res.Users) > 1 {
 			return errors.Errorf("legacyUnregister can only be called for identities with a single associated user")
 		}
-		var trsaHash []byte
-		err = tx.Raw("select user_transmission_rsa_hash from user_identities where identity_intermediary_id = ?", iid).Scan(trsaHash).Error
-		if err != nil {
 
+		err = tx.Model(&Identity{IntermediaryId: iid}).Association("Users").Clear()
+		if err != nil {
+			return errors.WithMessage(err, "Failed to break association")
 		}
 
-		err = d.db.Delete(&Identity{IntermediaryId: iid}).Error
+		err = tx.Delete(&Identity{IntermediaryId: iid}).Error
 		if err != nil {
-			return err
+			return errors.WithMessage(err, "Failed to delete identity")
 		}
-		err = d.db.Delete(&User{TransmissionRSAHash: trsaHash}).Error
+		err = tx.Delete(&User{TransmissionRSAHash: res.Users[0].TransmissionRSAHash}).Error
 		if err != nil {
-			return err
+			return errors.WithMessage(err, "Failed to delete user")
 		}
 		return nil
 	})

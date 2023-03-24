@@ -878,12 +878,98 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 	}
 }
 
-//func TestDatabaseImpl_LegacyUnregister(t *testing.T) {
-//	db, err := newDatabase("", "", "", "", "")
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//}
+func TestDatabaseImpl_LegacyUnregister(t *testing.T) {
+	db, err := newDatabase("", "", "TestDatabaseImpl_LegacyUnregister", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	identity := generateTestIdentity(t)
+	u := generateTestUser(t)
+
+	err = db.insertUser(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.insertIdentity(&identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token := "apnstoken01"
+	err = db.registerForNotifications(u, identity, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = db.GetUser(u.TransmissionRSAHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.LegacyUnregister(identity.IntermediaryId)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = db.GetUser(u.TransmissionRSAHash)
+	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("Expected gorm.ErrRecordNotFound, instead got %+v", err)
+	}
+
+	err = db.insertUser(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.insertIdentity(&identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.registerForNotifications(u, identity, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token2 := "fcm:newtoken"
+	u2 := generateTestUser(t)
+	err = db.insertUser(u2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.insertIdentity(&identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = db.registerForNotifications(u2, identity, token2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = db.LegacyUnregister(identity.IntermediaryId)
+	if err == nil {
+		t.Fatal("Should have received error trying to unregister iid with multiple associated users")
+	}
+
+	receivedIdent, err := db.getIdentity(identity.IntermediaryId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(receivedIdent.IntermediaryId, identity.IntermediaryId) {
+		t.Fatal("Did not receive expected identity")
+	}
+	_, err = db.GetUser(u.TransmissionRSAHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.GetUser(u2.TransmissionRSAHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
 
 func generateTestIdentity(t *testing.T) Identity {
 	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
