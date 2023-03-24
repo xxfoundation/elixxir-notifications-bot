@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"time"
@@ -136,25 +137,27 @@ func newDatabase(username, password, dbName, address,
 			jww.WARN.Printf("Database backend connection information not provided")
 		}
 
-		defer jww.INFO.Println("Map backend initialized successfully!")
+		temporaryDbPath := fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName)
 
-		mapImpl := &MapImpl{
-			states:               map[string]State{},
-			tokens:               map[string]Token{},
-			tokensByUser:         map[string]map[string]Token{},
-			users:                map[string]User{},
-			userIdentities:       map[string]map[string]bool{},
-			identityUsers:        map[string]map[string]bool{},
-			identities:           map[string]Identity{},
-			identitiesByOffset:   map[int64][]*Identity{},
-			ephemerals:           map[int]Ephemeral{},
-			ephemeralsById:       map[int64][]*Ephemeral{},
-			ephemeralsByIdentity: map[string][]*Ephemeral{},
-			ephemeralSequence:    0,
-			latest:               nil,
+		// Create the database connection
+		db, err = gorm.Open(sqlite.Open(temporaryDbPath), &gorm.Config{
+			Logger: logger.New(jww.TRACE, logger.Config{LogLevel: logger.Info}),
+		})
+		if err != nil {
+			return nil, errors.Errorf("Unable to initialize in-memory sqlite database backend: %+v", err)
 		}
 
-		return database(mapImpl), nil
+		// Enable foreign keys because they are disabled in SQLite by default
+		if err = db.Exec("PRAGMA foreign_keys = ON", nil).Error; err != nil {
+			return nil, err
+		}
+
+		// Enable Write Ahead Logging to enable multiple DB connections
+		if err = db.Exec("PRAGMA journal_mode = WAL;", nil).Error; err != nil {
+			return nil, err
+		}
+
+		defer jww.INFO.Println("SQLite in-memory backend initialized successfully!")
 	}
 
 	// Get and configure the internal database ConnPool

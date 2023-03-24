@@ -14,6 +14,7 @@ import (
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Inserts the given State into Storage if it does not exist
@@ -23,23 +24,10 @@ func (d *DatabaseImpl) UpsertState(state *State) error {
 
 	// Build a transaction to prevent race conditions
 	return d.db.Transaction(func(tx *gorm.DB) error {
-		// Make a copy of the provided state
-		newState := *state
-
-		// Attempt to insert state into the Database,
-		// or if it already exists, replace state with the Database value
-		err := tx.FirstOrCreate(state, &State{Key: state.Key}).Error
-		if err != nil {
-			return err
-		}
-
-		// If state is already present in the Database, overwrite it with newState
-		if newState.Value != state.Value {
-			return tx.Save(newState).Error
-		}
-
-		// Commit
-		return nil
+		return tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "key"}},
+			DoUpdates: clause.AssignmentColumns([]string{"value"}),
+		}).Create(state).Error
 	})
 }
 
@@ -53,9 +41,7 @@ func (d *DatabaseImpl) GetStateValue(key string) (string, error) {
 }
 
 func (d *DatabaseImpl) DeleteToken(token string) error {
-	return d.db.Model(&Token{
-		Token: token,
-	}).Delete("token = ?", token).Error
+	return d.db.Where("token = ?", token).Delete(&Token{Token: token}).Error
 }
 
 // Insert or Update User into backend
@@ -112,7 +98,9 @@ func (d *DatabaseImpl) getIdentity(iid []byte) (*Identity, error) {
 }
 
 func (d *DatabaseImpl) insertIdentity(identity *Identity) error {
-	return d.db.Create(identity).Error
+	return d.db.Clauses(clause.OnConflict{
+		DoNothing: true,
+	}).Create(identity).Error
 }
 
 func (d *DatabaseImpl) getIdentitiesByOffset(offset int64) ([]*Identity, error) {
@@ -150,8 +138,13 @@ type GTNResult struct {
 
 func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 	var result []GTNResult
-	raw := "Select distinct on (tokens.token) token, t3.transmission_rsa_hash, t3.ephemeral_id from tokens left join (Select users.transmission_rsa_hash, t2.ephemeral_id from users right join (Select t1.ephemeral_id, user_identities.user_transmission_rsa_hash as transmission_rsa_hash from user_identities left join (Select ephemerals.ephemeral_id, identities.intermediary_id from ephemerals inner join identities on ephemerals.intermediary_id = identities.intermediary_id where ephemerals.ephemeral_id in ?) as t1 on t1.intermediary_id = user_identities.identity_intermediary_id) as t2 on users.transmission_rsa_hash = t2.transmission_rsa_hash) as t3 on tokens.transmission_rsa_hash = t3.transmission_rsa_hash;"
-	return result, d.db.Raw(raw, ephemeralIds).Scan(&result).Error
+	err := d.db.Transaction(func(tx *gorm.DB) error {
+		t1 := tx.Table("identities").Select("ephemerals.ephemeral_id, identities.intermediary_id").Joins("inner join ephemerals on ephemerals.intermediary_id = identities.intermediary_id").Where("ephemerals.ephemeral_id in ?", ephemeralIds)
+		t2 := tx.Table("user_identities").Select("t1.ephemeral_id, user_identities.user_transmission_rsa_hash as transmission_rsa_hash").Joins("left join (?) t1 on t1.intermediary_id = user_identities.identity_intermediary_id", t1)
+		t3 := tx.Model(&User{}).Select("users.transmission_rsa_hash, t2.ephemeral_id").Joins("right join (?) as t2 on users.transmission_rsa_hash = t2.transmission_rsa_hash", t2)
+		return tx.Model(&Token{}).Distinct().Select("tokens.token, t3.transmission_rsa_hash, t3.ephemeral_id").Joins("left join (?) as t3 on tokens.transmission_rsa_hash = t3.transmission_rsa_hash", t3).Scan(&result).Error
+	})
+	return result, err
 }
 
 func (d *DatabaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
@@ -175,7 +168,7 @@ func (d *DatabaseImpl) registerForNotifications(u *User, identity Identity, toke
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(u).Association("Identities").Append(&identity)
 		if err != nil {
-			return err
+			return errors.WithMessage(err, "Failed to register identity")
 		}
 
 		err = tx.Model(u).Association("Tokens").Append(&Token{
@@ -183,7 +176,7 @@ func (d *DatabaseImpl) registerForNotifications(u *User, identity Identity, toke
 			TransmissionRSAHash: u.TransmissionRSAHash,
 		})
 		if err != nil {
-			return err
+			return errors.WithMessage(err, "Failed to register token")
 		}
 		return nil
 	})
@@ -193,29 +186,29 @@ func (d *DatabaseImpl) unregisterIdentities(u *User, iids []Identity) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&u).Association("Identities").Delete(iids)
 		if err != nil {
-			return err
+			return errors.WithMessage(err, "Failed to break association")
 		}
 		for _, iid := range iids {
 			var count int64
 			err = tx.Table("user_identities").Where("identity_intermediary_id = ?", iid.IntermediaryId).Count(&count).Error
 			if err != nil {
-				return err
+				return errors.WithMessagef(err, "Failed count user_identities for identity %+v", iid.IntermediaryId)
 			}
 			if count == 0 {
 				err = tx.Delete(iid).Error
 				if err != nil {
-					return err
+					return errors.WithMessage(err, "Failed to delete identity")
 				}
 			}
 
-			err = tx.Table("user_identities").Where("user_transmission_rsa_hash = ?", iid.IntermediaryId).Count(&count).Error
+			err = tx.Table("user_identities").Where("user_transmission_rsa_hash = ?", u.TransmissionRSAHash).Count(&count).Error
 			if err != nil {
-				return err
+				return errors.WithMessagef(err, "Failed to count user_identities for user %+v", u.TransmissionRSAHash)
 			}
 			if count == 0 {
 				err = tx.Delete(u).Error
 				if err != nil {
-					return err
+					return errors.WithMessage(err, "Failed to delete user")
 				}
 			}
 		}
@@ -226,19 +219,22 @@ func (d *DatabaseImpl) unregisterIdentities(u *User, iids []Identity) error {
 func (d *DatabaseImpl) unregisterTokens(u *User, tokens []Token) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		for _, t := range tokens {
-			tx.Delete(t)
-		}
-		err := tx.Model(&u).Association("Tokens").Delete(tokens)
-		if err != nil {
-			return err
+			err := tx.Delete(t).Error
+			if err != nil {
+				return errors.WithMessage(err, "Failed to delete token")
+			}
 		}
 
 		count := tx.Model(u).Association("Tokens").Count()
 
 		if count == 0 {
+			err := tx.Model(&u).Association("Identities").Clear()
+			if err != nil {
+				return errors.WithMessage(err, "Failed to prep user for delete")
+			}
 			err = tx.Delete(&u).Error
 			if err != nil {
-				return err
+				return errors.WithMessage(err, "Failed to delete user")
 			}
 		}
 		return nil

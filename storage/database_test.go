@@ -8,7 +8,7 @@ import (
 )
 
 func TestDatabase(t *testing.T) {
-	s, err := NewStorage("", "", "", "", "")
+	s, err := NewStorage("", "", "TestDatabase", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,25 +70,35 @@ func TestDatabase(t *testing.T) {
 	toNotify = append(toNotify, eph.Int64())
 	token4 := "fcm:token04"
 
-	// Register new user, token & identity
+	// Register user 1 with token 1 and identity 1
 	_, err = s.RegisterForNotifications(iid1, trsa, sig1, token1, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// User1:
+	//  Tokens: 1
+	//  Identities: 1
 	gtnList, err := s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(gtnList) != 1 {
-		t.Fatal("Got wrong gtnlist")
+		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
 	}
 
-	// Second user, register for same identity
+	// Register user 2 with token 4 and identity 1
 	_, err = s.RegisterForNotifications(iid1, trsa2, sig1, token4, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// User1:
+	//  Tokens: 1
+	//  Identities: 1
+	// User2:
+	//  Tokens: 4
+	//  Identities: 1
 	gtnList, err = s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
@@ -97,12 +107,18 @@ func TestDatabase(t *testing.T) {
 		t.Fatal("Got wrong gtnlist")
 	}
 
-	// Call same register for first user
+	// Call identitcal registration on user 1 (no change)
 	_, err = s.RegisterForNotifications(iid1, trsa, sig1, token1, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// User1:
+	//  Tokens: 1
+	//  Identities: 1
+	// User2:
+	//  Tokens: 4
+	//  Identities: 1
 	gtnList, err = s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
@@ -112,61 +128,85 @@ func TestDatabase(t *testing.T) {
 		t.Fatal("Got wrong gtnlist")
 	}
 
-	// Add new identity
+	// Register user 1 with identity 2 (still on token 1)
 	_, err = s.RegisterForNotifications(iid2, trsa, sig1, token1, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// User1:
+	//  Tokens: 1
+	//  Identities: 1, 2
+	// User2:
+	//  Tokens: 4
+	//  Identities: 1
 	gtnList, err = s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log(gtnList)
-	if len(gtnList) != 2 {
+	if len(gtnList) != 3 {
 		t.Fatal("Got wrong gtnlist")
 	}
 
-	// Add new token
+	// Register user 1 with token 2
 	_, err = s.RegisterForNotifications(iid2, trsa, sig1, token2, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// User1:
+	//  Tokens: 1, 2
+	//  Identities: 1, 2
+	// User2:
+	//  Tokens: 4
+	//  Identities: 1
 	gtnList, err = s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(gtnList) != 3 {
+	if len(gtnList) != 5 {
 		t.Fatal("Got wrong gtnlist")
 	}
 
-	// Add new token & identity
+	// Register user 1 with token3 and identity3
 	_, err = s.RegisterForNotifications(iid3, trsa, sig1, token3, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// User1:
+	//  Tokens: 1, 2, 3
+	//  Identities: 1, 2, 3
+	// User2:
+	//  Tokens: 4
+	//  Identities: 1
 	gtnList, err = s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(gtnList) != 4 {
-		t.Fatal("Got wrong gtnlist")
+	if len(gtnList) != 10 {
+		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
 	}
 
-	// Second user with new identity
+	// Register user 2 with identity 4
 	_, err = s.RegisterForNotifications(iid4, trsa2, sig1, token4, epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// User1:
+	//  Tokens: 1, 2, 3
+	//  Identities: 1, 2, 3
+	// User2:
+	//  Tokens: 4
+	//  Identities: 1, 4
 	gtnList, err = s.GetToNotify(toNotify)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(gtnList) != 4 {
-		t.Fatal("Got wrong gtnlist")
+	if len(gtnList) != 11 {
+		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
 	}
 
 }

@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestStorage_AddUser(t *testing.T) {
+func TestStorage_RegisterForNotifications(t *testing.T) {
 	s, err := NewStorage("", "", "", "", "")
 	if err != nil {
 		t.Errorf("Failed to create new storage object: %+v", err)
@@ -33,7 +33,7 @@ func TestStorage_AddUser(t *testing.T) {
 	}
 }
 
-func TestStorage_DeleteUser(t *testing.T) {
+func TestStorage_UnregisterForNotifications(t *testing.T) {
 	s, err := NewStorage("", "", "", "", "")
 	if err != nil {
 		t.Errorf("Failed to create new storage object: %+v", err)
