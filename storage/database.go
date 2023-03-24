@@ -117,10 +117,10 @@ func newDatabase(username, password, dbName, address,
 	port string) (database, error) {
 	var err error
 	var db *gorm.DB
-	var useSqlite bool
 	var dialector gorm.Dialector
 	// Connect to the database if the correct information is provided
-	if address != "" && port != "" {
+	usePostgres := address != "" && port != ""
+	if usePostgres {
 		// Create the database connection
 		connectString := fmt.Sprintf(
 			postgresConnectString,
@@ -131,7 +131,6 @@ func newDatabase(username, password, dbName, address,
 		}
 		dialector = postgres.Open(connectString)
 	} else {
-		useSqlite = true
 		jww.WARN.Printf("Database backend connection information not provided")
 		temporaryDbPath := fmt.Sprintf(sqliteDatabasePath, dbName)
 		dialector = sqlite.Open(temporaryDbPath)
@@ -145,7 +144,7 @@ func newDatabase(username, password, dbName, address,
 		return nil, errors.Errorf("Unable to initialize in-memory sqlite database backend: %+v", err)
 	}
 
-	if useSqlite {
+	if !usePostgres {
 		// Enable foreign keys because they are disabled in SQLite by default
 		if err = db.Exec("PRAGMA foreign_keys = ON", nil).Error; err != nil {
 			return nil, err
