@@ -18,7 +18,7 @@ import (
 )
 
 type Storage struct {
-	database
+	*databaseImpl
 	notificationBuffer *NotificationBuffer
 }
 

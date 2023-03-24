@@ -10,7 +10,6 @@
 package storage
 
 import (
-	"bytes"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
@@ -19,7 +18,7 @@ import (
 
 // Inserts the given State into Storage if it does not exist
 // Or updates the Database State if its value does not match the given State
-func (d *DatabaseImpl) UpsertState(state *State) error {
+func (d *databaseImpl) UpsertState(state *State) error {
 	jww.TRACE.Printf("Attempting to insert State into DB: %+v", state)
 
 	// Build a transaction to prevent race conditions
@@ -33,36 +32,24 @@ func (d *DatabaseImpl) UpsertState(state *State) error {
 
 // Returns a State's value from Storage with the given key
 // Or an error if a matching State does not exist
-func (d *DatabaseImpl) GetStateValue(key string) (string, error) {
+func (d *databaseImpl) GetStateValue(key string) (string, error) {
 	result := &State{Key: key}
 	err := d.db.Take(result).Error
 	jww.TRACE.Printf("Obtained State from DB: %+v", result)
 	return result.Value, err
 }
 
-func (d *DatabaseImpl) DeleteToken(token string) error {
+func (d *databaseImpl) DeleteToken(token string) error {
 	return d.db.Where("token = ?", token).Delete(&Token{Token: token}).Error
 }
 
 // Insert or Update User into backend
-func (d *DatabaseImpl) insertUser(user *User) error {
-	return d.db.Transaction(func(tx *gorm.DB) error {
-		ret := &User{}
-		err := tx.FirstOrCreate(ret, user).Error
-		if err != nil {
-			return err
-		}
-
-		if bytes.Equal(ret.TransmissionRSAHash, user.TransmissionRSAHash) {
-			return tx.Save(&user).Error
-		}
-
-		return nil
-	})
+func (d *databaseImpl) insertUser(user *User) error {
+	return d.db.Clauses(clause.OnConflict{DoNothing: true}).Create(user).Error
 }
 
 // Obtain User from backend by primary key
-func (d *DatabaseImpl) GetUser(transmissionRsaHash []byte) (*User, error) {
+func (d *databaseImpl) GetUser(transmissionRsaHash []byte) (*User, error) {
 	u := &User{}
 	err := d.db.Preload("Identities").Preload("Tokens").Take(u, "transmission_rsa_hash = ?", transmissionRsaHash).Error
 	if err != nil {
@@ -72,7 +59,7 @@ func (d *DatabaseImpl) GetUser(transmissionRsaHash []byte) (*User, error) {
 }
 
 // Delete User from backend by primary key
-func (d *DatabaseImpl) deleteUser(transmissionRsaHash []byte) error {
+func (d *databaseImpl) deleteUser(transmissionRsaHash []byte) error {
 	err := d.db.Delete(&User{
 		TransmissionRSAHash: transmissionRsaHash,
 	}).Error
@@ -82,13 +69,13 @@ func (d *DatabaseImpl) deleteUser(transmissionRsaHash []byte) error {
 	return nil
 }
 
-func (d *DatabaseImpl) GetAllUsers() ([]*User, error) {
+func (d *databaseImpl) GetAllUsers() ([]*User, error) {
 	var dest []*User
 	return dest, d.db.Find(&dest).Error
 }
 
 // Obtain Identity from backend by primary key
-func (d *DatabaseImpl) getIdentity(iid []byte) (*Identity, error) {
+func (d *databaseImpl) getIdentity(iid []byte) (*Identity, error) {
 	i := &Identity{}
 	err := d.db.Take(i, "intermediary_id = ?", iid).Error
 	if err != nil {
@@ -97,28 +84,28 @@ func (d *DatabaseImpl) getIdentity(iid []byte) (*Identity, error) {
 	return i, nil
 }
 
-func (d *DatabaseImpl) insertIdentity(identity *Identity) error {
+func (d *databaseImpl) insertIdentity(identity *Identity) error {
 	return d.db.Clauses(clause.OnConflict{
 		DoNothing: true,
 	}).Create(identity).Error
 }
 
-func (d *DatabaseImpl) getIdentitiesByOffset(offset int64) ([]*Identity, error) {
+func (d *databaseImpl) getIdentitiesByOffset(offset int64) ([]*Identity, error) {
 	var result []*Identity
 	err := d.db.Where(&Identity{OffsetNum: offset}).Find(&result).Error
 	return result, err
 }
 
-func (d *DatabaseImpl) GetOrphanedIdentities() ([]*Identity, error) {
+func (d *databaseImpl) GetOrphanedIdentities() ([]*Identity, error) {
 	var dest []*Identity
 	return dest, d.db.Find(&dest, "NOT EXISTS (select * from ephemerals where ephemerals.intermediary_id = identities.intermediary_id)").Error
 }
 
-func (d *DatabaseImpl) insertEphemeral(ephemeral *Ephemeral) error {
+func (d *databaseImpl) insertEphemeral(ephemeral *Ephemeral) error {
 	return d.db.Create(&ephemeral).Error
 }
 
-func (d *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
+func (d *databaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
 	var result []*Ephemeral
 	err := d.db.Where("ephemeral_id = ?", ephemeralId).Find(&result).Error
 	if err != nil {
@@ -136,7 +123,7 @@ type GTNResult struct {
 	EphemeralId         int64
 }
 
-func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
+func (d *databaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 	var result []GTNResult
 	err := d.db.Transaction(func(tx *gorm.DB) error {
 		t1 := tx.Table("identities").Select("ephemerals.ephemeral_id, identities.intermediary_id").Joins("inner join ephemerals on ephemerals.intermediary_id = identities.intermediary_id").Where("ephemerals.ephemeral_id in ?", ephemeralIds)
@@ -147,12 +134,12 @@ func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 	return result, err
 }
 
-func (d *DatabaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
+func (d *databaseImpl) DeleteOldEphemerals(currentEpoch int32) error {
 	res := d.db.Where("epoch < ?", currentEpoch).Delete(&Ephemeral{})
 	return res.Error
 }
 
-func (d *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
+func (d *databaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
 	var result []*Ephemeral
 	err := d.db.Order("epoch desc").Limit(1).Find(&result).Error
 	if err != nil {
@@ -164,7 +151,7 @@ func (d *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
 	return result[0], nil
 }
 
-func (d *DatabaseImpl) registerForNotifications(u *User, identity Identity, token string) error {
+func (d *databaseImpl) registerForNotifications(u *User, identity Identity, token string) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(u).Association("Identities").Append(&identity)
 		if err != nil {
@@ -182,7 +169,7 @@ func (d *DatabaseImpl) registerForNotifications(u *User, identity Identity, toke
 	})
 }
 
-func (d *DatabaseImpl) unregisterIdentities(u *User, iids []Identity) error {
+func (d *databaseImpl) unregisterIdentities(u *User, iids []Identity) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(&u).Association("Identities").Delete(iids)
 		if err != nil {
@@ -216,7 +203,7 @@ func (d *DatabaseImpl) unregisterIdentities(u *User, iids []Identity) error {
 	})
 }
 
-func (d *DatabaseImpl) unregisterTokens(u *User, tokens []Token) error {
+func (d *databaseImpl) unregisterTokens(u *User, tokens []Token) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		for _, t := range tokens {
 			err := tx.Delete(t).Error
@@ -241,7 +228,7 @@ func (d *DatabaseImpl) unregisterTokens(u *User, tokens []Token) error {
 	})
 }
 
-func (d *DatabaseImpl) LegacyUnregister(iid []byte) error {
+func (d *databaseImpl) LegacyUnregister(iid []byte) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		var res Identity
 		err := tx.Preload("Users").Find(&res, "intermediary_id = ?", iid).Error

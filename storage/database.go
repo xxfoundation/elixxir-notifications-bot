@@ -18,37 +18,11 @@ import (
 	"time"
 )
 
-// interface declaration for storage methods
-type database interface {
-	UpsertState(state *State) error
-	GetStateValue(key string) (string, error)
+const postgresConnectString = "host=%s port=%s user=%s dbname=%s sslmode=disable"
+const sqliteDatabasePath = "file:%s?mode=memory&cache=shared"
 
-	insertUser(user *User) error
-	GetUser(transmissionRsaHash []byte) (*User, error)
-	deleteUser(transmissionRsaHash []byte) error
-	GetAllUsers() ([]*User, error)
-
-	getIdentity(iid []byte) (*Identity, error)
-	insertIdentity(identity *Identity) error
-	getIdentitiesByOffset(offset int64) ([]*Identity, error)
-	GetOrphanedIdentities() ([]*Identity, error)
-
-	insertEphemeral(ephemeral *Ephemeral) error
-	GetEphemeral(ephemeralId int64) ([]*Ephemeral, error)
-	GetLatestEphemeral() (*Ephemeral, error)
-	DeleteOldEphemerals(currentEpoch int32) error
-	GetToNotify(ephemeralIds []int64) ([]GTNResult, error)
-
-	DeleteToken(token string) error
-
-	unregisterIdentities(u *User, iids []Identity) error
-	unregisterTokens(u *User, tokens []Token) error
-	registerForNotifications(u *User, identity Identity, token string) error
-	LegacyUnregister(iid []byte) error
-}
-
-// DatabaseImpl is a struct which implements database on an underlying gorm.DB
-type DatabaseImpl struct {
+// databaseImpl is a struct which implements database on an underlying gorm.DB
+type databaseImpl struct {
 	db *gorm.DB // Stored database connection
 }
 
@@ -111,43 +85,38 @@ type Ephemeral struct {
 // Initialize the database interface with database backend
 // Returns a database interface, close function, and error
 func newDatabase(username, password, dbName, address,
-	port string) (database, error) {
+	port string) (*databaseImpl, error) {
 	var err error
 	var db *gorm.DB
+	var useSqlite bool
+	var dialector gorm.Dialector
 	// Connect to the database if the correct information is provided
 	if address != "" && port != "" {
 		// Create the database connection
 		connectString := fmt.Sprintf(
-			"host=%s port=%s user=%s dbname=%s sslmode=disable",
+			postgresConnectString,
 			address, port, username, dbName)
 		// Handle empty database password
 		if len(password) > 0 {
 			connectString += fmt.Sprintf(" password=%s", password)
 		}
-		db, err = gorm.Open(postgres.Open(connectString), &gorm.Config{
-			Logger: logger.New(jww.TRACE, logger.Config{LogLevel: logger.Info}),
-		})
+		dialector = postgres.Open(connectString)
+	} else {
+		useSqlite = true
+		jww.WARN.Printf("Database backend connection information not provided")
+		temporaryDbPath := fmt.Sprintf(sqliteDatabasePath, dbName)
+		dialector = sqlite.Open(temporaryDbPath)
 	}
 
-	// Return the map-backend interface
-	// in the event there is a database error or information is not provided
-	if (address == "" || port == "") || err != nil {
-		if err != nil {
-			jww.WARN.Printf("Unable to initialize database backend: %+v", err)
-		} else {
-			jww.WARN.Printf("Database backend connection information not provided")
-		}
+	// Create the database connection
+	db, err = gorm.Open(dialector, &gorm.Config{
+		Logger: logger.New(jww.TRACE, logger.Config{LogLevel: logger.Info}),
+	})
+	if err != nil {
+		return nil, errors.Errorf("Unable to initialize in-memory sqlite database backend: %+v", err)
+	}
 
-		temporaryDbPath := fmt.Sprintf("file:%s?mode=memory&cache=shared", dbName)
-
-		// Create the database connection
-		db, err = gorm.Open(sqlite.Open(temporaryDbPath), &gorm.Config{
-			Logger: logger.New(jww.TRACE, logger.Config{LogLevel: logger.Info}),
-		})
-		if err != nil {
-			return nil, errors.Errorf("Unable to initialize in-memory sqlite database backend: %+v", err)
-		}
-
+	if useSqlite {
 		// Enable foreign keys because they are disabled in SQLite by default
 		if err = db.Exec("PRAGMA foreign_keys = ON", nil).Error; err != nil {
 			return nil, err
@@ -157,14 +126,12 @@ func newDatabase(username, password, dbName, address,
 		if err = db.Exec("PRAGMA journal_mode = WAL;", nil).Error; err != nil {
 			return nil, err
 		}
-
-		defer jww.INFO.Println("SQLite in-memory backend initialized successfully!")
 	}
 
 	// Get and configure the internal database ConnPool
 	sqlDb, err := db.DB()
 	if err != nil {
-		return database(&DatabaseImpl{}), errors.Errorf("Unable to configure database connection pool: %+v", err)
+		return nil, errors.Errorf("Unable to configure database connection pool: %+v", err)
 	}
 	// SetMaxIdleConns sets the maximum number of connections in the idle connection pool.
 	sqlDb.SetMaxIdleConns(10)
@@ -181,15 +148,15 @@ func newDatabase(username, password, dbName, address,
 	for _, model := range models {
 		err = db.AutoMigrate(model)
 		if err != nil {
-			return database(&DatabaseImpl{}), err
+			return nil, err
 		}
 	}
 
 	// Build the interface
-	di := &DatabaseImpl{
+	di := &databaseImpl{
 		db: db,
 	}
 
 	jww.INFO.Println("Database backend initialized successfully!")
-	return database(di), nil
+	return di, nil
 }
