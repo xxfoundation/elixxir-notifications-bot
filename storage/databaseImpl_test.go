@@ -93,32 +93,12 @@ func TestDatabaseImpl_DeleteToken(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	identity := generateTestIdentity(t)
+	u := generateTestUser(t)
 
 	err = db.insertUser(u)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 	}
 
 	err = db.insertIdentity(&identity)
@@ -162,15 +142,7 @@ func TestDatabaseImpl_insertUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	u := generateTestUser(t)
 
 	err = db.insertUser(u)
 	if err != nil {
@@ -205,15 +177,7 @@ func TestDatabaseImpl_GetUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	u := generateTestUser(t)
 
 	receivedUser, err := db.GetUser(u.TransmissionRSAHash)
 	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -240,15 +204,7 @@ func TestDatabaseImpl_deleteUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	u := generateTestUser(t)
 
 	receivedUser, err := db.GetUser(u.TransmissionRSAHash)
 	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -295,19 +251,8 @@ func TestDatabaseImpl_GetAllUsers(t *testing.T) {
 
 	expectedUsers := 5
 	for i := 1; i <= expectedUsers; i++ {
-		newTrsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-		if err != nil {
-			t.Fatal(err)
-		}
-		newH := hash.CMixHash.New()
-		newH.Write(newTrsa.GetPublic().Bytes())
-		sig := []byte("sig")
-		newU := &User{
-			TransmissionRSAHash: newH.Sum(nil),
-			TransmissionRSA:     newTrsa.GetPublic().Bytes(),
-			Signature:           sig,
-		}
-		err = db.insertUser(newU)
+		u := generateTestUser(t)
+		err = db.insertUser(u)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -329,19 +274,7 @@ func TestDatabaseImpl_getIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	err = db.insertIdentity(&identity)
 	if err != nil {
@@ -363,19 +296,7 @@ func TestDatabaseImpl_getIdentitiesByOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	err = db.insertIdentity(&identity)
 	if err != nil {
@@ -406,19 +327,7 @@ func TestDatabaseImpl_GetOrphanedIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	err = db.insertIdentity(&identity)
 	if err != nil {
@@ -433,18 +342,7 @@ func TestDatabaseImpl_GetOrphanedIdentities(t *testing.T) {
 		t.Fatalf("Did not receive expected count of orphaned identities\n\tExpected: %+v\n\tReceived: %+v\n", 1, len(orphaned))
 	}
 
-	uid2, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid2, err := ephemeral.GetIntermediaryId(uid2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	identity2 := Identity{
-		IntermediaryId: iid2,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid2)),
-	}
+	identity2 := generateTestIdentity(t)
 
 	err = db.insertIdentity(&identity2)
 	if err != nil {
@@ -485,19 +383,7 @@ func TestDatabaseImpl_insertEphemeral(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	e1 := &Ephemeral{
 		ID:             0,
@@ -530,19 +416,7 @@ func TestDatabaseImpl_GetEphemeral(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	e1 := &Ephemeral{
 		ID:             0,
@@ -585,19 +459,7 @@ func TestDatabaseImpl_DeleteOldEphemerals(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	e1 := &Ephemeral{
 		ID:             0,
@@ -658,19 +520,7 @@ func TestDatabaseImpl_GetLatestEphemeral(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-	}
+	identity := generateTestIdentity(t)
 
 	e1 := &Ephemeral{
 		IntermediaryId: identity.IntermediaryId,
@@ -784,32 +634,12 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	identity := generateTestIdentity(t)
+	u := generateTestUser(t)
 
 	err = db.insertUser(u)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 	}
 
 	err = db.insertIdentity(&identity)
@@ -831,31 +661,12 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid2, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid2, err := ephemeral.GetIntermediaryId(uid2)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trsa2, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h.Reset()
-	h.Write(trsa2.GetPublic().Bytes())
-	u2 := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa2.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	identity2 := generateTestIdentity(t)
+	u2 := generateTestUser(t)
 
 	err = db.insertUser(u2)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	identity2 := Identity{
-		IntermediaryId: iid2,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid2)),
 	}
 
 	err = db.insertIdentity(&identity)
@@ -920,32 +731,12 @@ func TestDatabaseImpl_unregisterIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	u := generateTestUser(t)
+	identity := generateTestIdentity(t)
 
 	err = db.insertUser(u)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 	}
 
 	err = db.unregisterIdentities(u, []Identity{identity})
@@ -969,24 +760,7 @@ func TestDatabaseImpl_unregisterIdentities(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid2, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid2, err := ephemeral.GetIntermediaryId(uid2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity2 := Identity{
-		IntermediaryId: iid2,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid2)),
-	}
-
-	err = db.insertIdentity(&identity)
-	if err != nil {
-		t.Fatal(err)
-	}
+	identity2 := generateTestIdentity(t)
 
 	token2 := "fcm:token2"
 	err = db.registerForNotifications(u, identity2, token2)
@@ -1022,32 +796,12 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid, err := ephemeral.GetIntermediaryId(uid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
-	h := hash.CMixHash.New()
-	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
-	u := &User{
-		TransmissionRSAHash: h.Sum(nil),
-		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
-	}
+	identity := generateTestIdentity(t)
+	u := generateTestUser(t)
 
 	err = db.insertUser(u)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	identity := Identity{
-		IntermediaryId: iid,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
 	}
 
 	token := "apnstoken02"
@@ -1076,19 +830,7 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	uid2, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
-	if err != nil {
-		t.Fatal(err)
-	}
-	iid2, err := ephemeral.GetIntermediaryId(uid2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	identity2 := Identity{
-		IntermediaryId: iid2,
-		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid2)),
-	}
+	identity2 := generateTestIdentity(t)
 
 	err = db.insertIdentity(&identity)
 	if err != nil {
@@ -1130,7 +872,7 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 		t.Fatalf("Expected gorm.ErrRecordNotFound when no user exists, instead got %+v", err)
 	}
 
-	_, err = db.getIdentity(iid)
+	_, err = db.getIdentity(identity.IntermediaryId)
 	if err != nil {
 		t.Fatalf("Failed to get identity: %+v", err)
 	}
@@ -1142,3 +884,34 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 //		t.Fatal(err)
 //	}
 //}
+
+func generateTestIdentity(t *testing.T) Identity {
+	uid, err := id.NewRandomID(csprng.NewSystemRNG(), id.User)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iid, err := ephemeral.GetIntermediaryId(uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := Identity{
+		IntermediaryId: iid,
+		OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
+	}
+	return identity
+}
+func generateTestUser(t *testing.T) *User {
+	trsa, err := rsa.GenerateKey(csprng.NewSystemRNG(), 512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := hash.CMixHash.New()
+	h.Write(trsa.GetPublic().Bytes())
+	sig := []byte("fake signature")
+	u := &User{
+		TransmissionRSAHash: h.Sum(nil),
+		TransmissionRSA:     trsa.GetPublic().Bytes(),
+		Signature:           sig,
+	}
+	return u
+}
