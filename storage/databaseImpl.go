@@ -75,9 +75,9 @@ func (d *DatabaseImpl) GetAllUsers() ([]*User, error) {
 }
 
 // Obtain Identity from backend by primary key
-func (d *DatabaseImpl) getIdentity(iid []byte) (*Identity, error) {
+func (d *DatabaseImpl) GetIdentity(iid []byte) (*Identity, error) {
 	i := &Identity{}
-	err := d.db.Take(i, "intermediary_id = ?", iid).Error
+	err := d.db.Preload("Users").Take(i, "intermediary_id = ?", iid).Error
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +119,7 @@ func (d *DatabaseImpl) GetEphemeral(ephemeralId int64) ([]*Ephemeral, error) {
 
 type GTNResult struct {
 	Token               string
+	App                 string
 	TransmissionRSAHash []byte
 	EphemeralId         int64
 }
@@ -129,7 +130,7 @@ func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 		t1 := tx.Table("identities").Select("ephemerals.ephemeral_id, identities.intermediary_id").Joins("inner join ephemerals on ephemerals.intermediary_id = identities.intermediary_id").Where("ephemerals.ephemeral_id in ?", ephemeralIds)
 		t2 := tx.Table("user_identities").Select("t1.ephemeral_id, user_identities.user_transmission_rsa_hash as transmission_rsa_hash").Joins("left join (?) t1 on t1.intermediary_id = user_identities.identity_intermediary_id", t1)
 		t3 := tx.Model(&User{}).Select("users.transmission_rsa_hash, t2.ephemeral_id").Joins("right join (?) as t2 on users.transmission_rsa_hash = t2.transmission_rsa_hash", t2)
-		return tx.Model(&Token{}).Distinct().Select("tokens.token, t3.transmission_rsa_hash, t3.ephemeral_id").Joins("left join (?) as t3 on tokens.transmission_rsa_hash = t3.transmission_rsa_hash", t3).Scan(&result).Error
+		return tx.Model(&Token{}).Distinct().Select("tokens.token, tokens.app, t3.transmission_rsa_hash, t3.ephemeral_id").Joins("left join (?) as t3 on tokens.transmission_rsa_hash = t3.transmission_rsa_hash", t3).Scan(&result).Error
 	})
 	return result, err
 }
@@ -151,17 +152,14 @@ func (d *DatabaseImpl) GetLatestEphemeral() (*Ephemeral, error) {
 	return result[0], nil
 }
 
-func (d *DatabaseImpl) registerForNotifications(u *User, identity Identity, token string) error {
+func (d *DatabaseImpl) registerForNotifications(u *User, identity Identity, token Token) error {
 	return d.db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Model(u).Association("Identities").Append(&identity)
 		if err != nil {
 			return errors.WithMessage(err, "Failed to register identity")
 		}
 
-		err = tx.Model(u).Association("Tokens").Append(&Token{
-			Token:               token,
-			TransmissionRSAHash: u.TransmissionRSAHash,
-		})
+		err = tx.Model(u).Association("Tokens").Append(&token)
 		if err != nil {
 			return errors.WithMessage(err, "Failed to register token")
 		}
@@ -175,30 +173,34 @@ func (d *DatabaseImpl) unregisterIdentities(u *User, iids []Identity) error {
 		if err != nil {
 			return errors.WithMessage(err, "Failed to break association")
 		}
-		for _, iid := range iids {
-			var count int64
-			err = tx.Table("user_identities").Where("identity_intermediary_id = ?", iid.IntermediaryId).Count(&count).Error
-			if err != nil {
-				return errors.WithMessagef(err, "Failed count user_identities for identity %+v", iid.IntermediaryId)
-			}
-			if count == 0 {
-				err = tx.Delete(iid).Error
-				if err != nil {
-					return errors.WithMessage(err, "Failed to delete identity")
-				}
-			}
-
-			err = tx.Table("user_identities").Where("user_transmission_rsa_hash = ?", u.TransmissionRSAHash).Count(&count).Error
-			if err != nil {
-				return errors.WithMessagef(err, "Failed to count user_identities for user %+v", u.TransmissionRSAHash)
-			}
-			if count == 0 {
-				err = tx.Delete(u).Error
-				if err != nil {
-					return errors.WithMessage(err, "Failed to delete user")
-				}
-			}
-		}
+		// This code will clean up users and identities with no associations
+		// it has been intentionally disabled
+		// TODO: long-running cleanup thread for identities?
+		// it has been intentionally disabled
+		//for _, iid := range iids {
+		//	var count int64
+		//	err = tx.Table("user_identities").Where("identity_intermediary_id = ?", iid.IntermediaryId).Count(&count).Error
+		//	if err != nil {
+		//		return errors.WithMessagef(err, "Failed count user_identities for identity %+v", iid.IntermediaryId)
+		//	}
+		//	if count == 0 {
+		//		err = tx.Delete(iid).Error
+		//		if err != nil {
+		//			return errors.WithMessage(err, "Failed to delete identity")
+		//		}
+		//	}
+		//
+		//	err = tx.Table("user_identities").Where("user_transmission_rsa_hash = ?", u.TransmissionRSAHash).Count(&count).Error
+		//	if err != nil {
+		//		return errors.WithMessagef(err, "Failed to count user_identities for user %+v", u.TransmissionRSAHash)
+		//	}
+		//	if count == 0 {
+		//		err = tx.Delete(u).Error
+		//		if err != nil {
+		//			return errors.WithMessage(err, "Failed to delete user")
+		//		}
+		//	}
+		//}
 		return nil
 	})
 }
@@ -212,18 +214,20 @@ func (d *DatabaseImpl) unregisterTokens(u *User, tokens []Token) error {
 			}
 		}
 
-		count := tx.Model(u).Association("Tokens").Count()
-
-		if count == 0 {
-			err := tx.Model(&u).Association("Identities").Clear()
-			if err != nil {
-				return errors.WithMessage(err, "Failed to prep user for delete")
-			}
-			err = tx.Delete(&u).Error
-			if err != nil {
-				return errors.WithMessage(err, "Failed to delete user")
-			}
-		}
+		// This code will delete the user if the unregistered token is its last
+		// it has been intentionally disabled
+		//count := tx.Model(u).Association("Tokens").Count()
+		//
+		//if count == 0 {
+		//	err := tx.Model(&u).Association("Identities").Clear()
+		//	if err != nil {
+		//		return errors.WithMessage(err, "Failed to prep user for delete")
+		//	}
+		//	err = tx.Delete(&u).Error
+		//	if err != nil {
+		//		return errors.WithMessage(err, "Failed to delete user")
+		//	}
+		//}
 		return nil
 	})
 }
@@ -254,4 +258,12 @@ func (d *DatabaseImpl) LegacyUnregister(iid []byte) error {
 		}
 		return nil
 	})
+}
+
+func (d *DatabaseImpl) insertToken(token Token) error {
+	return d.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&token).Error
+}
+
+func (d *DatabaseImpl) registerTrackedIdentity(user User, identity Identity) error {
+	return d.db.Model(&user).Association("Identities").Append(&identity)
 }

@@ -10,6 +10,7 @@ package notifications
 import (
 	"fmt"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
@@ -42,7 +43,7 @@ func TestImpl_InitDeleter(t *testing.T) {
 		t.Fatalf("Could not parse precanned time: %v", err.Error())
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now().Add(-30 * time.Hour))
-	_, err = s.RegisterForNotifications(iid, []byte("trsa"), []byte("Sig"), "token", epoch, 16)
+	_, err = s.RegisterForNotifications(iid, []byte("trsa"), "token", constants.MessengerIOS.String(), epoch, 16)
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
@@ -91,7 +92,7 @@ func TestImpl_InitCreator(t *testing.T) {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
-	u, err := s.RegisterForNotifications(iid, []byte("trsa"), []byte("Sig"), "token", epoch, 16)
+	u, err := s.RegisterForNotifications(iid, []byte("trsa"), "token", constants.MessengerIOS.String(), epoch, 16)
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}

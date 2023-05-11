@@ -10,68 +10,39 @@
 package notifications
 
 import (
-	"encoding/base64"
-	"gitlab.com/elixxir/notifications-bot/notifications/apns"
-	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"crypto/tls"
+	"gitlab.com/elixxir/notifications-bot/constants"
+	"gitlab.com/elixxir/notifications-bot/notifications/providers"
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/sideshow/apns2"
-	"github.com/sideshow/apns2/payload"
-	apnstoken "github.com/sideshow/apns2/token"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
-	"gitlab.com/elixxir/crypto/hash"
-	"gitlab.com/elixxir/crypto/registration"
-	"gitlab.com/elixxir/notifications-bot/notifications/firebase"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/comms/connect"
-	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
-	"strings"
 	"time"
 )
 
 const notificationsTag = "notificationData"
-
-// Params struct holds info passed in for configuration
-type Params struct {
-	Address                string
-	CertPath               string
-	KeyPath                string
-	FBCreds                string
-	NotificationsPerBatch  int
-	MaxNotificationPayload int
-	NotificationRate       int
-	APNS                   APNSParams
-}
-
-// APNSParams holds config info specific to apple's push notification service
-type APNSParams struct {
-	KeyPath  string
-	KeyID    string
-	Issuer   string
-	BundleID string
-	Dev      bool
-}
 
 // Impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
 	Comms            *notificationBot.Comms
 	Storage          *storage.Storage
 	inst             *network.Instance
-	fcm              *firebase.FirebaseComm
-	apnsClient       *apns.ApnsComm
 	receivedNdf      *uint32
 	roundStore       sync.Map
 	maxNotifications int
 	maxPayloadBytes  int
+
+	providers map[string]providers.Provider
 
 	ndfStopper Stopper
 }
@@ -99,51 +70,34 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		}
 	}
 
-	// Set up firebase messaging client
-	var fbComm *firebase.FirebaseComm
-	if !noFirebase {
-		app, err := firebase.SetupMessagingApp(params.FBCreds)
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to setup firebase messaging app")
-		}
-		fbComm = firebase.NewFirebaseComm(app)
-	}
 	receivedNdf := uint32(0)
 
 	impl := &Impl{
-		fcm:              fbComm,
+		providers:        map[string]providers.Provider{},
 		receivedNdf:      &receivedNdf,
 		maxNotifications: params.NotificationsPerBatch,
 		maxPayloadBytes:  params.MaxNotificationPayload,
 	}
 
-	if params.APNS.KeyPath == "" {
+	// Set up firebase messaging client
+	if !noFirebase {
+		impl.providers[constants.MessengerAndroid.String()], err = providers.NewFCM(params.FBCreds)
+
+		if params.HavenFBCreds != "" {
+			impl.providers[constants.HavenAndroid.String()], err = providers.NewFCM(params.HavenFBCreds)
+		}
+	}
+
+	if params.KeyPath == "" {
 		jww.WARN.Println("WARNING: RUNNING WITHOUT APNS")
 	} else {
-		if params.APNS.KeyID == "" || params.APNS.Issuer == "" || params.APNS.BundleID == "" {
-			return nil, errors.WithMessagef(err, "APNS not properly configured: %+v", params.APNS)
-		}
+		impl.providers[constants.MessengerIOS.String()], err = providers.NewApns(params.APNS)
+	}
 
-		authKey, err := apnstoken.AuthKeyFromFile(params.APNS.KeyPath)
-		if err != nil {
-			return nil, errors.WithMessage(err, "Failed to load auth key from file")
-		}
-		token := &apnstoken.Token{
-			AuthKey: authKey,
-			// KeyID from developer account (Certificates, Identifiers & Profiles -> Keys)
-			KeyID: params.APNS.KeyID,
-			// TeamID from developer account (View Account -> Membership)
-			TeamID: params.APNS.Issuer,
-		}
-		apnsClient := apns2.NewTokenClient(token)
-		if params.APNS.Dev {
-			jww.INFO.Printf("Running with dev apns gateway")
-			apnsClient.Development()
-		} else {
-			apnsClient.Production()
-		}
-
-		impl.apnsClient = apns.NewApnsComm(apnsClient, params.APNS.BundleID)
+	if params.HavenAPNS.KeyPath == "" {
+		jww.WARN.Println("WARNING: RUNNING WITHOUT HAVEN APNS")
+	} else {
+		impl.providers[constants.HavenIOS.String()], err = providers.NewApns(params.HavenAPNS)
 	}
 
 	// Start notification comms server
@@ -159,6 +113,22 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 
 	go impl.Cleaner()
 	go impl.Sender(params.NotificationRate)
+
+	go func() {
+		if params.HttpsKeyPath == "" || params.HttpsCertPath == "" {
+			jww.WARN.Println("Running without HTTPS")
+			return
+		}
+		httpsCertificate, err := tls.LoadX509KeyPair(params.HttpsCertPath, params.HttpsKeyPath)
+		if err != nil {
+			jww.ERROR.Printf("Failed to load https certificate: %+v", err)
+			return
+		}
+		err = comms.ServeHttps(httpsCertificate)
+		if err != nil {
+			jww.ERROR.Printf("Failed to serve HTTPS: %+v", err)
+		}
+	}()
 
 	return impl, nil
 }
@@ -177,6 +147,18 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 
 	impl.Functions.ReceiveNotificationBatch = func(data *pb.NotificationBatch, auth *connect.Auth) error {
 		return instance.ReceiveNotificationBatch(data, auth)
+	}
+	impl.Functions.RegisterToken = func(msg *pb.RegisterTokenRequest) error {
+		return instance.RegisterToken(msg)
+	}
+	impl.Functions.RegisterTrackedID = func(msg *pb.RegisterTrackedIdRequest) error {
+		return instance.RegisterTrackedID(msg.Request)
+	}
+	impl.Functions.UnregisterToken = func(msg *pb.UnregisterTokenRequest) error {
+		return instance.UnregisterToken(msg)
+	}
+	impl.Functions.UnregisterTrackedID = func(msg *pb.UnregisterTrackedIdRequest) error {
+		return instance.UnregisterTrackedID(msg.Request)
 	}
 
 	return impl
@@ -204,9 +186,7 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 		ephemerals = append(ephemerals, i)
 		unsent = append(unsent, overflow...)
 	}
-	jww.INFO.Printf("Ephemerals: %+v", ephemerals)
 	toNotify, err := nb.Storage.GetToNotify(ephemerals)
-	jww.INFO.Printf("GTN result: %+v", toNotify)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
 	}
@@ -220,155 +200,21 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 
 // notify is a helper function which handles sending notifications to either APNS or firebase
 func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
-	isAPNS := !strings.Contains(toNotify.Token, ":")
-	// mutableContent := 1
-	if isAPNS {
-		jww.INFO.Printf("Notifying ephemeral ID %+v via APNS to token %+v", toNotify.EphemeralId, toNotify.Token)
-		notifPayload := payload.NewPayload().AlertTitle("Privacy: protected!").AlertBody(
-			"Some notifications are not for you to ensure privacy; we hope to remove this notification soon").MutableContent().Custom(
-			notificationsTag, csv)
-		notif := &apns2.Notification{
-			CollapseID:  base64.StdEncoding.EncodeToString(toNotify.TransmissionRSAHash),
-			DeviceToken: toNotify.Token,
-			Expiration:  time.Now().Add(time.Hour * 24 * 7),
-			Priority:    apns2.PriorityHigh,
-			Payload:     notifPayload,
-			PushType:    apns2.PushTypeAlert,
-			Topic:       nb.apnsClient.GetTopic(),
-		}
-		resp, err := nb.apnsClient.Push(notif)
-		if err != nil {
-			jww.ERROR.Printf("Failed to send notification via APNS: %+v: %+v", resp, err)
-			// TODO : Should be re-enabled for specific error cases? deep dive on apns docs may be helpful
-			//err := db.DeleteUserByHash(u.TransmissionRSAHash)
-			//if err != nil {
-			//	return errors.WithMessagef(err, "Failed to remove user registration tRSA hash: %+v", u.TransmissionRSAHash)
-			//}
-		} else {
-			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", toNotify.EphemeralId, toNotify.Token, resp)
-		}
-	} else {
-		resp, err := nb.fcm.SendNotification(nb.fcm.Client, toNotify.Token, csv)
-		if err != nil {
-			// Catch firebase errors that we don't want to crash on
-			// 404 indicate that the token stored is incorrect
-			// this means rather than crashing we should log and unregister the user
-			// 400 can also indicate incorrect token, do extra checking on this (12/27/2021)
-			// Error documentation: https://firebase.google.com/docs/reference/fcm/rest/v1/ErrorCode
-			// Stale token documentation: https://firebase.google.com/docs/cloud-messaging/manage-tokens
-			jww.ERROR.Printf("Error sending notification via FCM: %+v", err)
-			invalidToken := strings.Contains(err.Error(), "400") &&
-				strings.Contains(err.Error(), "Invalid registration")
-			if strings.Contains(err.Error(), "404") || invalidToken {
-				jww.ERROR.Printf("User with Transmission RSA hash %+v has invalid token, unregistering...", toNotify.TransmissionRSAHash)
-				err := nb.Storage.DeleteToken(toNotify.Token)
-				if err != nil {
-					jww.ERROR.Printf("Failed to remove user registration tRSA hash %+v: %+v", toNotify.TransmissionRSAHash, err)
-				}
-			} else {
-				jww.ERROR.Printf("Failed to send notification to user with tRSA hash %+v: %+v", toNotify.TransmissionRSAHash, err)
+	tokenValid, err := nb.providers[toNotify.App].Notify(csv, toNotify)
+	if err != nil {
+		jww.ERROR.Println(err)
+		if !tokenValid {
+			jww.DEBUG.Printf("User with tRSA hash %+v has invalid token [%+v] for app %s - attempting to remove", toNotify.TransmissionRSAHash, toNotify.Token, toNotify.App)
+			err := nb.Storage.DeleteToken(toNotify.Token)
+			if err != nil {
+				jww.ERROR.Printf("Failed to remove %s token registration tRSA hash %+v: %+v", toNotify.App, toNotify.TransmissionRSAHash, err)
 			}
-		} else {
-			jww.INFO.Printf("Notified ephemeral ID %+v [%+v] and received response %+v", toNotify.EphemeralId, toNotify.Token, resp)
 		}
 	}
-}
-
-// RegisterForNotifications is called by the client, and adds a user registration to our database
-func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest) error {
-	var err error
-	// Check auth & inputs
-	if string(request.Token) == "" {
-		return errors.New("Cannot register for notifications with empty client token")
-	}
-
-	// Verify permissioning RSA signature
-	permHost, ok := nb.Comms.GetHost(&id.Permissioning)
-	if !ok {
-		return errors.New("Could not find permissioning host to verify client signature")
-	}
-	err = registration.VerifyWithTimestamp(permHost.GetPubKey(), request.RegistrationTimestamp,
-		string(request.TransmissionRsa), request.TransmissionRsaSig)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to verify perm sig with timestamp")
-	}
-
-	// Verify IID transmission RSA signature
-	h, err := hash.NewCMixHash()
-	if err != nil {
-		return errors.WithMessage(err, "Failed to create cmix hash")
-	}
-	_, err = h.Write(request.IntermediaryId)
-	if err != nil {
-		return errors.Wrap(err, "Failed to write intermediary id to hash")
-	}
-	pub, err := rsa.LoadPublicKeyFromPem(request.TransmissionRsa)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to load public key from bytes")
-	}
-	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
-	if err != nil {
-		return errors.Wrap(err, "Failed to verify IID signature from client")
-	}
-
-	// Add the user to storage
-	_, epoch := ephemeral.HandleQuantization(time.Now())
-	_, err = nb.Storage.RegisterForNotifications(request.IntermediaryId, request.TransmissionRsa, request.IIDTransmissionRsaSig, request.Token, epoch, nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)
-	if err != nil {
-		return errors.Wrap(err, "Failed to register user with notifications")
-	}
-
-	return nil
-}
-
-// UnregisterForNotifications is called by the client, and removes a user registration from our database
-func (nb *Impl) UnregisterForNotifications(request *pb.NotificationUnregisterRequest) error {
-	if request.TransmissionRSA == nil && request.Token == "" {
-		return nb.Storage.LegacyUnregister(request.IntermediaryId)
-	}
-
-	h, err := hash.NewCMixHash()
-	if err != nil {
-		return errors.WithMessage(err, "Failed to create cmix hash")
-	}
-	_, err = h.Write(request.TransmissionRSA)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to hash transmission RSA")
-	}
-	transmissionRSAHash := h.Sum(nil)
-
-	u, err := nb.Storage.GetUser(transmissionRSAHash)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to find user with intermediary ID %+v", request.IntermediaryId)
-	}
-
-	h.Reset()
-	_, err = h.Write(request.IntermediaryId)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to write intermediary id to hash")
-	}
-
-	pub, err := rsa.LoadPublicKeyFromPem(u.TransmissionRSA)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to load public key from database")
-	}
-	err = rsa.Verify(pub, hash.CMixHash, h.Sum(nil), request.IIDTransmissionRsaSig, nil)
-	if err != nil {
-		return errors.Wrap(err, "Failed to verify IID signature from client")
-	}
-	err = nb.Storage.UnregisterForNotifications(request.TransmissionRSA, [][]byte{request.IntermediaryId}, []string{request.Token})
-	if err != nil {
-		return errors.Wrap(err, "Failed to unregister user with notifications")
-	}
-	return nil
 }
 
 // ReceiveNotificationBatch receives the batch of notification data from gateway.
 func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth *connect.Auth) error {
-	//if !auth.IsAuthenticated {
-	//	return errors.New("Cannot receive notification data: client is not authenticated")
-	//}
-
 	rid := notifBatch.RoundID
 
 	_, loaded := nb.roundStore.LoadOrStore(rid, time.Now())
