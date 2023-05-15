@@ -28,20 +28,28 @@ certPath: "${cert_path}"
 # The listening port of this server
 port: ${port}
 
-# Path to the firebase credentials file
+# Path to the firebase credentials files
 firebaseCredentialsPath: "{fb_creds_path}"
+havenFirebaseCredentialsPath: "{fb_creds_path}"
 
 # Path to the permissioning server certificate file
 permissioningCertPath: "${permissioning_cert_path}"
 # Address:port of the permissioning server
 permissioningAddress: "${permissioning_address}:${port}"
 
-# APNS parameters
+# XX Messenger APNS parameters
 apnsKeyPath: ""
 apnsKeyID: ""
 apnsIssuer: ""
 apnsBundleID: ""
 apnsDev: true
+
+# Haven APNS parameters
+havenApnsKeyPath: ""
+havenApnsKeyID: ""
+havenApnsIssuer: ""
+havenApnsBundleID: ""
+havenApnsDev: true
 
 # Notification params
 notificationRate: 30  # Duration in seconds

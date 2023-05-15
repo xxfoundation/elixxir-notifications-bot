@@ -5,32 +5,29 @@
 // LICENSE file.                                                              //
 ////////////////////////////////////////////////////////////////////////////////
 
-// This file contains the main logic for notifications, including the main implementation and core loop
+// Package notifications contains the core logic for interacting with the notifications bot.
+//
+// This includes registering users, receiving notifications, and sending to providers.
 
 package notifications
 
 import (
 	"crypto/tls"
-	"gitlab.com/elixxir/notifications-bot/constants"
-	"gitlab.com/elixxir/notifications-bot/notifications/providers"
-	"sync"
-
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/comms/network"
 	"gitlab.com/elixxir/comms/notificationBot"
+	"gitlab.com/elixxir/notifications-bot/constants"
+	"gitlab.com/elixxir/notifications-bot/notifications/providers"
 	"gitlab.com/elixxir/notifications-bot/storage"
-	"gitlab.com/elixxir/primitives/notifications"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/ndf"
 	"gitlab.com/xx_network/primitives/netTime"
 	"gitlab.com/xx_network/primitives/utils"
-	"time"
+	"sync"
 )
-
-const notificationsTag = "notificationData"
 
 // Impl for notifications; holds comms, storage object, creds and main functions
 type Impl struct {
@@ -162,147 +159,4 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 	}
 
 	return impl
-}
-
-// SendBatch accepts the map of ephemeralID:list[notifications.Data]
-// It handles logic for building the CSV & sending to devices
-func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notifications.Data, error) {
-	csvs := map[int64]string{}
-	var ephemerals []int64
-	var unsent []*notifications.Data
-	jww.INFO.Printf("data: %+v", data)
-	for i, ilist := range data {
-		var overflow, toSend []*notifications.Data
-		if len(ilist) > nb.maxNotifications {
-			overflow = ilist[nb.maxNotifications:]
-			toSend = ilist[:nb.maxNotifications]
-		} else {
-			toSend = ilist[:]
-		}
-
-		notifs, rest := notifications.BuildNotificationCSV(toSend, nb.maxPayloadBytes-len([]byte(notificationsTag)))
-		overflow = append(overflow, rest...)
-		csvs[i] = string(notifs)
-		ephemerals = append(ephemerals, i)
-		unsent = append(unsent, overflow...)
-	}
-	toNotify, err := nb.Storage.GetToNotify(ephemerals)
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to get list of tokens to notify")
-	}
-	for i := range toNotify {
-		go func(res storage.GTNResult) {
-			nb.notify(csvs[res.EphemeralId], res)
-		}(toNotify[i])
-	}
-	return unsent, nil
-}
-
-// notify is a helper function which handles sending notifications to either APNS or firebase
-func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
-	tokenValid, err := nb.providers[toNotify.App].Notify(csv, toNotify)
-	if err != nil {
-		jww.ERROR.Println(err)
-		if !tokenValid {
-			jww.DEBUG.Printf("User with tRSA hash %+v has invalid token [%+v] for app %s - attempting to remove", toNotify.TransmissionRSAHash, toNotify.Token, toNotify.App)
-			err := nb.Storage.DeleteToken(toNotify.Token)
-			if err != nil {
-				jww.ERROR.Printf("Failed to remove %s token registration tRSA hash %+v: %+v", toNotify.App, toNotify.TransmissionRSAHash, err)
-			}
-		}
-	}
-}
-
-// ReceiveNotificationBatch receives the batch of notification data from gateway.
-func (nb *Impl) ReceiveNotificationBatch(notifBatch *pb.NotificationBatch, auth *connect.Auth) error {
-	rid := notifBatch.RoundID
-
-	_, loaded := nb.roundStore.LoadOrStore(rid, time.Now())
-	if loaded {
-		jww.DEBUG.Printf("Dropping duplicate notification batch for round %+v", notifBatch.RoundID)
-		return nil
-	}
-
-	jww.INFO.Printf("Received notification batch for round %+v", notifBatch.RoundID)
-
-	buffer := nb.Storage.GetNotificationBuffer()
-	data := processNotificationBatch(notifBatch)
-	buffer.Add(id.Round(notifBatch.RoundID), data)
-
-	return nil
-}
-
-func processNotificationBatch(l *pb.NotificationBatch) []*notifications.Data {
-	var res []*notifications.Data
-	for _, item := range l.Notifications {
-		res = append(res, &notifications.Data{
-			EphemeralID: item.EphemeralID,
-			RoundID:     l.RoundID,
-			IdentityFP:  item.IdentityFP,
-			MessageHash: item.MessageHash,
-		})
-	}
-	return res
-}
-
-func (nb *Impl) ReceivedNdf() *uint32 {
-	return nb.receivedNdf
-}
-
-func (nb *Impl) Cleaner() {
-	cleanF := func(key, val interface{}) bool {
-		t := val.(time.Time)
-		if time.Since(t) > (5 * time.Minute) {
-			nb.roundStore.Delete(key)
-		}
-		return true
-	}
-
-	cleanTicker := time.NewTicker(time.Minute * 10)
-
-	for {
-		select {
-		case <-cleanTicker.C:
-			nb.roundStore.Range(cleanF)
-		}
-	}
-}
-
-func (nb *Impl) Sender(sendFreq int) {
-	sendTicker := time.NewTicker(time.Duration(sendFreq) * time.Second)
-	for {
-		select {
-		case <-sendTicker.C:
-			go func() {
-				// Retreive & swap notification buffer
-				notifBuf := nb.Storage.GetNotificationBuffer()
-				notifMap := notifBuf.Swap()
-
-				if len(notifMap) == 0 {
-					return
-				}
-
-				unsent := map[uint64][]*notifications.Data{}
-				rest, err := nb.SendBatch(notifMap)
-				if err != nil {
-					jww.ERROR.Printf("Failed to send notification batch: %+v", err)
-					// If we fail to run SendBatch, put everything back in unsent
-					for _, elist := range notifMap {
-						for _, n := range elist {
-							unsent[n.RoundID] = append(unsent[n.RoundID], n)
-						}
-					}
-				} else {
-					// Loop through rest and add to unsent map
-					for _, n := range rest {
-						unsent[n.RoundID] = append(unsent[n.RoundID], n)
-					}
-				}
-				// Re-add unsent notifications to the buffer
-				for rid, nd := range unsent {
-					notifBuf.Add(id.Round(rid), nd)
-				}
-			}()
-		}
-	}
 }

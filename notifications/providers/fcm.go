@@ -1,3 +1,10 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright © 2022 xx foundation                                             //
+//                                                                            //
+// Use of this source code is governed by a license that can be found in the  //
+// LICENSE file.                                                              //
+////////////////////////////////////////////////////////////////////////////////
+
 package providers
 
 import (
@@ -36,6 +43,7 @@ func NewFCM(serviceKeyPath string) (Provider, error) {
 	}, nil
 }
 
+// Notify implements the Provider interface for FCM, sending the notifications to the provider.
 func (f *fcm) Notify(csv string, target storage.GTNResult) (bool, error) {
 	ctx := context.Background()
 	ttl := 7 * 24 * time.Hour

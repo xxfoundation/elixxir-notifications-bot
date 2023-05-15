@@ -1,3 +1,10 @@
+////////////////////////////////////////////////////////////////////////////////
+// Copyright © 2022 xx foundation                                             //
+//                                                                            //
+// Use of this source code is governed by a license that can be found in the  //
+// LICENSE file.                                                              //
+////////////////////////////////////////////////////////////////////////////////
+
 package providers
 
 import (
@@ -59,6 +66,7 @@ func NewApns(params APNSParams) (Provider, error) {
 	}, nil
 }
 
+// Notify implements the Provider interface for APNS, sending the notifications to the provider.
 func (a *apns) Notify(csv string, target storage.GTNResult) (bool, error) {
 	notifPayload := payload.NewPayload().AlertTitle(constants.NotificationTitle).AlertBody(
 		constants.NotificationBody).MutableContent().Custom(
@@ -85,6 +93,6 @@ func (a *apns) Notify(csv string, target storage.GTNResult) (bool, error) {
 	return true, nil
 }
 
-func (c *apns) GetTopic() string {
-	return c.topic
+func (a *apns) GetTopic() string {
+	return a.topic
 }
