@@ -9,6 +9,7 @@
 package storage
 
 import (
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/crypto/csprng"
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
@@ -280,7 +281,7 @@ func TestStorage_RegisterForNotifications(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	_, err = s.RegisterForNotifications(iid, []byte("transmissionrsa"), "token", "xxm", 0, 8)
+	_, err = s.RegisterForNotifications(iid, []byte("transmissionrsa"), "token", constants.MessengerIOS.String(), 0, 8)
 	if err != nil {
 		t.Errorf("Failed to add user: %+v", err)
 	}

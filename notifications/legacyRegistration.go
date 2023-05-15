@@ -12,9 +12,11 @@ import (
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/hash"
 	"gitlab.com/elixxir/crypto/registration"
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
+	"strings"
 	"time"
 )
 
@@ -57,7 +59,15 @@ func (nb *Impl) RegisterForNotifications(request *pb.NotificationRegisterRequest
 
 	// Add the user to storage
 	_, epoch := ephemeral.HandleQuantization(time.Now())
-	_, err = nb.Storage.RegisterForNotifications(request.IntermediaryId, request.TransmissionRsa, request.Token, "xxm", epoch, nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)
+
+	var app string
+	if strings.Contains(request.Token, ":") {
+		app = constants.MessengerAndroid.String()
+	} else {
+		app = constants.MessengerIOS.String()
+	}
+
+	_, err = nb.Storage.RegisterForNotifications(request.IntermediaryId, request.TransmissionRsa, request.Token, app, epoch, nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)
 	if err != nil {
 		return errors.Wrap(err, "Failed to register user with notifications")
 	}

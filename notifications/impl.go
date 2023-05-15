@@ -79,9 +79,15 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 	// Set up firebase messaging client
 	if !noFirebase {
 		impl.providers[constants.MessengerAndroid.String()], err = providers.NewFCM(params.FBCreds)
+		if err != nil {
+			jww.WARN.Printf("Failed to start firebase provider for %s", constants.MessengerAndroid)
+		}
 
 		if params.HavenFBCreds != "" {
 			impl.providers[constants.HavenAndroid.String()], err = providers.NewFCM(params.HavenFBCreds)
+			if err != nil {
+				jww.WARN.Printf("Failed to start firebase provider for %s", constants.HavenAndroid)
+			}
 		}
 	}
 
@@ -89,12 +95,18 @@ func StartNotifications(params Params, noTLS, noFirebase bool) (*Impl, error) {
 		jww.WARN.Println("WARNING: RUNNING WITHOUT APNS")
 	} else {
 		impl.providers[constants.MessengerIOS.String()], err = providers.NewApns(params.APNS)
+		if err != nil {
+			jww.WARN.Printf("Failed to start APNS provider for %s", constants.MessengerIOS)
+		}
 	}
 
 	if params.HavenAPNS.KeyPath == "" {
 		jww.WARN.Println("WARNING: RUNNING WITHOUT HAVEN APNS")
 	} else {
 		impl.providers[constants.HavenIOS.String()], err = providers.NewApns(params.HavenAPNS)
+		if err != nil {
+			jww.WARN.Printf("Failed to start APNS provider for %s", constants.HavenIOS)
+		}
 	}
 
 	// Start notification comms server

@@ -95,7 +95,12 @@ func (nb *Impl) SendBatch(data map[int64][]*notifications.Data) ([]*notification
 
 // notify is a helper function which handles sending notifications to either APNS or firebase
 func (nb *Impl) notify(csv string, toNotify storage.GTNResult) {
-	tokenValid, err := nb.providers[toNotify.App].Notify(csv, toNotify)
+	provider, ok := nb.providers[toNotify.App]
+	if !ok {
+		jww.ERROR.Printf("Could not find provider for app %s", toNotify.App)
+		return
+	}
+	tokenValid, err := provider.Notify(csv, toNotify)
 	if err != nil {
 		jww.ERROR.Println(err)
 		if !tokenValid {
