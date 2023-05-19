@@ -10,6 +10,7 @@
 package storage
 
 import (
+	"encoding/base64"
 	"github.com/pkg/errors"
 	jww "github.com/spf13/jwalterweatherman"
 	"gorm.io/gorm"
@@ -287,4 +288,17 @@ func (d *DatabaseImpl) insertToken(token Token) error {
 // registerTrackedIdentity links an Identity to a User.
 func (d *DatabaseImpl) registerTrackedIdentity(user User, identity Identity) error {
 	return d.db.Model(&user).Association("Identities").Append(&identity)
+}
+
+func (d *DatabaseImpl) registerTrackedIdentities(user User, ids []Identity) error {
+	return d.db.Transaction(func(tx *gorm.DB) error {
+		for _, iid := range ids {
+			err := tx.Model(&user).Association("Identities").Append(&iid)
+			if err != nil {
+				return errors.WithMessagef(err, "Failed to register identity %s to user with transmission RSA hash %s",
+					base64.StdEncoding.EncodeToString(iid.IntermediaryId), base64.StdEncoding.EncodeToString(user.TransmissionRSAHash))
+			}
+		}
+		return nil
+	})
 }

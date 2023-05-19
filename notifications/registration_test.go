@@ -165,10 +165,10 @@ func TestImpl_RegisterTrackedID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	iidSig, err := notifications.SignIdentity(private, iid, reqTs, notifications.RegisterTrackedIDTag, csprng.NewSystemRNG())
+	iidSig, err := notifications.SignIdentity(private, [][]byte{iid}, reqTs, notifications.RegisterTrackedIDTag, csprng.NewSystemRNG())
 
 	err = impl.RegisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: iid,
+		TrackedIntermediaryID: [][]byte{iid},
 		TransmissionRsaPem:    crt,
 		RequestTimestamp:      reqTs.UnixNano(),
 		Signature:             nil,
@@ -178,7 +178,7 @@ func TestImpl_RegisterTrackedID(t *testing.T) {
 	}
 
 	err = impl.RegisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: iid,
+		TrackedIntermediaryID: [][]byte{iid},
 		TransmissionRsaPem:    crt,
 		RequestTimestamp:      reqTs.UnixNano(),
 		Signature:             iidSig,
@@ -332,10 +332,10 @@ func TestImpl_UnregisterTrackedID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	iidSig, err := notifications.SignIdentity(private, iid, reqTs, notifications.RegisterTrackedIDTag, csprng.NewSystemRNG())
+	iidSig, err := notifications.SignIdentity(private, [][]byte{iid}, reqTs, notifications.RegisterTrackedIDTag, csprng.NewSystemRNG())
 
 	err = impl.RegisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: iid,
+		TrackedIntermediaryID: [][]byte{iid},
 		TransmissionRsaPem:    crt,
 		RequestTimestamp:      reqTs.UnixNano(),
 		Signature:             iidSig,
@@ -345,7 +345,7 @@ func TestImpl_UnregisterTrackedID(t *testing.T) {
 	}
 
 	err = impl.UnregisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: iid,
+		TrackedIntermediaryID: [][]byte{iid},
 		TransmissionRsaPem:    crt,
 		RequestTimestamp:      reqTs.UnixNano(),
 		Signature:             iidSig,
@@ -354,9 +354,9 @@ func TestImpl_UnregisterTrackedID(t *testing.T) {
 		t.Fatal("Expected err attempting to unregister with same sig")
 	}
 
-	unregSig, err := notifications.SignIdentity(private, iid, reqTs, notifications.UnregisterTrackedIDTag, csprng.NewSystemRNG())
+	unregSig, err := notifications.SignIdentity(private, [][]byte{iid}, reqTs, notifications.UnregisterTrackedIDTag, csprng.NewSystemRNG())
 	err = impl.UnregisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: iid,
+		TrackedIntermediaryID: [][]byte{iid},
 		TransmissionRsaPem:    crt,
 		RequestTimestamp:      reqTs.UnixNano(),
 		Signature:             unregSig,

@@ -83,7 +83,7 @@ func (s *Storage) UnregisterToken(token string, transmissionRSA []byte) error {
 }
 
 // RegisterTrackedID registers a tracked ID for the user with the passed in RSA
-func (s *Storage) RegisterTrackedID(iid, transmissionRSA []byte, epoch int32, addressSpace uint8) error {
+func (s *Storage) RegisterTrackedID(iidList [][]byte, transmissionRSA []byte, epoch int32, addressSpace uint8) error {
 	transmissionRSAHash, err := getHash(transmissionRSA)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to hash transmisssion RSA")
@@ -94,31 +94,35 @@ func (s *Storage) RegisterTrackedID(iid, transmissionRSA []byte, epoch int32, ad
 		return errors.WithMessage(err, "Cannot register tracked ID to unregistered user")
 	}
 
-	identity, err := s.GetIdentity(iid)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			identity = &Identity{
-				IntermediaryId: iid,
-				OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
-			}
-			err = s.insertIdentity(identity)
-			if err != nil {
+	var ids []Identity
+	for _, iid := range iidList {
+		identity, err := s.GetIdentity(iid)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				identity = &Identity{
+					IntermediaryId: iid,
+					OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
+				}
+				err = s.insertIdentity(identity)
+				if err != nil {
+					return err
+				}
+				_, err = s.AddLatestEphemeral(identity, epoch, uint(addressSpace))
+				if err != nil {
+					return err
+				}
+			} else {
 				return err
 			}
-			_, err = s.AddLatestEphemeral(identity, epoch, uint(addressSpace))
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
 		}
+		ids = append(ids, *identity)
 	}
 
-	return s.database.registerTrackedIdentity(*u, *identity)
+	return s.database.registerTrackedIdentities(*u, ids)
 }
 
-// UnregisterTrackedID unregisters a tracked id from the user with the passed in RSA
-func (s *Storage) UnregisterTrackedID(trackedID, transmissionRSA []byte) error {
+// UnregisterTrackedIDs unregisters a tracked id from the user with the passed in RSA
+func (s *Storage) UnregisterTrackedIDs(trackedIdList [][]byte, transmissionRSA []byte) error {
 	transmissionRSAHash, err := getHash(transmissionRSA)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to hash transmisssion RSA")
@@ -130,7 +134,12 @@ func (s *Storage) UnregisterTrackedID(trackedID, transmissionRSA []byte) error {
 		return nil
 	}
 
-	err = s.database.unregisterIdentities(u, []Identity{{IntermediaryId: trackedID}})
+	var ids []Identity
+	for _, i := range trackedIdList {
+		ids = append(ids, Identity{IntermediaryId: i})
+	}
+
+	err = s.database.unregisterIdentities(u, ids)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil

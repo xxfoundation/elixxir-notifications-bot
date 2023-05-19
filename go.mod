@@ -9,13 +9,12 @@ require (
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/jwalterweatherman v1.1.0
 	github.com/spf13/viper v1.12.0
-	gitlab.com/elixxir/comms v0.0.4-0.20230511183231-e32b848c552d
-	gitlab.com/elixxir/crypto v0.0.7-0.20230427180955-9563c73f0fea
+	gitlab.com/elixxir/comms v0.0.4-0.20230519211512-4a998f4b0938
+	gitlab.com/elixxir/crypto v0.0.7-0.20230519213156-886b0387c218
 	gitlab.com/elixxir/primitives v0.0.3-0.20230214180039-9a25e2d3969c
 	gitlab.com/xx_network/comms v0.0.4-0.20230214180029-5387fb85736d
 	gitlab.com/xx_network/crypto v0.0.5-0.20230214003943-8a09396e95dd
 	gitlab.com/xx_network/primitives v0.0.4-0.20230310205521-c440e68e34c4
-	golang.org/x/net v0.6.0
 	google.golang.org/api v0.103.0
 	gorm.io/driver/postgres v1.5.0
 	gorm.io/driver/sqlite v1.4.4
@@ -71,6 +70,7 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
+	golang.org/x/net v0.6.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect

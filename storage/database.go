@@ -32,6 +32,7 @@ type database interface {
 	GetAllUsers() ([]*User, error)
 
 	registerTrackedIdentity(user User, identity Identity) error
+	registerTrackedIdentities(user User, ids []Identity) error
 
 	GetIdentity(iid []byte) (*Identity, error)
 	insertIdentity(identity *Identity) error

@@ -115,5 +115,5 @@ func (nb *Impl) UnregisterTrackedID(msg *pb.TrackedIntermediaryIdRequest) error 
 		return errors.WithMessage(err, "Failed to verify identity signature")
 	}
 
-	return nb.Storage.UnregisterTrackedID(msg.TrackedIntermediaryID, msg.TransmissionRsaPem)
+	return nb.Storage.UnregisterTrackedIDs(msg.TrackedIntermediaryID, msg.TransmissionRsaPem)
 }

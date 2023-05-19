@@ -66,7 +66,7 @@ func TestStorage_RegisterTrackedID(t *testing.T) {
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
 
-	err = s.RegisterTrackedID(iid, pub, epoch, 16)
+	err = s.RegisterTrackedID([][]byte{iid}, pub, epoch, 16)
 	if err == nil {
 		t.Fatal("Expected error registering identity to unregistered public key")
 	}
@@ -76,12 +76,12 @@ func TestStorage_RegisterTrackedID(t *testing.T) {
 		t.Fatalf("Failed to register token: %+v", err)
 	}
 
-	err = s.RegisterTrackedID(iid, pub, epoch, 16)
+	err = s.RegisterTrackedID([][]byte{iid}, pub, epoch, 16)
 	if err != nil {
 		t.Fatalf("Received error registering identity: %+v", err)
 	}
 
-	err = s.RegisterTrackedID(iid, pub, epoch, 16)
+	err = s.RegisterTrackedID([][]byte{iid}, pub, epoch, 16)
 	if err != nil {
 		t.Fatalf("Received unexpected error on duplicate identity registration: %+v", err)
 	}
@@ -192,7 +192,7 @@ func TestStorage_UnregisterTrackedID(t *testing.T) {
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
 
-	err = s.UnregisterTrackedID(iid, pub)
+	err = s.UnregisterTrackedIDs([][]byte{iid}, pub)
 	if err != nil {
 		t.Fatalf("Error on unregister tracked ID with nothing inserted: %+v", err)
 	}
@@ -202,7 +202,7 @@ func TestStorage_UnregisterTrackedID(t *testing.T) {
 		t.Fatalf("Failed to register token: %+v", err)
 	}
 
-	err = s.UnregisterTrackedID(iid, pub)
+	err = s.UnregisterTrackedIDs([][]byte{iid}, pub)
 	if err != nil {
 		t.Fatalf("Error on unregister tracked ID with user inserted, but no tracked IDs: %+v", err)
 	}
@@ -212,17 +212,17 @@ func TestStorage_UnregisterTrackedID(t *testing.T) {
 		t.Fatalf("Failed to register token: %+v", err)
 	}
 
-	err = s.RegisterTrackedID(iid, pub, epoch, 16)
+	err = s.RegisterTrackedID([][]byte{iid}, pub, epoch, 16)
 	if err != nil {
 		t.Fatalf("Received error registering identity: %+v", err)
 	}
 
-	err = s.UnregisterTrackedID(iid2, pub)
+	err = s.UnregisterTrackedIDs([][]byte{iid2}, pub)
 	if err != nil {
 		t.Fatalf("Error on unregister untracked ID: %+v", err)
 	}
 
-	err = s.RegisterTrackedID(iid2, pub, epoch, 16)
+	err = s.RegisterTrackedID([][]byte{iid2}, pub, epoch, 16)
 	if err != nil {
 		t.Fatalf("Received error registering identity: %+v", err)
 	}
@@ -240,7 +240,7 @@ func TestStorage_UnregisterTrackedID(t *testing.T) {
 		t.Fatalf("Did not receive expected identities for user")
 	}
 
-	err = s.UnregisterTrackedID(iid, pub)
+	err = s.UnregisterTrackedIDs([][]byte{iid}, pub)
 	if err != nil {
 		t.Fatalf("Failed to unregister tracked ID: %+v", err)
 	}
@@ -254,7 +254,7 @@ func TestStorage_UnregisterTrackedID(t *testing.T) {
 		t.Fatalf("Identity was not properly deleted")
 	}
 
-	err = s.UnregisterTrackedID(iid2, pub)
+	err = s.UnregisterTrackedIDs([][]byte{iid2}, pub)
 	if err != nil {
 		t.Fatalf("Failed to unregister tracked ID: %+v", err)
 	}
