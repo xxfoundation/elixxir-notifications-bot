@@ -68,7 +68,9 @@ func (s *Storage) UnregisterToken(token string, transmissionRSA []byte) error {
 
 	u, err := s.GetUser(transmissionRSAHash)
 	if err != nil {
-		// TODO: should this return an error?
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.WithMessage(err, "Failed to retrieve user")
+		}
 		return nil
 	}
 
@@ -130,7 +132,9 @@ func (s *Storage) UnregisterTrackedIDs(trackedIdList [][]byte, transmissionRSA [
 
 	u, err := s.GetUser(transmissionRSAHash)
 	if err != nil {
-		// TODO: should this return an error?
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.WithMessage(err, "Failed to retrieve user")
+		}
 		return nil
 	}
 
