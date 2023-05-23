@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
 	"testing"
@@ -30,7 +31,6 @@ func TestDatabase(t *testing.T) {
 	toNotify = append(toNotify, eph.Int64())
 
 	trsa := []byte("trsa")
-	sig1 := []byte("First signature")
 	token1 := "apnstoken01"
 	token2 := "fcm:token02"
 	token3 := "apnstoken03"
@@ -71,7 +71,7 @@ func TestDatabase(t *testing.T) {
 	token4 := "fcm:token04"
 
 	// Register user 1 with token 1 and identity 1
-	_, err = s.RegisterForNotifications(iid1, trsa, sig1, token1, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid1, trsa, token1, constants.MessengerIOS.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestDatabase(t *testing.T) {
 	}
 
 	// Register user 2 with token 4 and identity 1
-	_, err = s.RegisterForNotifications(iid1, trsa2, sig1, token4, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid1, trsa2, token4, constants.MessengerAndroid.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestDatabase(t *testing.T) {
 	}
 
 	// Call identitcal registration on user 1 (no change)
-	_, err = s.RegisterForNotifications(iid1, trsa, sig1, token1, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid1, trsa, token1, constants.MessengerIOS.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestDatabase(t *testing.T) {
 	}
 
 	// Register user 1 with identity 2 (still on token 1)
-	_, err = s.RegisterForNotifications(iid2, trsa, sig1, token1, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid2, trsa, token1, constants.MessengerIOS.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestDatabase(t *testing.T) {
 	}
 
 	// Register user 1 with token 2
-	_, err = s.RegisterForNotifications(iid2, trsa, sig1, token2, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid2, trsa, token2, constants.MessengerAndroid.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestDatabase(t *testing.T) {
 	}
 
 	// Register user 1 with token3 and identity3
-	_, err = s.RegisterForNotifications(iid3, trsa, sig1, token3, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid3, trsa, token3, constants.MessengerIOS.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestDatabase(t *testing.T) {
 	}
 
 	// Register user 2 with identity 4
-	_, err = s.RegisterForNotifications(iid4, trsa2, sig1, token4, epoch, addressSpace)
+	_, err = s.RegisterForNotifications(iid4, trsa2, token4, constants.MessengerAndroid.String(), epoch, addressSpace)
 	if err != nil {
 		t.Fatal(err)
 	}

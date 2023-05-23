@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"gitlab.com/elixxir/crypto/hash"
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/crypto/csprng"
 	"gitlab.com/xx_network/crypto/signature/rsa"
 	"gitlab.com/xx_network/primitives/id"
@@ -107,7 +108,11 @@ func TestDatabaseImpl_DeleteToken(t *testing.T) {
 	}
 
 	token := "apnstoken01"
-	err = db.registerForNotifications(u, identity, token)
+	err = db.registerForNotifications(u, identity, Token{
+		Token:               token,
+		App:                 constants.MessengerIOS.String(),
+		TransmissionRSAHash: u.TransmissionRSAHash,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +158,7 @@ func TestDatabaseImpl_insertUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(u.Signature, receivedUser.Signature) || !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
+	if !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
 		t.Fatalf("Did not receive expected user data\n\tExpected: %+v\n\tReceived: %+v\n", u, receivedUser)
 	}
 
@@ -166,7 +171,7 @@ func TestDatabaseImpl_insertUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(u.Signature, receivedUser.Signature) || !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
+	if !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
 		t.Fatalf("Did not receive expected user data\n\tExpected: %+v\n\tReceived: %+v\n", u, receivedUser)
 	}
 }
@@ -193,7 +198,7 @@ func TestDatabaseImpl_GetUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(u.Signature, receivedUser.Signature) || !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
+	if !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
 		t.Fatalf("Did not receive expected user data\n\tExpected: %+v\n\tReceived: %+v\n", u, receivedUser)
 	}
 }
@@ -220,7 +225,7 @@ func TestDatabaseImpl_deleteUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(u.Signature, receivedUser.Signature) || !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
+	if !bytes.Equal(u.TransmissionRSA, receivedUser.TransmissionRSA) || !bytes.Equal(u.TransmissionRSAHash, receivedUser.TransmissionRSAHash) {
 		t.Fatalf("Did not receive expected user data\n\tExpected: %+v\n\tReceived: %+v\n", u, receivedUser)
 	}
 
@@ -281,7 +286,7 @@ func TestDatabaseImpl_getIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	receivedIdentity, err := db.getIdentity(identity.IntermediaryId)
+	receivedIdentity, err := db.GetIdentity(identity.IntermediaryId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,7 +661,10 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 	}
 
 	token := "apnstoken02"
-	err = db.registerForNotifications(u, identity, token)
+	err = db.registerForNotifications(u, identity, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -675,7 +683,10 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 	}
 
 	token2 := "fcm:token2"
-	err = db.registerForNotifications(u2, identity2, token2)
+	err = db.registerForNotifications(u2, identity2, Token{
+		Token: token2,
+		App:   constants.MessengerAndroid.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -688,7 +699,10 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 		t.Fatalf("Did not receive expected user\n\tExpected: %+v\n\t: Receiveid: %+v\n", u2, ru)
 	}
 
-	err = db.registerForNotifications(u, identity2, token)
+	err = db.registerForNotifications(u, identity2, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -700,7 +714,10 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 		t.Fatalf("Did not receive expected user\n\tExpected: %+v\n\t: Receiveid: %+v\n", u2, ru)
 	}
 
-	err = db.registerForNotifications(u, identity2, token2)
+	err = db.registerForNotifications(u, identity2, Token{
+		Token: token2,
+		App:   constants.MessengerAndroid.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -712,7 +729,10 @@ func TestDatabaseImpl_registerForNotifications(t *testing.T) {
 		t.Fatalf("Did not receive expected user\n\tExpected: %+v\n\t: Receiveid: %+v\n", u, ru)
 	}
 
-	err = db.registerForNotifications(u2, identity, token)
+	err = db.registerForNotifications(u2, identity, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -755,7 +775,10 @@ func TestDatabaseImpl_unregisterIdentities(t *testing.T) {
 	}
 
 	token := "apnstoken02"
-	err = db.registerForNotifications(u, identity, token)
+	err = db.registerForNotifications(u, identity, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -763,7 +786,10 @@ func TestDatabaseImpl_unregisterIdentities(t *testing.T) {
 	identity2 := generateTestIdentity(t)
 
 	token2 := "fcm:token2"
-	err = db.registerForNotifications(u, identity2, token2)
+	err = db.registerForNotifications(u, identity2, Token{
+		Token: token2,
+		App:   constants.MessengerAndroid.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -811,8 +837,8 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 	}
 
 	_, err = db.GetUser(u.TransmissionRSAHash)
-	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("Expected gorm.ErrRecordNotFound when no user exists, instead got %+v", err)
+	if err != nil {
+		t.Fatalf("User should still exist after unregister, instead got: %+v", err)
 	}
 
 	err = db.insertUser(u)
@@ -825,7 +851,10 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = db.registerForNotifications(u, identity, token)
+	err = db.registerForNotifications(u, identity, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -838,7 +867,10 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 	}
 
 	token2 := "fcm:token2"
-	err = db.registerForNotifications(u, identity2, token2)
+	err = db.registerForNotifications(u, identity2, Token{
+		Token: token2,
+		App:   constants.MessengerAndroid.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -868,11 +900,14 @@ func TestDatabaseImpl_unregisterTokens(t *testing.T) {
 		t.Fatalf("Failed to unregister token: %+v", err)
 	}
 	_, err = db.GetUser(u.TransmissionRSAHash)
-	if err == nil || !errors.Is(err, gorm.ErrRecordNotFound) {
-		t.Fatalf("Expected gorm.ErrRecordNotFound when no user exists, instead got %+v", err)
+	if err != nil {
+		t.Fatalf("User should still exist after unregister, instead got: %+v", err)
+	}
+	if len(u.Identities) != 2 {
+		t.Fatalf("User identities should be unaffected by token removal")
 	}
 
-	_, err = db.getIdentity(identity.IntermediaryId)
+	_, err = db.GetIdentity(identity.IntermediaryId)
 	if err != nil {
 		t.Fatalf("Failed to get identity: %+v", err)
 	}
@@ -898,7 +933,10 @@ func TestDatabaseImpl_LegacyUnregister(t *testing.T) {
 	}
 
 	token := "apnstoken01"
-	err = db.registerForNotifications(u, identity, token)
+	err = db.registerForNotifications(u, identity, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -928,7 +966,10 @@ func TestDatabaseImpl_LegacyUnregister(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = db.registerForNotifications(u, identity, token)
+	err = db.registerForNotifications(u, identity, Token{
+		Token: token,
+		App:   constants.MessengerIOS.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -944,7 +985,10 @@ func TestDatabaseImpl_LegacyUnregister(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = db.registerForNotifications(u2, identity, token2)
+	err = db.registerForNotifications(u2, identity, Token{
+		Token: token2,
+		App:   constants.MessengerAndroid.String(),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -954,7 +998,7 @@ func TestDatabaseImpl_LegacyUnregister(t *testing.T) {
 		t.Fatal("Should have received error trying to unregister iid with multiple associated users")
 	}
 
-	receivedIdent, err := db.getIdentity(identity.IntermediaryId)
+	receivedIdent, err := db.GetIdentity(identity.IntermediaryId)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -993,11 +1037,9 @@ func generateTestUser(t *testing.T) *User {
 	}
 	h := hash.CMixHash.New()
 	h.Write(trsa.GetPublic().Bytes())
-	sig := []byte("fake signature")
 	u := &User{
 		TransmissionRSAHash: h.Sum(nil),
 		TransmissionRSA:     trsa.GetPublic().Bytes(),
-		Signature:           sig,
 	}
 	return u
 }

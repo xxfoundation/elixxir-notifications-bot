@@ -8,7 +8,6 @@
 package storage
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
 	"gitlab.com/elixxir/crypto/hash"
@@ -30,20 +29,138 @@ func NewStorage(username, password, dbName, address, port string) (*Storage, err
 	return storage, err
 }
 
+// RegisterToken registers a token to a user based on their transmission RSA
+func (s *Storage) RegisterToken(token, app string, transmissionRSA []byte) error {
+	transmissionRSAHash, err := getHash(transmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to hash transmisssion RSA")
+	}
+
+	u, err := s.GetUser(transmissionRSAHash)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			u = &User{
+				TransmissionRSAHash: transmissionRSAHash,
+				TransmissionRSA:     transmissionRSA,
+				Tokens: []Token{
+					{Token: token, TransmissionRSAHash: transmissionRSAHash},
+				},
+			}
+			return s.insertUser(u)
+		} else {
+			return err
+		}
+	}
+
+	return s.database.insertToken(Token{
+		App:                 app,
+		Token:               token,
+		TransmissionRSAHash: transmissionRSAHash,
+	})
+}
+
+// UnregisterToken token unregisters a token from the user with the passed in RSA
+func (s *Storage) UnregisterToken(token string, transmissionRSA []byte) error {
+	transmissionRSAHash, err := getHash(transmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to hash transmisssion RSA")
+	}
+
+	u, err := s.GetUser(transmissionRSAHash)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.WithMessage(err, "Failed to retrieve user")
+		}
+		return nil
+	}
+
+	err = s.database.unregisterTokens(u, []Token{{Token: token}})
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+// RegisterTrackedID registers a tracked ID for the user with the passed in RSA
+func (s *Storage) RegisterTrackedID(iidList [][]byte, transmissionRSA []byte, epoch int32, addressSpace uint8) error {
+	transmissionRSAHash, err := getHash(transmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to hash transmisssion RSA")
+	}
+
+	u, err := s.GetUser(transmissionRSAHash)
+	if err != nil {
+		return errors.WithMessage(err, "Cannot register tracked ID to unregistered user")
+	}
+
+	var ids []Identity
+	for _, iid := range iidList {
+		identity, err := s.GetIdentity(iid)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				identity = &Identity{
+					IntermediaryId: iid,
+					OffsetNum:      ephemeral.GetOffsetNum(ephemeral.GetOffset(iid)),
+				}
+				err = s.insertIdentity(identity)
+				if err != nil {
+					return err
+				}
+				_, err = s.AddLatestEphemeral(identity, epoch, uint(addressSpace))
+				if err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		}
+		ids = append(ids, *identity)
+	}
+
+	return s.database.registerTrackedIdentities(*u, ids)
+}
+
+// UnregisterTrackedIDs unregisters a tracked id from the user with the passed in RSA
+func (s *Storage) UnregisterTrackedIDs(trackedIdList [][]byte, transmissionRSA []byte) error {
+	transmissionRSAHash, err := getHash(transmissionRSA)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to hash transmisssion RSA")
+	}
+
+	u, err := s.GetUser(transmissionRSAHash)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.WithMessage(err, "Failed to retrieve user")
+		}
+		return nil
+	}
+
+	var ids []Identity
+	for _, i := range trackedIdList {
+		ids = append(ids, Identity{IntermediaryId: i})
+	}
+
+	err = s.database.unregisterIdentities(u, ids)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 // RegisterForNotifications registers a user with the passed in transmissionRSA
 // to receive notifications on the identity with intermediary id iid, with the passed in token
-func (s *Storage) RegisterForNotifications(iid, transmissionRSA, signature []byte, token string, epoch int32, addressSpace uint8) (*User, error) {
-	h, err := hash.NewCMixHash()
+func (s *Storage) RegisterForNotifications(iid, transmissionRSA []byte, token, app string, epoch int32, addressSpace uint8) (*User, error) {
+	transmissionRSAHash, err := getHash(transmissionRSA)
 	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to create cmix hash")
+		return nil, errors.WithMessage(err, "Failed to hash transmisssion RSA")
 	}
-	_, err = h.Write(transmissionRSA)
-	if err != nil {
-		return nil, errors.WithMessage(err, "Failed to hash transmission RSA")
-	}
-	transmissionRSAHash := h.Sum(nil)
-
-	identity, err := s.getIdentity(iid)
+	identity, err := s.GetIdentity(iid)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			identity = &Identity{
@@ -69,9 +186,8 @@ func (s *Storage) RegisterForNotifications(iid, transmissionRSA, signature []byt
 			u = &User{
 				TransmissionRSAHash: transmissionRSAHash,
 				TransmissionRSA:     transmissionRSA,
-				Signature:           signature,
 				Tokens: []Token{
-					{Token: token, TransmissionRSAHash: transmissionRSAHash},
+					{Token: token, TransmissionRSAHash: transmissionRSAHash, App: app},
 				}, Identities: []Identity{*identity},
 			}
 			return u, s.insertUser(u)
@@ -80,49 +196,7 @@ func (s *Storage) RegisterForNotifications(iid, transmissionRSA, signature []byt
 		}
 	}
 
-	return u, s.registerForNotifications(u, *identity, token)
-}
-
-// UnregisterForNotifications breaks the association between a user and any passed in intermediary IDs and/or tokens
-// Token entries will be deleted, identity entries will be deleted iff there are no other users associated with them, and user records will be deleted if they have no associated tokens
-func (s *Storage) UnregisterForNotifications(transmissionRSA []byte, iids [][]byte, tokens []string) error {
-	h, err := hash.NewCMixHash()
-	if err != nil {
-		return errors.WithMessage(err, "Failed to create cmix hash")
-	}
-	_, err = h.Write(transmissionRSA)
-	if err != nil {
-		return errors.WithMessage(err, "Failed to hash transmission RSA")
-	}
-	transmissionRSAHash := h.Sum(nil)
-
-	u, err := s.GetUser(transmissionRSAHash)
-	if err != nil {
-		return errors.WithMessagef(err, "Could not find user with transmission RSA hash %s", base64.StdEncoding.EncodeToString(transmissionRSAHash))
-	}
-
-	var identitiesToRemove []Identity
-	for _, iid := range iids {
-		identitiesToRemove = append(identitiesToRemove, Identity{IntermediaryId: iid})
-	}
-
-	err = s.unregisterIdentities(u, identitiesToRemove)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to unregister identities from user with transmission RSA hash %s", base64.StdEncoding.EncodeToString(transmissionRSAHash))
-	}
-
-	var tokensToRemove []Token
-	for _, token := range tokens {
-		// TODO: this will not work due to complications from multi-device support & changing tokens
-		tokensToRemove = append(tokensToRemove, Token{Token: token})
-	}
-
-	err = s.unregisterTokens(u, tokensToRemove)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to unregister tokens from user with transmission RSA hash %s", base64.StdEncoding.EncodeToString(transmissionRSAHash))
-	}
-
-	return nil
+	return u, s.registerForNotifications(u, *identity, Token{Token: token, App: app, TransmissionRSAHash: transmissionRSAHash})
 }
 
 // AddLatestEphemeral generates an ephemeral ID for the passed in identity and adds it to storage
@@ -194,4 +268,17 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 
 func (s *Storage) GetNotificationBuffer() *NotificationBuffer {
 	return s.notificationBuffer
+}
+
+func getHash(transmissionRSA []byte) (transmissionRSAHash []byte, err error) {
+	h, err := hash.NewCMixHash()
+	if err != nil {
+		return
+	}
+	_, err = h.Write(transmissionRSA)
+	if err != nil {
+		return
+	}
+	transmissionRSAHash = h.Sum(nil)
+	return
 }

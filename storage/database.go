@@ -31,7 +31,10 @@ type database interface {
 	deleteUser(transmissionRsaHash []byte) error
 	GetAllUsers() ([]*User, error)
 
-	getIdentity(iid []byte) (*Identity, error)
+	registerTrackedIdentity(user User, identity Identity) error
+	registerTrackedIdentities(user User, ids []Identity) error
+
+	GetIdentity(iid []byte) (*Identity, error)
 	insertIdentity(identity *Identity) error
 	getIdentitiesByOffset(offset int64) ([]*Identity, error)
 	GetOrphanedIdentities() ([]*Identity, error)
@@ -42,11 +45,12 @@ type database interface {
 	DeleteOldEphemerals(currentEpoch int32) error
 	GetToNotify(ephemeralIds []int64) ([]GTNResult, error)
 
+	insertToken(token Token) error
 	DeleteToken(token string) error
 
 	unregisterIdentities(u *User, iids []Identity) error
 	unregisterTokens(u *User, tokens []Token) error
-	registerForNotifications(u *User, identity Identity, token string) error
+	registerForNotifications(u *User, identity Identity, token Token) error
 	LegacyUnregister(iid []byte) error
 }
 
@@ -73,13 +77,13 @@ type UserV1 struct {
 
 type Token struct {
 	Token               string `gorm:"primaryKey"`
+	App                 string
 	TransmissionRSAHash []byte `gorm:"not null;references users(transmission_rsa_hash)"`
 }
 
 type User struct {
 	TransmissionRSAHash []byte     `gorm:"primaryKey"`
 	TransmissionRSA     []byte     `gorm:"not null"`
-	Signature           []byte     `gorm:"not null"`
 	Tokens              []Token    `gorm:"foreignKey:TransmissionRSAHash;constraint:OnDelete:CASCADE;"`
 	Identities          []Identity `gorm:"many2many:user_identities;"`
 }
