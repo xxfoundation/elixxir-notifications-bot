@@ -61,17 +61,17 @@ func (nb *Impl) initCreator() {
 	nextTrigger := time.Unix(0, int64(epoch)*offsetPhase)
 
 	// Check for users with no associated ephemerals, add them if found (this should not happen unless there were issues)
-	orphaned, err := nb.Storage.GetOrphanedUsers()
+	orphaned, err := nb.Storage.GetOrphanedIdentities()
 	if err != nil {
 		jww.FATAL.Panicf("Failed to retrieve orphaned users: %+v", err)
 	}
 	if len(orphaned) > 0 {
 		jww.WARN.Printf("Found %d orphaned users in database", len(orphaned))
 	}
-	for _, u := range orphaned {
-		_, err := nb.Storage.AddLatestEphemeral(u, epoch, uint(nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)) // TODO: is this the correct epoch?  Should we do the previous one as well?
+	for _, i := range orphaned {
+		_, err := nb.Storage.AddLatestEphemeral(i, epoch, uint(nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)) // TODO: is this the correct epoch?  Should we do the previous one as well?
 		if err != nil {
-			jww.WARN.Printf("Failed to add latest ephemeral for orphaned user %+v: %+v", u.TransmissionRSAHash, err)
+			jww.WARN.Printf("Failed to add latest ephemeral for orphaned identity %+v: %+v", i.IntermediaryId, err)
 		}
 	}
 
@@ -113,6 +113,7 @@ func (nb *Impl) initDeleter() {
 }
 
 func (nb *Impl) deleteEphemerals(start time.Time) {
+	fmt.Println("deleteEphemerals")
 	_, currentEpoch := ephemeral.HandleQuantization(start)
 	err := nb.Storage.DeleteOldEphemerals(currentEpoch)
 	if err != nil {

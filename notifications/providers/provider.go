@@ -5,22 +5,15 @@
 // LICENSE file.                                                              //
 ////////////////////////////////////////////////////////////////////////////////
 
-package apns
+// Package providers contains logic for interacting with external notifications providers such as APNS
 
-import "github.com/sideshow/apns2"
+package providers
 
-type ApnsComm struct {
-	*apns2.Client
-	topic string
-}
+import "gitlab.com/elixxir/notifications-bot/storage"
 
-func NewApnsComm(cl *apns2.Client, topic string) *ApnsComm {
-	return &ApnsComm{
-		Client: cl,
-		topic:  topic,
-	}
-}
-
-func (c *ApnsComm) GetTopic() string {
-	return c.topic
+// Provider interface represents an external notification provider, implementing
+// an easy-to-use Notify function for the rest of the repo to call.
+type Provider interface {
+	// Notify sends a notification and returns the token status and an error
+	Notify(csv string, target storage.GTNResult) (bool, error)
 }

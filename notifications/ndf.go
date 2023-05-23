@@ -117,3 +117,26 @@ func trackNdf(poller io.PollingConn, quitCh chan bool, gwEvt GatewaysChanged) {
 		}
 	}
 }
+
+func (nb *Impl) ReceivedNdf() *uint32 {
+	return nb.receivedNdf
+}
+
+func (nb *Impl) Cleaner() {
+	cleanF := func(key, val interface{}) bool {
+		t := val.(time.Time)
+		if time.Since(t) > (5 * time.Minute) {
+			nb.roundStore.Delete(key)
+		}
+		return true
+	}
+
+	cleanTicker := time.NewTicker(time.Minute * 10)
+
+	for {
+		select {
+		case <-cleanTicker.C:
+			nb.roundStore.Range(cleanF)
+		}
+	}
+}
