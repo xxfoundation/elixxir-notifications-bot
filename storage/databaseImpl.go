@@ -133,12 +133,24 @@ type GTNResult struct {
 	EphemeralId         int64
 }
 
+// The following struct can be used to scan in the intermediary result tables t1 and t2
+//
+//type T1Result struct {
+//	EphemeralId    int64
+//	IntermediaryId []byte
+//}
+//
+//type T2Result struct {
+//	EphemeralId         int64
+//	TransmissionRsaHash []byte
+//}
+
 // GetToNotify returns a list of GTNResult data matching the list of ephemeral IDs passed in.
 func (d *DatabaseImpl) GetToNotify(ephemeralIds []int64) ([]GTNResult, error) {
 	var result []GTNResult
 	err := d.db.Transaction(func(tx *gorm.DB) error {
 		t1 := tx.Table("identities").Select("ephemerals.ephemeral_id, identities.intermediary_id").Joins("inner join ephemerals on ephemerals.intermediary_id = identities.intermediary_id").Where("ephemerals.ephemeral_id in ?", ephemeralIds)
-		t2 := tx.Table("user_identities").Select("t1.ephemeral_id, user_identities.user_transmission_rsa_hash as transmission_rsa_hash").Joins("left join (?) t1 on t1.intermediary_id = user_identities.identity_intermediary_id", t1)
+		t2 := tx.Table("user_identities").Select("t1.ephemeral_id, user_identities.user_transmission_rsa_hash as transmission_rsa_hash").Joins("right join (?) as t1 on t1.intermediary_id = user_identities.identity_intermediary_id", t1)
 		t3 := tx.Model(&User{}).Select("users.transmission_rsa_hash, t2.ephemeral_id").Joins("right join (?) as t2 on users.transmission_rsa_hash = t2.transmission_rsa_hash", t2)
 		return tx.Model(&Token{}).Distinct().Select("tokens.token, tokens.app, t3.transmission_rsa_hash, t3.ephemeral_id").Joins("left join (?) as t3 on tokens.transmission_rsa_hash = t3.transmission_rsa_hash", t3).Scan(&result).Error
 	})

@@ -211,7 +211,6 @@ func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephe
 		IntermediaryId: i.IntermediaryId,
 		EphemeralId:    eid.Int64(),
 		Epoch:          epoch,
-		Offset:         i.OffsetNum,
 	}
 	err = s.insertEphemeral(e)
 	if err != nil {
@@ -227,7 +226,6 @@ func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephe
 			IntermediaryId: i.IntermediaryId,
 			EphemeralId:    eid2.Int64(),
 			Epoch:          epoch + 1,
-			Offset:         i.OffsetNum,
 		}
 		fmt.Printf("Adding ephemeral: %+v\n", e)
 		err = s.insertEphemeral(e)
@@ -257,7 +255,6 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 			IntermediaryId: i.IntermediaryId,
 			EphemeralId:    eid.Int64(),
 			Epoch:          epoch,
-			Offset:         offset,
 		})
 		if err != nil {
 			return errors.WithMessage(err, "Failed to insert ephemeral ID for user")

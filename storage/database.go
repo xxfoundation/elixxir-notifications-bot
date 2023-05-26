@@ -110,7 +110,6 @@ type Identity struct {
 type Ephemeral struct {
 	ID             uint   `gorm:"primaryKey"`
 	IntermediaryId []byte `gorm:"not null;references identities(intermediary_id)"`
-	Offset         int64  `gorm:"not null; index"`
 	EphemeralId    int64  `gorm:"not null; index"`
 	Epoch          int32  `gorm:"not null; index"`
 }
