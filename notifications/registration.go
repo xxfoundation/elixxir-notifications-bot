@@ -8,7 +8,9 @@
 package notifications
 
 import (
+	"encoding/base64"
 	"github.com/pkg/errors"
+	jww "github.com/spf13/jwalterweatherman"
 	pb "gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/crypto/notifications"
 	"gitlab.com/elixxir/crypto/registration"
@@ -24,6 +26,7 @@ var timestampError = "Timestamp of request must be within last 5 seconds.  Reque
 // correct. The RSA->PEM relationship is one to many. It will succeed if the token is already
 // registered.
 func (nb *Impl) RegisterToken(msg *pb.RegisterTokenRequest) error {
+	jww.INFO.Println("RegisterToken")
 	requestTimestamp := time.Unix(0, msg.RequestTimestamp)
 	if time.Now().Sub(requestTimestamp) > time.Second*5 {
 		return errors.Errorf(timestampError, requestTimestamp.String(), time.Now().String())
@@ -33,6 +36,7 @@ func (nb *Impl) RegisterToken(msg *pb.RegisterTokenRequest) error {
 	if !ok {
 		return errors.New("Could not find permissioning host to verify client signature")
 	}
+	jww.INFO.Printf("Verifying perm sig with params:\n\tPubKey: %s\n\tTimestamp: %d\n\tTRSA: %s\n\tSIG: %s\n", base64.StdEncoding.EncodeToString(permHost.GetPubKey().Bytes()), msg.RegistrationTimestamp, base64.StdEncoding.EncodeToString(msg.TransmissionRsaPem), base64.StdEncoding.EncodeToString(msg.TransmissionRsaRegistrarSig))
 	err := registration.VerifyWithTimestamp(permHost.GetPubKey(), msg.RegistrationTimestamp,
 		string(msg.TransmissionRsaPem), msg.TransmissionRsaRegistrarSig)
 	if err != nil {
@@ -57,6 +61,7 @@ func (nb *Impl) RegisterToken(msg *pb.RegisterTokenRequest) error {
 // The actual ID is not revealed, instead an intermediary value is sent which cannot
 // be revered to get the ID, but is repeatable. So it can be rainbow-tabled.
 func (nb *Impl) RegisterTrackedID(msg *pb.TrackedIntermediaryIdRequest) error {
+	jww.INFO.Println("RegisterTrackedID")
 	requestTimestamp := time.Unix(0, msg.RequestTimestamp)
 	if time.Now().Sub(requestTimestamp) > time.Second*5 {
 		return errors.Errorf(timestampError, requestTimestamp.String(), time.Now().String())
@@ -79,6 +84,7 @@ func (nb *Impl) RegisterTrackedID(msg *pb.TrackedIntermediaryIdRequest) error {
 // UnregisterToken unregisters the given device token. The request is signed.
 // Does not return an error if the token cannot be found
 func (nb *Impl) UnregisterToken(msg *pb.UnregisterTokenRequest) error {
+	jww.INFO.Println("UnregisterToken")
 	requestTimestamp := time.Unix(0, msg.RequestTimestamp)
 	if time.Now().Sub(requestTimestamp) > time.Second*5 {
 		return errors.Errorf(timestampError, requestTimestamp.String(), time.Now().String())
@@ -100,6 +106,7 @@ func (nb *Impl) UnregisterToken(msg *pb.UnregisterTokenRequest) error {
 // UnregisterTrackedID unregisters the given tracked ID. The request is signed.
 // Does not return an error if the ID cannot be found
 func (nb *Impl) UnregisterTrackedID(msg *pb.TrackedIntermediaryIdRequest) error {
+	jww.INFO.Println("UnregisterTrackedID")
 	requestTimestamp := time.Unix(0, msg.RequestTimestamp)
 	if time.Now().Sub(requestTimestamp) > time.Second*5 {
 		return errors.Errorf(timestampError, requestTimestamp.String(), time.Now().String())

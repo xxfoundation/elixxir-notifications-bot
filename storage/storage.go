@@ -43,7 +43,7 @@ func (s *Storage) RegisterToken(token, app string, transmissionRSA []byte) error
 				TransmissionRSAHash: transmissionRSAHash,
 				TransmissionRSA:     transmissionRSA,
 				Tokens: []Token{
-					{Token: token, TransmissionRSAHash: transmissionRSAHash},
+					{Token: token, TransmissionRSAHash: transmissionRSAHash, App: app},
 				},
 			}
 			return s.insertUser(u)

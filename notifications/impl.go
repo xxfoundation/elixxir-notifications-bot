@@ -158,16 +158,32 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 		return instance.ReceiveNotificationBatch(data, auth)
 	}
 	impl.Functions.RegisterToken = func(msg *pb.RegisterTokenRequest) error {
-		return instance.RegisterToken(msg)
+		err := instance.RegisterToken(msg)
+		if err != nil {
+			jww.ERROR.Printf("Failed to RegisterToken: %+v", err)
+		}
+		return err
 	}
 	impl.Functions.RegisterTrackedID = func(msg *pb.RegisterTrackedIdRequest) error {
-		return instance.RegisterTrackedID(msg.Request)
+		err := instance.RegisterTrackedID(msg.Request)
+		if err != nil {
+			jww.ERROR.Printf("Failed to RegisterTrackedID: %+v", err)
+		}
+		return err
 	}
 	impl.Functions.UnregisterToken = func(msg *pb.UnregisterTokenRequest) error {
-		return instance.UnregisterToken(msg)
+		err := instance.UnregisterToken(msg)
+		if err != nil {
+			jww.ERROR.Printf("Failed to UnregisterToken: %+v", err)
+		}
+		return err
 	}
 	impl.Functions.UnregisterTrackedID = func(msg *pb.UnregisterTrackedIdRequest) error {
-		return instance.UnregisterTrackedID(msg.Request)
+		err := instance.UnregisterTrackedID(msg.Request)
+		if err != nil {
+			jww.ERROR.Printf("Failed to UnregisterTrackedID: %+v", err)
+		}
+		return err
 	}
 
 	return impl
