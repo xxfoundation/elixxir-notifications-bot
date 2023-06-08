@@ -165,7 +165,7 @@ func NewImplementation(instance *Impl) *notificationBot.Implementation {
 		return err
 	}
 	impl.Functions.RegisterTrackedID = func(msg *pb.RegisterTrackedIdRequest) error {
-		err := instance.RegisterTrackedID(msg.Request)
+		err := instance.RegisterTrackedID(msg)
 		if err != nil {
 			jww.ERROR.Printf("Failed to RegisterTrackedID: %+v", err)
 		}

@@ -93,7 +93,18 @@ func (s *Storage) RegisterTrackedID(iidList [][]byte, transmissionRSA []byte, ep
 
 	u, err := s.GetUser(transmissionRSAHash)
 	if err != nil {
-		return errors.WithMessage(err, "Cannot register tracked ID to unregistered user")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			u = &User{
+				TransmissionRSAHash: transmissionRSAHash,
+				TransmissionRSA:     transmissionRSA,
+			}
+			err = s.insertUser(u)
+			if err != nil {
+				return errors.WithMessage(err, "Failed to register user")
+			}
+		} else {
+			return errors.WithMessage(err, "Failed to look up user")
+		}
 	}
 
 	var ids []Identity
