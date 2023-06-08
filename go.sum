@@ -510,8 +510,6 @@ github.com/zeebo/assert v1.1.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN
 github.com/zeebo/blake3 v0.2.3 h1:TFoLXsjeXqRNFxSbk35Dk4YtszE/MQQGK10BH4ptoTg=
 github.com/zeebo/blake3 v0.2.3/go.mod h1:mjJjZpnsyIVtVgTOSpJ9vmRE4wgDeyt2HU3qXvvKCaQ=
 github.com/zeebo/pcg v1.0.1/go.mod h1:09F0S9iiKrwn9rlI5yjLkmrug154/YRW6KnnXVDM/l4=
-gitlab.com/elixxir/comms v0.0.4-0.20230519211512-4a998f4b0938 h1:f27+QUFiGWrprKm+fstOg3ABkYLpWcZi3+8Lf5eDnqY=
-gitlab.com/elixxir/comms v0.0.4-0.20230519211512-4a998f4b0938/go.mod h1:z+qW0D9VpY5QKTd7wRlb5SK4kBNqLYsa4DXBcUXue9Q=
 gitlab.com/elixxir/comms v0.0.4-0.20230608201134-3cac2b04fb52 h1:S1h/1m8uXb3iEcaSch1tYbNjNRDLHyXyor5k/xodVXE=
 gitlab.com/elixxir/comms v0.0.4-0.20230608201134-3cac2b04fb52/go.mod h1:z+qW0D9VpY5QKTd7wRlb5SK4kBNqLYsa4DXBcUXue9Q=
 gitlab.com/elixxir/crypto v0.0.7-0.20230519213156-886b0387c218 h1:wh7baAROg/RpsPQqe80UP3KBSm9V9eDCOyW6yQ1tpqI=

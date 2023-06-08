@@ -174,7 +174,7 @@ func TestImpl_RegisterTrackedID(t *testing.T) {
 			RequestTimestamp:      reqTs.UnixNano(),
 			Signature:             nil,
 		},
-		RegistrationTimestamp:       reqTs.UnixNano(),
+		RegistrationTimestamp:       ts,
 		TransmissionRsaRegistrarSig: psig,
 	})
 	if err == nil {
@@ -188,7 +188,7 @@ func TestImpl_RegisterTrackedID(t *testing.T) {
 			RequestTimestamp:      reqTs.UnixNano(),
 			Signature:             iidSig,
 		},
-		RegistrationTimestamp:       reqTs.UnixNano(),
+		RegistrationTimestamp:       ts,
 		TransmissionRsaRegistrarSig: psig,
 	})
 	if err != nil {
@@ -347,9 +347,9 @@ func TestImpl_UnregisterTrackedID(t *testing.T) {
 			TrackedIntermediaryID: [][]byte{iid},
 			TransmissionRsaPem:    crt,
 			RequestTimestamp:      reqTs.UnixNano(),
-			Signature:             nil,
+			Signature:             iidSig,
 		},
-		RegistrationTimestamp:       reqTs.UnixNano(),
+		RegistrationTimestamp:       ts,
 		TransmissionRsaRegistrarSig: psig,
 	})
 	if err != nil {
