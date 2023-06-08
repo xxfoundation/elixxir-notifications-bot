@@ -111,9 +111,9 @@ var rootCmd = &cobra.Command{
 			},
 			HavenAPNS: providers.APNSParams{
 				KeyPath:  havenApnsKeyPath,
-				KeyID:    "havenApnsKeyID",
-				Issuer:   "havenApnsIssuer",
-				BundleID: "havenApnsBundleID",
+				KeyID:    viper.GetString("havenApnsKeyID"),
+				Issuer:   viper.GetString("havenApnsIssuer"),
+				BundleID: viper.GetString("havenApnsBundleID"),
 				Dev:      viper.GetBool("havenApnsDev"),
 			},
 			HavenFBCreds:  havenFbCreds,

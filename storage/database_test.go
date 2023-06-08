@@ -10,7 +10,7 @@ import (
 )
 
 func TestDatabase(t *testing.T) {
-	s, err := NewStorage("jonahhusson", "", "cmix", "0.0.0.0", "5432")
+	s, err := NewStorage("", "", "cmix", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,4 +216,5 @@ func TestDatabase(t *testing.T) {
 		t.Log(len(gtnList))
 		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
 	}
+
 }
