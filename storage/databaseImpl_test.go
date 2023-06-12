@@ -365,7 +365,6 @@ func TestDatabaseImpl_GetOrphanedIdentities(t *testing.T) {
 	err = db.insertEphemeral(&Ephemeral{
 		ID:             0,
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    123,
 		Epoch:          123,
 	})
@@ -393,7 +392,6 @@ func TestDatabaseImpl_insertEphemeral(t *testing.T) {
 	e1 := &Ephemeral{
 		ID:             0,
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    123,
 		Epoch:          123,
 	}
@@ -426,7 +424,6 @@ func TestDatabaseImpl_GetEphemeral(t *testing.T) {
 	e1 := &Ephemeral{
 		ID:             0,
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    123,
 		Epoch:          123,
 	}
@@ -469,7 +466,6 @@ func TestDatabaseImpl_DeleteOldEphemerals(t *testing.T) {
 	e1 := &Ephemeral{
 		ID:             0,
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    123,
 		Epoch:          123,
 	}
@@ -529,7 +525,6 @@ func TestDatabaseImpl_GetLatestEphemeral(t *testing.T) {
 
 	e1 := &Ephemeral{
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    123,
 		Epoch:          123,
 	}
@@ -554,7 +549,6 @@ func TestDatabaseImpl_GetLatestEphemeral(t *testing.T) {
 
 	e2 := &Ephemeral{
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    124,
 		Epoch:          123,
 	}
@@ -574,7 +568,6 @@ func TestDatabaseImpl_GetLatestEphemeral(t *testing.T) {
 
 	e3 := &Ephemeral{
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    124,
 		Epoch:          122,
 	}
@@ -594,7 +587,6 @@ func TestDatabaseImpl_GetLatestEphemeral(t *testing.T) {
 
 	e4 := &Ephemeral{
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    126,
 		Epoch:          125,
 	}
@@ -614,7 +606,6 @@ func TestDatabaseImpl_GetLatestEphemeral(t *testing.T) {
 
 	e5 := &Ephemeral{
 		IntermediaryId: identity.IntermediaryId,
-		Offset:         ephemeral.GetOffset(identity.IntermediaryId),
 		EphemeralId:    127,
 		Epoch:          121,
 	}

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/xx_network/primitives/id"
 	"gitlab.com/xx_network/primitives/id/ephemeral"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestDatabase(t *testing.T) {
-	s, err := NewStorage("", "", "TestDatabase", "", "")
+	s, err := NewStorage("", "", "cmix", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,6 +207,13 @@ func TestDatabase(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(gtnList) != 11 {
+		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
+	}
+
+	gtnList, err = s.GetToNotify([]int64{toNotify[0]})
+	if len(gtnList) != 4 {
+		fmt.Println(toNotify[0])
+		t.Log(len(gtnList))
 		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
 	}
 

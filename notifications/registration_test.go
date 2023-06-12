@@ -167,21 +167,29 @@ func TestImpl_RegisterTrackedID(t *testing.T) {
 
 	iidSig, err := notifications.SignIdentity(private, [][]byte{iid}, reqTs, notifications.RegisterTrackedIDTag, csprng.NewSystemRNG())
 
-	err = impl.RegisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: [][]byte{iid},
-		TransmissionRsaPem:    crt,
-		RequestTimestamp:      reqTs.UnixNano(),
-		Signature:             nil,
+	err = impl.RegisterTrackedID(&mixmessages.RegisterTrackedIdRequest{
+		Request: &mixmessages.TrackedIntermediaryIdRequest{
+			TrackedIntermediaryID: [][]byte{iid},
+			TransmissionRsaPem:    crt,
+			RequestTimestamp:      reqTs.UnixNano(),
+			Signature:             nil,
+		},
+		RegistrationTimestamp:       ts,
+		TransmissionRsaRegistrarSig: psig,
 	})
 	if err == nil {
 		t.Fatal("Expected error verifying tracked ID sig")
 	}
 
-	err = impl.RegisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: [][]byte{iid},
-		TransmissionRsaPem:    crt,
-		RequestTimestamp:      reqTs.UnixNano(),
-		Signature:             iidSig,
+	err = impl.RegisterTrackedID(&mixmessages.RegisterTrackedIdRequest{
+		Request: &mixmessages.TrackedIntermediaryIdRequest{
+			TrackedIntermediaryID: [][]byte{iid},
+			TransmissionRsaPem:    crt,
+			RequestTimestamp:      reqTs.UnixNano(),
+			Signature:             iidSig,
+		},
+		RegistrationTimestamp:       ts,
+		TransmissionRsaRegistrarSig: psig,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -334,11 +342,15 @@ func TestImpl_UnregisterTrackedID(t *testing.T) {
 
 	iidSig, err := notifications.SignIdentity(private, [][]byte{iid}, reqTs, notifications.RegisterTrackedIDTag, csprng.NewSystemRNG())
 
-	err = impl.RegisterTrackedID(&mixmessages.TrackedIntermediaryIdRequest{
-		TrackedIntermediaryID: [][]byte{iid},
-		TransmissionRsaPem:    crt,
-		RequestTimestamp:      reqTs.UnixNano(),
-		Signature:             iidSig,
+	err = impl.RegisterTrackedID(&mixmessages.RegisterTrackedIdRequest{
+		Request: &mixmessages.TrackedIntermediaryIdRequest{
+			TrackedIntermediaryID: [][]byte{iid},
+			TransmissionRsaPem:    crt,
+			RequestTimestamp:      reqTs.UnixNano(),
+			Signature:             iidSig,
+		},
+		RegistrationTimestamp:       ts,
+		TransmissionRsaRegistrarSig: psig,
 	})
 	if err != nil {
 		t.Fatal(err)

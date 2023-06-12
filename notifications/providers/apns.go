@@ -41,6 +41,11 @@ func NewApns(params APNSParams) (Provider, error) {
 		return nil, errors.Errorf("APNS not properly configured: %+v", params)
 	}
 
+	jww.INFO.Printf("Initializing APNS provider for %s (%s) with key ID %s", params.BundleID, params.Issuer, params.KeyID)
+	if params.Dev {
+		jww.WARN.Printf("APNS provider for %s running in dev mode", params.BundleID)
+	}
+
 	authKey, err := apnstoken.AuthKeyFromFile(params.KeyPath)
 	if err != nil {
 		return nil, errors.WithMessage(err, "Failed to load auth key from file")

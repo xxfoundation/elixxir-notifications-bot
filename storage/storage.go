@@ -43,7 +43,7 @@ func (s *Storage) RegisterToken(token, app string, transmissionRSA []byte) error
 				TransmissionRSAHash: transmissionRSAHash,
 				TransmissionRSA:     transmissionRSA,
 				Tokens: []Token{
-					{Token: token, TransmissionRSAHash: transmissionRSAHash},
+					{Token: token, TransmissionRSAHash: transmissionRSAHash, App: app},
 				},
 			}
 			return s.insertUser(u)
@@ -93,7 +93,18 @@ func (s *Storage) RegisterTrackedID(iidList [][]byte, transmissionRSA []byte, ep
 
 	u, err := s.GetUser(transmissionRSAHash)
 	if err != nil {
-		return errors.WithMessage(err, "Cannot register tracked ID to unregistered user")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			u = &User{
+				TransmissionRSAHash: transmissionRSAHash,
+				TransmissionRSA:     transmissionRSA,
+			}
+			err = s.insertUser(u)
+			if err != nil {
+				return errors.WithMessage(err, "Failed to register user")
+			}
+		} else {
+			return errors.WithMessage(err, "Failed to look up user")
+		}
 	}
 
 	var ids []Identity
@@ -211,7 +222,6 @@ func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephe
 		IntermediaryId: i.IntermediaryId,
 		EphemeralId:    eid.Int64(),
 		Epoch:          epoch,
-		Offset:         i.OffsetNum,
 	}
 	err = s.insertEphemeral(e)
 	if err != nil {
@@ -227,7 +237,6 @@ func (s *Storage) AddLatestEphemeral(i *Identity, epoch int32, size uint) (*Ephe
 			IntermediaryId: i.IntermediaryId,
 			EphemeralId:    eid2.Int64(),
 			Epoch:          epoch + 1,
-			Offset:         i.OffsetNum,
 		}
 		fmt.Printf("Adding ephemeral: %+v\n", e)
 		err = s.insertEphemeral(e)
@@ -257,7 +266,6 @@ func (s *Storage) AddEphemeralsForOffset(offset int64, epoch int32, size uint, t
 			IntermediaryId: i.IntermediaryId,
 			EphemeralId:    eid.Int64(),
 			Epoch:          epoch,
-			Offset:         offset,
 		})
 		if err != nil {
 			return errors.WithMessage(err, "Failed to insert ephemeral ID for user")
