@@ -60,25 +60,37 @@ func (nb *Impl) RegisterToken(msg *pb.RegisterTokenRequest) error {
 // Returns an error if TransmissionRSA is not registered with a valid token.
 // The actual ID is not revealed, instead an intermediary value is sent which cannot
 // be revered to get the ID, but is repeatable. So it can be rainbow-tabled.
-func (nb *Impl) RegisterTrackedID(msg *pb.TrackedIntermediaryIdRequest) error {
+func (nb *Impl) RegisterTrackedID(msg *pb.RegisterTrackedIdRequest) error {
 	jww.INFO.Println("RegisterTrackedID")
-	requestTimestamp := time.Unix(0, msg.RequestTimestamp)
+	requestTimestamp := time.Unix(0, msg.Request.RequestTimestamp)
 	if time.Now().Sub(requestTimestamp) > time.Second*5 {
 		return errors.Errorf(timestampError, requestTimestamp.String(), time.Now().String())
 	}
 
-	pub, err := rsa.GetScheme().UnmarshalPublicKeyPEM(msg.TransmissionRsaPem)
+	// Verify permissioning RSA signature
+	permHost, ok := nb.Comms.GetHost(&id.Permissioning)
+	if !ok {
+		return errors.New("Could not find permissioning host to verify client signature")
+	}
+	jww.INFO.Printf("Verifying perm sig with params:\n\tPubKey: %s\n\tTimestamp: %d\n\tTRSA: %s\n\tSIG: %s\n", base64.StdEncoding.EncodeToString(permHost.GetPubKey().Bytes()), msg.RegistrationTimestamp, base64.StdEncoding.EncodeToString(msg.Request.TransmissionRsaPem), base64.StdEncoding.EncodeToString(msg.TransmissionRsaRegistrarSig))
+	err := registration.VerifyWithTimestamp(permHost.GetPubKey(), msg.RegistrationTimestamp,
+		string(msg.Request.TransmissionRsaPem), msg.TransmissionRsaRegistrarSig)
+	if err != nil {
+		return errors.WithMessage(err, "Failed to verify permissioning signature")
+	}
+
+	pub, err := rsa.GetScheme().UnmarshalPublicKeyPEM(msg.Request.TransmissionRsaPem)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to unmarshal public key")
 	}
 
-	err = notifications.VerifyIdentity(pub, msg.TrackedIntermediaryID, requestTimestamp, notifications.RegisterTrackedIDTag, msg.Signature)
+	err = notifications.VerifyIdentity(pub, msg.Request.TrackedIntermediaryID, requestTimestamp, notifications.RegisterTrackedIDTag, msg.Request.Signature)
 	if err != nil {
 		return errors.WithMessage(err, "Failed to verify identity signature")
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
 
-	return nb.Storage.RegisterTrackedID(msg.TrackedIntermediaryID, msg.TransmissionRsaPem, epoch, nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)
+	return nb.Storage.RegisterTrackedID(msg.Request.TrackedIntermediaryID, msg.Request.TransmissionRsaPem, epoch, nb.inst.GetPartialNdf().Get().AddressSpace[0].Size)
 }
 
 // UnregisterToken unregisters the given device token. The request is signed.

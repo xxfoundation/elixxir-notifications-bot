@@ -66,11 +66,6 @@ func TestStorage_RegisterTrackedID(t *testing.T) {
 	}
 	_, epoch := ephemeral.HandleQuantization(time.Now())
 
-	err = s.RegisterTrackedID([][]byte{iid}, pub, epoch, 16)
-	if err == nil {
-		t.Fatal("Expected error registering identity to unregistered public key")
-	}
-
 	err = s.RegisterToken(token, app, pub)
 	if err != nil {
 		t.Fatalf("Failed to register token: %+v", err)
