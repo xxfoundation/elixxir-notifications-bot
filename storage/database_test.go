@@ -225,11 +225,3 @@ func TestDatabase(t *testing.T) {
 	}
 
 }
-
-func TestGtn(t *testing.T) {
-	s, err := NewStorage("jonahhusson", "", "cmix", "0.0.0.0", "5432")
-	if err != nil {
-		t.Fatal(err)
-	}
-	s.GetToNotify([]int64{88364, 126817})
-}
