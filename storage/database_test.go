@@ -31,6 +31,13 @@ func TestDatabase(t *testing.T) {
 	}
 	toNotify = append(toNotify, eph.Int64())
 
+	hangingUser1 := []byte("hanginguser")
+
+	err = s.RegisterTrackedID([][]byte{iid1}, hangingUser1, epoch, addressSpace)
+	if err != nil {
+		t.Fatal("Error adding hanging user")
+	}
+
 	trsa := []byte("trsa")
 	token1 := "apnstoken01"
 	token2 := "fcm:token02"
@@ -217,4 +224,12 @@ func TestDatabase(t *testing.T) {
 		t.Fatalf("Got wrong gtnlist: %+v", gtnList)
 	}
 
+}
+
+func TestGtn(t *testing.T) {
+	s, err := NewStorage("jonahhusson", "", "cmix", "0.0.0.0", "5432")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.GetToNotify([]int64{88364, 126817})
 }
