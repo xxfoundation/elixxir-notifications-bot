@@ -10,6 +10,7 @@ package notifications
 import (
 	"fmt"
 	jww "github.com/spf13/jwalterweatherman"
+	"gitlab.com/elixxir/notifications-bot/constants"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
@@ -33,7 +34,7 @@ func TestImpl_InitDeleter(t *testing.T) {
 	impl := &Impl{
 		Storage: s,
 	}
-	uid := id.NewIdFromString("zezima", id.User, t)
+	uid := id.NewIdFromString("deleter_zezima", id.User, t)
 	iid, err := ephemeral.GetIntermediaryId(uid)
 	if err != nil {
 		t.Errorf("Failed to get intermediary ephemeral id: %+v", err)
@@ -41,15 +42,13 @@ func TestImpl_InitDeleter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token")
+	_, epoch := ephemeral.HandleQuantization(time.Now().Add(-30 * time.Hour))
+	_, err = s.RegisterForNotifications(iid, []byte("trsa"), "token", constants.MessengerIOS.String(), epoch, 16)
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
-	_, epoch := ephemeral.HandleQuantization(time.Now().Add(-30 * time.Hour))
-	e, err := s.AddLatestEphemeral(u, epoch, 16)
-	if err != nil {
-		t.Errorf("Failed to add latest ephemeral for user: %+v", err)
-	}
+
+	e, err := s.GetLatestEphemeral()
 	elist, err := s.GetEphemeral(e.EphemeralId)
 	if err != nil {
 		t.Errorf("Failed to get latest ephemeral for user: %+v", err)
@@ -58,7 +57,7 @@ func TestImpl_InitDeleter(t *testing.T) {
 		t.Error("Did not receive ephemeral for user")
 	}
 	impl.initDeleter()
-	time.Sleep(time.Second * 5)
+	time.Sleep(time.Second * 10)
 	elist, err = s.GetEphemeral(e.EphemeralId)
 	if err == nil {
 		t.Errorf("Ephemeral should have been deleted, did not receive error: %+v", e)
@@ -92,11 +91,17 @@ func TestImpl_InitCreator(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not parse precanned time: %v", err.Error())
 	}
-	u, err := s.AddUser(iid, []byte("trsa"), []byte("Sig"), "token")
+	_, epoch := ephemeral.HandleQuantization(time.Now())
+	u, err := s.RegisterForNotifications(iid, []byte("trsa"), "token", constants.MessengerIOS.String(), epoch, 16)
 	if err != nil {
 		t.Errorf("Failed to add user to storage: %+v", err)
 	}
-	fmt.Println(u.OffsetNum)
+
+	u, err = s.GetUser(u.TransmissionRSAHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(u.Identities[0].OffsetNum)
 	impl.initCreator()
 	e, err := s.GetLatestEphemeral()
 	if err != nil {

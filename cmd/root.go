@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 	"gitlab.com/elixxir/comms/mixmessages"
 	"gitlab.com/elixxir/notifications-bot/notifications"
+	"gitlab.com/elixxir/notifications-bot/notifications/providers"
 	"gitlab.com/elixxir/notifications-bot/storage"
 	"gitlab.com/xx_network/comms/connect"
 	"gitlab.com/xx_network/primitives/id"
@@ -66,9 +67,27 @@ var rootCmd = &cobra.Command{
 			jww.FATAL.Panicf("Unable to expand credentials path: %+v", err)
 		}
 
+		havenFbCreds, err := utils.ExpandPath(viper.GetString("havenFirebaseCredentialsPath"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand haven credentials path: %+v", err)
+		}
+
 		apnsKeyPath, err := utils.ExpandPath(viper.GetString("apnsKeyPath"))
 		if err != nil {
 			jww.FATAL.Panicf("Unable to expand apns key path: %+v", err)
+		}
+		havenApnsKeyPath, err := utils.ExpandPath(viper.GetString("havenApnsKeyPath"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand apns key path: %+v", err)
+		}
+
+		httpsCertPath, err := utils.ExpandPath(viper.GetString("httpsCert"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand https key path: %+v", err)
+		}
+		httpsKeyPath, err := utils.ExpandPath(viper.GetString("httpsKey"))
+		if err != nil {
+			jww.FATAL.Panicf("Unable to expand https cert path: %+v", err)
 		}
 		viper.SetDefault("notificationRate", 30)
 		viper.SetDefault("notificationsPerBatch", 20)
@@ -83,13 +102,23 @@ var rootCmd = &cobra.Command{
 			NotificationRate:       viper.GetInt("notificationRate"),
 			NotificationsPerBatch:  viper.GetInt("notificationsPerBatch"),
 			MaxNotificationPayload: viper.GetInt("maxNotificationPayload"),
-			APNS: notifications.APNSParams{
+			APNS: providers.APNSParams{
 				KeyPath:  apnsKeyPath,
 				KeyID:    viper.GetString("apnsKeyID"),
 				Issuer:   viper.GetString("apnsIssuer"),
 				BundleID: viper.GetString("apnsBundleID"),
 				Dev:      viper.GetBool("apnsDev"),
 			},
+			HavenAPNS: providers.APNSParams{
+				KeyPath:  havenApnsKeyPath,
+				KeyID:    viper.GetString("havenApnsKeyID"),
+				Issuer:   viper.GetString("havenApnsIssuer"),
+				BundleID: viper.GetString("havenApnsBundleID"),
+				Dev:      viper.GetBool("havenApnsDev"),
+			},
+			HavenFBCreds:  havenFbCreds,
+			HttpsCertPath: httpsCertPath,
+			HttpsKeyPath:  httpsKeyPath,
 		}
 
 		rawAddr := viper.GetString("dbAddress")
