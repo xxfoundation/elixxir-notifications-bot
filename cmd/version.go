@@ -1,7 +1,8 @@
 ////////////////////////////////////////////////////////////////////////////////
-// Copyright © 2018 Privategrity Corporation                                   /
-//                                                                             /
-// All rights reserved.                                                        /
+// Copyright © 2022 xx foundation                                             //
+//                                                                            //
+// Use of this source code is governed by a license that can be found in the  //
+// LICENSE file.                                                              //
 ////////////////////////////////////////////////////////////////////////////////
 
 // Handles command-line version functionality
@@ -15,7 +16,7 @@ import (
 )
 
 // Change this value to set the version for this build
-const currentVersion = "2.2.0"
+const currentVersion = "2.3.0"
 
 func printVersion() {
 	fmt.Printf("Elixxir Notifications Server v%s -- %s\n\n", SEMVER, GITVERSION)
